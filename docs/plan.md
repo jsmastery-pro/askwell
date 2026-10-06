@@ -36,7 +36,7 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 |---|---|---|---|---|---|
 | P0-T01 | Monorepo + tooling | Bob | — | done | #2 |
 | P0-T02 | Next.js app | Bob | P0-T01 | done | #6 |
-| P0-T03 | Docker + env + first deploy | Bob | P0-T02 | todo | — |
+| P0-T03 | Docker + env + first deploy | Bob | P0-T02 | done | #10 |
 
 ---
 
