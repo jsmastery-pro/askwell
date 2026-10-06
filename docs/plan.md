@@ -53,7 +53,16 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 **Done when:** migrations run on `main`; a new user signs up and lands on an empty dashboard; the landing page is live.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P1-T01 | DB schema + migration | Bob | — | todo | — |
+| P1-T02 | getOwnedProject helper | Bob | P1-T01 | todo | — |
+| P1-T03 | Shared API contract + plan limits | Bob | — | todo | — |
+| P1-T04 | Landing page (static) | Alice | — | todo | — |
+| P1-T05 | Clerk auth pages + middleware | Alice | — | todo | — |
+| P1-T06 | Dashboard shell + account row | Alice | P1-T01, P1-T05 | todo | — |
 
 ---
 
