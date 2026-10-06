@@ -30,7 +30,13 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 **Done when:** the app's home page loads from the InstaCloud `main` URL.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P0-T01 | Monorepo + tooling | Bob | — | todo | — |
+| P0-T02 | Next.js app | Bob | P0-T01 | todo | — |
+| P0-T03 | Docker + env + first deploy | Bob | P0-T02 | todo | — |
 
 ---
 
