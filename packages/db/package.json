@@ -24,5 +24,9 @@
     "eslint": "catalog:",
     "@types/pg": "catalog:",
     "@types/node": "catalog:"
+  },
+  "exports": {
+    ".": "./schema/index.ts",
+    "./client": "./client.ts"
   }
 }
