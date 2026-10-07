@@ -51,7 +51,8 @@ export const widgetChatResponseSchema = z.object({
 });
 export type WidgetChatResponse = z.infer<typeof widgetChatResponseSchema>;
 
-// PATCH /api/projects/:id/config — Pro only (402 on Free). null resets a field to its default.
+// PATCH /api/projects/:id/config — Pro only (402 on Free). Send only the fields to change.
+// null resets buttonColor, label or headerText to its default; the other fields reject null.
 export const updateWidgetConfigRequestSchema = z
   .object({
     buttonColor: hexColor.nullable(),
