@@ -5,13 +5,14 @@
 | Owner | Bob |
 | Lane | A |
 | Needs first | P2-T01 |
-| Files allowed | `apps/web/app/api/widget/config/**`, `apps/web/lib/rate-limit/**`, `apps/web/lib/widget-config/**` |
+| Files allowed | `apps/web/app/api/widget/config/**`, `apps/web/lib/rate-limit/**`, `apps/web/lib/widget-config/**`, `apps/web/package.json`, `apps/web/next.config.ts`, `pnpm-lock.yaml` |
 | project.md | §8 API routes (Public), §6.5 Widget, §5 Plans, §9 Security rules (Public key abuse, Cost abuse, CORS) |
 
 ## Goal
 A public, rate-limited `GET /api/widget/config?key=pk_...` that returns the plan-applied widget config to any origin.
 
 ## Steps
+0. Wire the web app to the db: add `@askwell/db` (`workspace:*`) to `apps/web/package.json` and to `transpilePackages` in `next.config.ts`.
 1. `apps/web/lib/widget-config`: `getWidgetConfigByKey(key)` → resolves the project by `public_key` only, loads its config and the owner's plan, returns `applyPlanToConfig(...)` or `null`.
 2. `apps/web/lib/rate-limit`: `checkRateLimit(key, limit)` on the `rate_limits` table (key = public key + IP). One atomic upsert per call; reset the window in place when it expires.
 3. Route: validate `key` with zod; rate limit; unknown key → `404`; over limit → `429`; success → `200` with the config.
@@ -29,4 +30,6 @@ A public, rate-limited `GET /api/widget/config?key=pk_...` that returns the plan
 - The public key identifies a project. It grants nothing else — never return owner ID, project name, or usage.
 - `getWidgetConfigByKey` is also used by `/embed` (P2-T06). Keep its signature stable once merged.
 - `checkRateLimit` will be reused by the chat route in Phase 3. Keep it generic.
+- Route tests may use PGlite (in-memory Postgres) as in P1-T02. Add its dev dependencies to `apps/web`.
+- Dependency edits in `apps/web/package.json` / `pnpm-lock.yaml` may overlap with another open PR. If yours merges second: `git merge origin/main`, keep both sides' entries, run `pnpm install`, re-run checks. No force-push.
 - Get the client IP from the platform's forwarded header; fall back to a fixed string rather than skipping the limit.
