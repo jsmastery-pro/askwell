@@ -79,7 +79,17 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 **Done when:** create a project → copy the snippet → a plain HTML page on another origin shows the button → the panel opens and shows a mock reply.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P2-T01 | Shared widget contract additions | Bob | P1-T03 | todo | — |
+| P2-T02 | Projects API | Bob | P1-T02, P1-T06, P2-T01 | todo | — |
+| P2-T03 | Widget config route + rate limit | Bob | P2-T01 | todo | — |
+| P2-T04 | Projects dashboard + Install page | Bob | P2-T02 | todo | — |
+| P2-T05 | Widget loader script | Alice | P2-T01 | todo | — |
+| P2-T06 | Embed panel with mock replies | Alice | P2-T01 | todo | — |
+| P2-T07 | Serve widget.js, frame headers, cross-origin test | Alice | P2-T05, P2-T06 | todo | — |
 
 ---
 
