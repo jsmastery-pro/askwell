@@ -27,4 +27,4 @@ The web app serves `/widget.js`, only `/embed` can be framed by other sites, and
 ## Notes
 - This is the Phase 2 "Done when". Put a screenshot or short clip in the PR.
 - The end-to-end check needs a real key, so it needs P2-T02 and P2-T03 merged. Steps 1, 2, 4 don't.
-- Don't change Clerk middleware behaviour; if `/embed` or `/widget.js` gets caught by auth, stop and ask.
+- Don't change Clerk auth in `apps/web/proxy.ts` (Next 16's `middleware.ts`); if `/embed` or `/widget.js` gets caught by auth, stop and ask.

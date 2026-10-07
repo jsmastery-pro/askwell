@@ -5,7 +5,7 @@
 | Owner | Alice |
 | Lane | B |
 | Needs first | none |
-| Files allowed | `apps/web/middleware.ts`, `apps/web/app/(auth)/**`, `apps/web/app/layout.tsx`, `apps/web/package.json`, `pnpm-lock.yaml`, `apps/web/components/landing/Pricing.tsx`, `apps/web/components/landing/LiveDemoPlaceholder.tsx` |
+| Files allowed | `apps/web/proxy.ts` (Next 16 name for `middleware.ts`), `apps/web/app/(auth)/**`, `apps/web/app/layout.tsx`, `apps/web/package.json`, `pnpm-lock.yaml`, `apps/web/components/landing/Pricing.tsx`, `apps/web/components/landing/LiveDemoPlaceholder.tsx` |
 | project.md | §6.2 Auth, §5 Plans |
 
 ## Goal
