@@ -23,10 +23,13 @@
     "vitest": "catalog:",
     "eslint": "catalog:",
     "@types/pg": "catalog:",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "@electric-sql/pglite": "catalog:",
+    "@electric-sql/pglite-pgvector": "catalog:"
   },
   "exports": {
     ".": "./schema/index.ts",
-    "./client": "./client.ts"
+    "./client": "./client.ts",
+    "./queries": "./queries/index.ts"
   }
 }
