@@ -1,32 +1,48 @@
-import { APP_NAME } from "@askwell/shared";
-import { Container } from "../Container";
+import { BrowserFrame } from "./BrowserFrame";
+import { ChatTranscript } from "./ChatTranscript";
+import { FONT_DISPLAY } from "./fonts";
+import { Section } from "./Section";
 
 export function LiveDemoPlaceholder() {
   return (
-    <section className="border-t border-slate-800 py-24">
-      <Container>
-        <h2 className="text-center text-3xl font-bold">See it in action</h2>
-        <p className="mx-auto mt-4 max-w-xl text-center text-slate-400">
-          The live {APP_NAME} widget runs right here on launch. For now, here&apos;s a preview.
-        </p>
-        <div className="mx-auto mt-12 max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <span className="text-sm font-semibold">{APP_NAME} assistant</span>
-            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
-          </div>
-          <div className="mt-3 space-y-2">
-            <div className="max-w-[80%] rounded-xl rounded-tl-none bg-slate-800 px-3 py-2 text-sm text-slate-300">
-              Hi! Ask me anything about this product.
-            </div>
-            <div className="ml-auto max-w-[80%] rounded-xl rounded-tr-none bg-slate-50 px-3 py-2 text-sm text-slate-950">
-              What does the Pro plan include?
-            </div>
-            <div className="max-w-[80%] rounded-xl rounded-tl-none bg-slate-800 px-3 py-2 text-sm text-slate-300">
-              5 projects, 2,000 messages a month, and full widget customization.
-            </div>
-          </div>
+    <section className="bg-[#EEF1F6] py-24">
+      <Section className="grid grid-cols-1 items-center gap-16 lg:grid-cols-[1fr_1.05fr]">
+        <BrowserFrame url="acme.com">
+          <ChatTranscript
+            title="Acme Analytics"
+            messages={[
+              { from: "bot", text: "Hi! Ask me anything about Acme Analytics." },
+              { from: "visitor", text: "What's the difference between Free and Pro?" },
+              {
+                from: "bot",
+                text: "Free includes 1 project and 100 messages a month. Pro includes 5 projects, 2,000 messages, and full widget customization.",
+              },
+              { from: "visitor", text: "Can I use my own domain for checkout?" },
+              {
+                from: "bot",
+                text: "I don't know — that's outside what's in my docs. You can ask the Acme team directly.",
+              },
+            ]}
+          />
+        </BrowserFrame>
+        <div>
+          <h2 className="text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+            See it answer a real question.
+          </h2>
+          <p className="mt-4 max-w-md text-[#70788D]">
+            This is the exact widget your visitors will use — opened here so you can see the full
+            exchange, including what happens when the answer isn&apos;t in your docs.
+          </p>
+          <ul className="mt-8 space-y-4">
+            <li className="border-l-2 border-[#F2A33C] pl-4 text-sm text-[#161A24]">
+              Scoped to one project&apos;s content only.
+            </li>
+            <li className="border-l-2 border-[#F2A33C] pl-4 text-sm text-[#161A24]">
+              Answers &quot;I don&apos;t know&quot; instead of guessing.
+            </li>
+          </ul>
         </div>
-      </Container>
+      </Section>
     </section>
   );
 }
