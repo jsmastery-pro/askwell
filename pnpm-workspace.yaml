@@ -29,4 +29,6 @@ catalog:
   pg: ^8.23.1
   "@types/pg": ^8.23.1
   "@types/node": ^22.20.5
+  "@electric-sql/pglite": ^0.5.8
+  "@electric-sql/pglite-pgvector": ^0.0.9
   zod: ^4.6.5
