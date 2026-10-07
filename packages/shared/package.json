@@ -11,6 +11,9 @@
     "test": "vitest run",
     "build": "tsc --noEmit"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "typescript": "catalog:",
     "vitest": "catalog:",
