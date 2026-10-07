@@ -6,3 +6,6 @@ export * from "./projects";
 export * from "./knowledge";
 export * from "./conversations";
 export * from "./billing";
+export * from "./widget-plan";
+export * from "./widget-messages";
+export * from "./rate-limits";
