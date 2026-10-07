@@ -58,9 +58,9 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | P1-T01 | DB schema + migration | Bob | — | done | #3, #4 |
-| P1-T02 | getOwnedProject helper | Bob | P1-T01 | todo | — |
-| P1-T03 | Shared API contract + plan limits | Bob | — | todo | — |
-| P1-T04 | Landing page (static) | Alice | — | todo | — |
+| P1-T02 | getOwnedProject helper | Bob | P1-T01 | done | #10 |
+| P1-T03 | Shared API contract + plan limits | Bob | — | done | #6 |
+| P1-T04 | Landing page (static) | Alice | — | done | #7, #11 |
 | P1-T05 | Clerk auth pages + middleware | Alice | — | todo | — |
 | P1-T06 | Dashboard shell + account row | Alice | P1-T01, P1-T05 | todo | — |
 

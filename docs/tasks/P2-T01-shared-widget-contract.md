@@ -9,11 +9,11 @@
 | project.md | §5 Plans, §6.5 Widget, §9 Security rules (postMessage, Plan bypass) |
 
 ## Goal
-Add the widget pieces both lanes import in Phase 2: default widget config, a pure helper that applies the plan to a config, the postMessage event types, and rate limit constants. Approved contract change — additive only.
+Add the widget pieces both lanes import in Phase 2 that P1-T03 didn't already provide: a pure helper that applies the plan to a config, the postMessage event types, and rate limit constants. Approved contract change — additive only.
 
 ## Steps
-1. `WIDGET_DEFAULTS`: default button color, position (`bottom-right`), label, animation (`fade`), header text, `showBadge: true`. Labels/header text may use `APP_NAME`.
-2. `applyPlanToConfig(stored, plan)`: pure function. `free` → returns `WIDGET_DEFAULTS` with `showBadge: true`, ignoring stored values. `pro` → stored values, with `null` text fields falling back to `WIDGET_DEFAULTS`. Output type is the widget config response type from P1-T03.
+1. Defaults already exist: reuse `DEFAULT_WIDGET_CONFIG` and `WidgetConfig` from P1-T03 (`src/widget.ts`). Don't add a second defaults constant or config type.
+2. `applyPlanToConfig(stored, plan)`: pure function. `free` → returns `DEFAULT_WIDGET_CONFIG` (badge on), ignoring stored values. `pro` → stored values, with `null` text fields falling back to `DEFAULT_WIDGET_CONFIG`. Returns `WidgetConfig`.
 3. postMessage types: a discriminated union for panel → loader (`close`, `resize`, `unread`) and loader → panel if needed. Include a type guard that validates an unknown `event.data`.
 4. `RATE_LIMITS`: per key+IP window for public routes. Start with `{ windowSeconds: 60, max: 60 }` for config; leave room for chat in Phase 3.
 5. Export everything from the existing entry point.

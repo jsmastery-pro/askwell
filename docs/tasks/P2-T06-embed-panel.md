@@ -28,6 +28,6 @@ The `/embed?key=...` page inside the iframe: header, message list, input, typing
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
-- Until P2-T03 merges, use a local fixture built from `WIDGET_DEFAULTS` inside `apps/web/app/embed/`; switch to `getWidgetConfigByKey` once it lands. Don't edit `apps/web/lib/widget-config`.
+- Until P2-T03 merges, use a local fixture from `DEFAULT_WIDGET_CONFIG` inside `apps/web/app/embed/`; switch to `getWidgetConfigByKey` once it lands. Don't edit `apps/web/lib/widget-config`.
 - Framing headers are P2-T07's job, not this task's.
 - Panel must not import Clerk or require sign-in.

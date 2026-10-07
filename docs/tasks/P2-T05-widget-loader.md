@@ -28,6 +28,6 @@
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
-- Until P2-T03 merges, mock the fetch with a fixture typed as the shared config response (from `WIDGET_DEFAULTS`). Don't define your own config type.
+- Until P2-T03 merges, mock the fetch with a fixture typed as `WidgetConfigResponse` (`{ config: DEFAULT_WIDGET_CONFIG }`). Don't define your own config type.
 - Keep the bundle small: no frameworks in the loader.
 - New dev deps (e.g. jsdom) are fine; name them in the PR body.
