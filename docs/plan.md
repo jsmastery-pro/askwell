@@ -108,7 +108,18 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 
 **Done when:** upload a PDF → ask about it on the plain HTML page → correct answer; an unrelated question → "I don't know"; the 21st message in a minute is refused.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P3-T01 | AI + shared foundations | Bob | P2-T03 | todo | — |
+| P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | todo | — |
+| P3-T03 | Delete source + Knowledge page | Bob | P3-T02, P2-T04 | todo | — |
+| P3-T04 | Chunk search + seed script | Alice | P3-T01 | todo | — |
+| P3-T05 | Chat route | Alice | P3-T04, P2-T03 | todo | — |
+| P3-T06 | Connect the panel to chat | Alice | P3-T05, P2-T06 | todo | — |
+
+PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-08.
 
 ---
 
