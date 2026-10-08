@@ -28,7 +28,7 @@ let ip = 0;
 function get(key: string | null, clientIp = `10.0.0.${++ip}`) {
   const url = new URL("https://app.test/api/widget/config");
   if (key !== null) url.searchParams.set("key", key);
-  return GET(new Request(url, { headers: { Origin: "https://example.com", "x-real-ip": clientIp } }));
+  return GET(new Request(url, { headers: { Origin: "https://example.com", "cf-connecting-ip": clientIp } }));
 }
 
 describe("GET /api/widget/config", () => {
@@ -62,10 +62,11 @@ describe("GET /api/widget/config", () => {
 
   it("returns 429 past the limit, with Retry-After and CORS", async () => {
     const statuses = [];
-    for (let i = 0; i < RATE_LIMITS.widgetConfig.max + 1; i++) {
+    for (let i = 0; i < RATE_LIMITS.widgetConfig.max; i++) {
       statuses.push((await get("pk_pro", "10.9.9.9")).status);
     }
-    expect(statuses.slice(0, -1).every((s) => s === 200)).toBe(true);
+    expect(statuses.every((s) => s === 200)).toBe(true);
+    // Request max + 1: the first one over the limit.
     const res = await get("pk_pro", "10.9.9.9");
     expect(res.status).toBe(429);
     expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
