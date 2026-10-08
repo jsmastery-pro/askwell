@@ -41,7 +41,16 @@ describe("checkRateLimit", () => {
 });
 
 describe("getClientIp", () => {
-  it("prefers x-real-ip", () => {
+  it("prefers cf-connecting-ip, which InstaCloud's Cloudflare edge sets", () => {
+    const headers = new Headers({
+      "cf-connecting-ip": "103.0.0.1",
+      "x-real-ip": "1.1.1.1",
+      "x-forwarded-for": "162.158.9.143",
+    });
+    expect(getClientIp(headers)).toBe("103.0.0.1");
+  });
+
+  it("falls back to x-real-ip", () => {
     expect(getClientIp(new Headers({ "x-real-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2" }))).toBe("1.1.1.1");
   });
 

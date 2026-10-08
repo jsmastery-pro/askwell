@@ -41,13 +41,16 @@ export async function checkRateLimit(
 }
 
 /**
- * Client IP from the platform's proxy headers. Prefers x-real-ip, then the last
- * x-forwarded-for hop (appended by the proxy; earlier hops are client-supplied and
- * spoofable). Falls back to a fixed string so the limit is never skipped.
+ * Client IP from the platform's proxy headers. InstaCloud's edge is Cloudflare, which sets
+ * cf-connecting-ip to the real client and overwrites client-sent forwarding headers.
+ * Then x-real-ip, then the last x-forwarded-for hop (earlier hops are client-supplied).
+ * Falls back to a fixed string so the limit is never skipped.
  */
 export function getClientIp(headers: Headers): string {
-  const realIp = headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
+  for (const name of ["cf-connecting-ip", "x-real-ip"]) {
+    const ip = headers.get(name)?.trim();
+    if (ip) return ip;
+  }
   const lastHop = headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
   return lastHop || "unknown";
 }
