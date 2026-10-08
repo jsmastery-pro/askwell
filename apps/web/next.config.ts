@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
-  transpilePackages: ["@askwell/shared"],
+  transpilePackages: ["@askwell/shared", "@askwell/db"],
   agentRules: false,
 };
 
