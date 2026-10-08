@@ -1,27 +1,26 @@
+import { PLAN_LIMITS } from "@askwell/shared";
 import { describe, expect, it } from "vitest";
 import { PRICING_ROWS } from "./Pricing";
 
-describe("PRICING_ROWS", () => {
-  it("matches the plan limits from project.md section 5", () => {
-    const byFeature = Object.fromEntries(PRICING_ROWS.map((row) => [row.feature, row]));
+const row = (feature: string) => PRICING_ROWS.find((r) => r.feature === feature);
 
-    expect(byFeature["Projects"]).toEqual({
-      group: "Usage",
-      feature: "Projects",
-      free: "1",
-      pro: "5",
+describe("PRICING_ROWS", () => {
+  it("reads every usage limit from PLAN_LIMITS", () => {
+    expect(row("Projects")).toMatchObject({
+      free: String(PLAN_LIMITS.free.projects),
+      pro: String(PLAN_LIMITS.pro.projects),
     });
-    expect(byFeature["Messages / month (per project)"]).toEqual({
-      group: "Usage",
-      feature: "Messages / month (per project)",
-      free: "100",
-      pro: "2,000",
+    expect(row("Messages / month (per project)")).toMatchObject({
+      free: PLAN_LIMITS.free.messagesPerMonth.toLocaleString("en-US"),
+      pro: PLAN_LIMITS.pro.messagesPerMonth.toLocaleString("en-US"),
     });
-    expect(byFeature["Knowledge files (per project)"]).toEqual({
-      group: "Usage",
-      feature: "Knowledge files (per project)",
-      free: "3",
-      pro: "25",
+    expect(row("Knowledge files (per project)")).toMatchObject({
+      free: String(PLAN_LIMITS.free.knowledgeFilesPerProject),
+      pro: String(PLAN_LIMITS.pro.knowledgeFilesPerProject),
     });
+  });
+
+  it("formats thousands with a separator", () => {
+    expect(row("Messages / month (per project)")?.pro).toMatch(/^\d{1,3}(,\d{3})+$/);
   });
 });
