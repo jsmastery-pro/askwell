@@ -1,19 +1,28 @@
 import Link from "next/link";
+import { PLAN_LIMITS, type Plan } from "@askwell/shared";
 import { FONT_DISPLAY } from "./fonts";
 import { Section } from "./Section";
 
-// TODO: swap this for `PLAN_LIMITS` from "@askwell/shared" once P1-T03 lands.
+export const formatLimit = (n: number) => n.toLocaleString("en-US");
+
+type NumericLimit = "projects" | "messagesPerMonth" | "knowledgeFilesPerProject";
+
+const limitRow = (feature: string, key: NumericLimit) => {
+  const value = (plan: Plan) => formatLimit(PLAN_LIMITS[plan][key]);
+  return { group: "Usage", feature, free: value("free"), pro: value("pro") };
+};
+
 export const PRICING_ROWS = [
-  { group: "Usage", feature: "Projects", free: "1", pro: "5" },
-  { group: "Usage", feature: "Messages / month (per project)", free: "100", pro: "2,000" },
-  { group: "Usage", feature: "Knowledge files (per project)", free: "3", pro: "25" },
+  limitRow("Projects", "projects"),
+  limitRow("Messages / month (per project)", "messagesPerMonth"),
+  limitRow("Knowledge files (per project)", "knowledgeFilesPerProject"),
   { group: "Customization", feature: "Button color", free: "Default", pro: "Any" },
   { group: "Customization", feature: "Button position", free: "Bottom right", pro: "Any corner" },
   { group: "Customization", feature: "Button label", free: "Default", pro: "Custom" },
   { group: "Customization", feature: "Open animation", free: "Fade", pro: "Fade / slide / scale" },
   { group: "Customization", feature: "Header text", free: "Default", pro: "Custom" },
   { group: "Customization", feature: '"Powered by" badge', free: "Shown", pro: "Hidden" },
-] as const;
+];
 
 const GROUPS = ["Usage", "Customization"] as const;
 

@@ -1,6 +1,8 @@
+import { PLAN_LIMITS } from "@askwell/shared";
 import { BrowserFrame } from "./BrowserFrame";
 import { ChatTranscript } from "./ChatTranscript";
 import { FONT_DISPLAY } from "./fonts";
+import { formatLimit } from "./Pricing";
 import { Section } from "./Section";
 
 export function LiveDemoPlaceholder() {
@@ -15,7 +17,7 @@ export function LiveDemoPlaceholder() {
               { from: "visitor", text: "What's the difference between Free and Pro?" },
               {
                 from: "bot",
-                text: "Free includes 1 project and 100 messages a month. Pro includes 5 projects, 2,000 messages, and full widget customization.",
+                text: `Free includes ${PLAN_LIMITS.free.projects} project and ${formatLimit(PLAN_LIMITS.free.messagesPerMonth)} messages a month. Pro includes ${PLAN_LIMITS.pro.projects} projects, ${formatLimit(PLAN_LIMITS.pro.messagesPerMonth)} messages, and full widget customization.`,
               },
               { from: "visitor", text: "Can I use my own domain for checkout?" },
               {
