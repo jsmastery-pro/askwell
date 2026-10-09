@@ -16,7 +16,7 @@ The `/embed?key=...` page inside the iframe: header, message list, input, typing
 2. UI: header text, message list, input, typing state, "Powered by `APP_NAME`" badge when `showBadge`.
 3. Visitor ID: random ID in the iframe's `localStorage`, reused across visits. Wrap storage access in try/catch; fall back to an in-memory ID.
 4. Replies: one function, `getReply(message)`, in `apps/web/app/embed/` that waits briefly and returns a canned reply. Phase 3 swaps only this function for the chat route.
-5. Close button posts `close` to the parent using the `origin` query param as target origin. Never `*`. Post `unread` when a reply arrives.
+5. Close button **and the Escape key** post `close` to the parent (keydown inside the iframe never reaches the loader — from the #24 review) using the `origin` query param as target origin. Never `*`. Post `unread` when a reply arrives.
 6. Every visitor message and reply renders as text — no `dangerouslySetInnerHTML`.
 7. Tests: a message containing `<img src=x onerror=alert(1)>` renders as literal text; visitor ID is stable across reloads; badge hidden when `showBadge` is false.
 
@@ -25,6 +25,7 @@ The `/embed?key=...` page inside the iframe: header, message list, input, typing
 - [ ] HTML in messages renders as literal text
 - [ ] Visitor ID persists across reloads
 - [ ] `close` is posted to the exact parent origin, never `*`
+- [ ] Pressing Escape inside the panel closes it
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
