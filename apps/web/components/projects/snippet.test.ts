@@ -27,6 +27,11 @@ describe("resolveAppUrl", () => {
     expect(resolveAppUrl(headers, {})).toBe("https://bob.test");
   });
 
+  it("uses the first value when proxies send a list", () => {
+    const headers = new Headers({ "x-forwarded-host": "bob.test, internal:3000", "x-forwarded-proto": "https, http" });
+    expect(resolveAppUrl(headers, {})).toBe("https://bob.test");
+  });
+
   it("uses http for localhost", () => {
     expect(resolveAppUrl(new Headers({ host: "localhost:3000" }), {})).toBe("http://localhost:3000");
   });

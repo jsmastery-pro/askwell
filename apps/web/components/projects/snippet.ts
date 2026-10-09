@@ -12,7 +12,12 @@ export function buildInstallSnippet(appUrl: string, publicKey: string): string {
 export function resolveAppUrl(headers: Headers, env: Record<string, string | undefined> = process.env): string {
   const configured = env["NEXT_PUBLIC_APP_URL"]?.trim();
   if (configured) return configured;
-  const host = headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost:3000";
-  const proto = headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const host = firstValue(headers.get("x-forwarded-host")) ?? firstValue(headers.get("host")) ?? "localhost:3000";
+  const proto = firstValue(headers.get("x-forwarded-proto")) ?? (host.startsWith("localhost") ? "http" : "https");
   return `${proto}://${host}`;
+}
+
+// Proxy chains can send "a.com, b.com"; the first entry is the client-facing value.
+function firstValue(header: string | null): string | undefined {
+  return header?.split(",")[0]?.trim() || undefined;
 }
