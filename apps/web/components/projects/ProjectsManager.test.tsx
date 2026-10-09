@@ -59,6 +59,18 @@ describe("ProjectsManager", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
+  it("sends one request when create is submitted twice in the same tick", async () => {
+    render(<ProjectsManager initialProjects={[]} limit={5} />);
+    fetchMock.mockReturnValue(new Promise(() => {})); // never resolves: the first request stays in flight
+    fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "Docs bot" } });
+    const form = screen.getByRole("button", { name: "Create project" }).closest("form")!;
+    await act(async () => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("renames a project", async () => {
     render(<ProjectsManager initialProjects={[project()]} limit={5} />);
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));

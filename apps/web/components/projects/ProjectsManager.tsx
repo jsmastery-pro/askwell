@@ -8,7 +8,7 @@ import type {
 } from "@askwell/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "./styles";
 
 type Props = { initialProjects: Project[]; limit: number };
@@ -34,15 +34,28 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set synchronously, unlike `busy`, so a second submit in the same tick is ignored.
+  const inFlight = useRef(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  async function create(event: FormEvent) {
-    event.preventDefault();
+  async function run<T>(request: () => Promise<T>): Promise<T | undefined> {
+    if (inFlight.current) return undefined;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
-    const result = await send<CreateProjectResponse>("/api/projects", "POST", { name });
-    setBusy(false);
+    try {
+      return await request();
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    const result = await run(() => send<CreateProjectResponse>("/api/projects", "POST", { name }));
+    if (!result) return;
     if (!result.ok) return setError(result.message);
     setProjects((current) => [...current, result.data.project]);
     setName("");
@@ -51,10 +64,8 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
 
   async function rename(event: FormEvent, id: string) {
     event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const result = await send<UpdateProjectResponse>(`/api/projects/${id}`, "PATCH", { name: editName });
-    setBusy(false);
+    const result = await run(() => send<UpdateProjectResponse>(`/api/projects/${id}`, "PATCH", { name: editName }));
+    if (!result) return;
     if (!result.ok) return setError(result.message);
     setProjects((current) => current.map((p) => (p.id === id ? result.data.project : p)));
     setEditingId(null);
@@ -63,10 +74,8 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
 
   async function remove(project: Project) {
     if (!window.confirm(`Delete "${project.name}"? Its widget, knowledge and conversations are deleted too.`)) return;
-    setBusy(true);
-    setError(null);
-    const result = await send<{ ok: true }>(`/api/projects/${project.id}`, "DELETE");
-    setBusy(false);
+    const result = await run(() => send<{ ok: true }>(`/api/projects/${project.id}`, "DELETE"));
+    if (!result) return;
     if (!result.ok) return setError(result.message);
     setProjects((current) => current.filter((p) => p.id !== project.id));
     router.refresh();
