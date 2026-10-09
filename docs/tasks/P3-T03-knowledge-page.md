@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | A |
 | Needs first | P3-T02, P2-T04 |
-| Files allowed | `apps/web/app/api/knowledge/**`, `apps/web/app/dashboard/projects/[id]/knowledge/**`, `apps/web/components/knowledge/**`, `apps/web/lib/knowledge/**` |
+| Files allowed | `apps/web/app/api/knowledge/**`, `apps/web/app/dashboard/projects/[id]/knowledge/**`, `apps/web/components/knowledge/**`, `apps/web/lib/knowledge/**`, `apps/web/app/dashboard/page.tsx` |
 | project.md | §6.4 Knowledge, §8 API routes (Owner), §9 Security rules (Tenant leak, XSS) |
 
 ## Goal
@@ -17,7 +17,8 @@ Owners see their sources with status, add text or files, and delete a source alo
 3. `/dashboard/projects/[id]/knowledge`: list with status badges (`processing`, `ready`, `failed`), a paste-text form, a file upload, and delete with confirm. Poll or refresh while any source is `processing`.
 4. Show the plan-limit message on `403`.
 5. Add a "Knowledge" link from the project's pages.
-6. Tests: delete another owner's source → `404`; delete removes the storage object and chunks.
+6. Follow-up from #28: the Overview page (`app/dashboard/page.tsx`) still says "Creating a project is coming in the next update". Replace it with a link to `/dashboard/projects`.
+7. Tests: delete another owner's source → `404`; delete removes the storage object and chunks.
 
 ## Done when
 - [ ] Upload from the page → status goes `processing` → `ready` without a manual reload
