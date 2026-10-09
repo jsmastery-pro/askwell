@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { ERROR_CODES, type ApiError } from "@askwell/shared";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
@@ -8,10 +9,22 @@ const isProtectedRoute = createRouteMatcher([
   "/api/billing(.*)",
 ]);
 
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
+
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
+  if (!isProtectedRoute(req)) return;
+
+  // API callers get a JSON 401, not a redirect to the sign-in page.
+  if (isApiRoute(req)) {
+    const { userId } = await auth();
+    if (!userId) {
+      const body: ApiError = { error: { code: ERROR_CODES.unauthorized, message: "Sign in required." } };
+      return Response.json(body, { status: 401 });
+    }
+    return;
   }
+
+  await auth.protect();
 });
 
 export const config = {
