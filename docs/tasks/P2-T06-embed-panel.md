@@ -5,7 +5,7 @@
 | Owner | Alice |
 | Lane | B |
 | Needs first | P2-T01 (P2-T03 via mock) |
-| Files allowed | `apps/web/app/embed/**`, `apps/web/components/widget-panel/**` |
+| Files allowed | `apps/web/app/embed/**`, `apps/web/components/widget-panel/**`, `apps/widget/src/loader.ts`, `apps/widget/src/loader.test.ts` |
 | project.md | §6.5 Widget (Panel), §9 Security rules (XSS, postMessage) |
 
 ## Goal
@@ -18,7 +18,8 @@ The `/embed?key=...` page inside the iframe: header, message list, input, typing
 4. Replies: one function, `getReply(message)`, in `apps/web/app/embed/` that waits briefly and returns a canned reply. Phase 3 swaps only this function for the chat route.
 5. Close button **and the Escape key** post `close` to the parent (keydown inside the iframe never reaches the loader — from the #24 review) using the `origin` query param as target origin. Never `*`. Post `unread` when a reply arrives.
 6. Every visitor message and reply renders as text — no `dangerouslySetInnerHTML`.
-7. Tests: a message containing `<img src=x onerror=alert(1)>` renders as literal text; visitor ID is stable across reloads; badge hidden when `showBadge` is false.
+7. Carried over from P2-T05 (#24 merged before this was done): in `apps/widget/src/loader.ts`, check the config response by hand before rendering — `position` in `WIDGET_POSITIONS`, `animation` in `WIDGET_ANIMATIONS`, `buttonColor` matches `/^#[0-9a-f]{6}$/i`, `label` and `headerText` are strings. Anything else → render nothing. No zod (5 kB budget, §3). Add a loader test for a malformed 200 response.
+8. Tests: a message containing `<img src=x onerror=alert(1)>` renders as literal text; visitor ID is stable across reloads; badge hidden when `showBadge` is false.
 
 ## Done when
 - [ ] Sending a message shows the typing state, then the mock reply
@@ -26,6 +27,8 @@ The `/embed?key=...` page inside the iframe: header, message list, input, typing
 - [ ] Visitor ID persists across reloads
 - [ ] `close` is posted to the exact parent origin, never `*`
 - [ ] Pressing Escape inside the panel closes it
+- [ ] A 200 config response with a missing/invalid field renders nothing and throws nothing on the host page
+- [ ] `widget.js` stays under 5 kB
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
