@@ -4,6 +4,7 @@ import { SignOutButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { APP_NAME } from "@askwell/shared";
 import { FONT_BODY, FONT_DISPLAY, GOOGLE_FONTS_HREF } from "../../components/landing/fonts";
+import { NavLink } from "../../components/projects/NavLink";
 import { ensureAccount } from "./account";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2A33C]";
@@ -23,14 +24,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         >
           {APP_NAME}
         </Link>
-        <nav aria-label="Dashboard" className="md:mt-10 md:flex-1">
-          <Link
-            href="/dashboard"
-            aria-current="page"
-            className={`block rounded-md bg-white/10 px-3 py-2 text-sm font-medium text-white ${FOCUS}`}
-          >
+        <nav aria-label="Dashboard" className="flex gap-1 md:mt-10 md:flex-1 md:flex-col">
+          <NavLink href="/dashboard" exact>
             Overview
-          </Link>
+          </NavLink>
+          <NavLink href="/dashboard/projects">Projects</NavLink>
         </nav>
         <SignOutButton redirectUrl="/sign-in">
           <button
