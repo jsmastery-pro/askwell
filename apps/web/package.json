@@ -4,22 +4,24 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "pnpm copy-widget && next dev",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --ignore-pattern public/widget.js",
     "test": "vitest run",
-    "build": "next build"
+    "build": "pnpm copy-widget && next build",
+    "copy-widget": "node -e \"const fs=require('node:fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('../widget/dist/widget.js','public/widget.js')\""
   },
   "dependencies": {
     "@askwell/db": "workspace:*",
     "@askwell/shared": "workspace:*",
-    "drizzle-orm": "catalog:",
     "@clerk/nextjs": "^7.9.11",
+    "drizzle-orm": "catalog:",
     "next": "16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@askwell/widget": "workspace:*",
     "@electric-sql/pglite": "catalog:",
     "@electric-sql/pglite-pgvector": "catalog:",
     "@tailwindcss/postcss": "^4.3.3",
