@@ -10,9 +10,13 @@
     "build": "esbuild src/index.ts --bundle --outfile=dist/widget.js --format=iife --minify"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "vitest": "catalog:",
+    "esbuild": "catalog:",
     "eslint": "catalog:",
-    "esbuild": "catalog:"
+    "jsdom": "30.0.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@askwell/shared": "workspace:*"
   }
 }
