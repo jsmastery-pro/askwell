@@ -8,6 +8,7 @@ import {
   type PanelToLoaderMessage,
 } from "@askwell/shared/widget-messages";
 import { getReply } from "../../app/embed/reply";
+import { textColorOn } from "./contrast";
 import { getVisitorId } from "./visitor-id";
 
 type ChatMessage = { id: number; from: "visitor" | "bot"; text: string };
@@ -16,12 +17,6 @@ const CLOSE: PanelToLoaderMessage = { source: WIDGET_MESSAGE_SOURCE, type: "clos
 const GREETING: ChatMessage = { id: 0, from: "bot", text: "Hi! Ask me anything." };
 const FONT = { fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' };
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#161A24]";
-
-function textColorOn(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  const luminance = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  return luminance > 160 ? "#111" : "#fff";
-}
 
 export function Panel({ config, parentOrigin }: { config: WidgetConfig; parentOrigin: string | null }) {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
