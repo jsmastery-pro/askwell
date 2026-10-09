@@ -67,6 +67,29 @@ describe("mountWidget", () => {
     expect(document.querySelector("[data-askwell]")).toBeNull();
   });
 
+  it.each([
+    ["a missing config", {}],
+    ["a missing position", { config: { ...DEFAULT_WIDGET_CONFIG, position: undefined } }],
+    ["an unknown position", { config: { ...DEFAULT_WIDGET_CONFIG, position: "middle" } }],
+    ["an unknown animation", { config: { ...DEFAULT_WIDGET_CONFIG, animation: "spin" } }],
+    ["a non-hex color", { config: { ...DEFAULT_WIDGET_CONFIG, buttonColor: "red;position:static" } }],
+    ["a non-string label", { config: { ...DEFAULT_WIDGET_CONFIG, label: 42 } }],
+    ["a null body", null],
+  ])("renders nothing and doesn't throw for %s", async (_case, body) => {
+    document.body.innerHTML = "<p>host page</p>";
+    mockFetch(200, body);
+
+    expect(await mountWidget(scriptTag())).toBeNull();
+    expect(document.body.innerHTML).toBe("<p>host page</p>");
+  });
+
+  it("renders nothing for a non-JSON 200 response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>oops</html>", { status: 200 })));
+
+    expect(await mountWidget(scriptTag())).toBeNull();
+    expect(document.querySelector("[data-askwell]")).toBeNull();
+  });
+
   it("fetches the config from the script's own origin", async () => {
     const fetchMock = mockFetch(200);
     unmount = await mountWidget(scriptTag("pk_abc"));
