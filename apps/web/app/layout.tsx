@@ -1,4 +1,3 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { APP_NAME } from "@askwell/shared";
@@ -11,11 +10,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <ClerkProvider>
-          {children}
-        </ClerkProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
