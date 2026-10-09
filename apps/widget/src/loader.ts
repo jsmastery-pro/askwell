@@ -7,6 +7,21 @@ import {
 import { CSS } from "./styles";
 
 const MIN_PANEL_HEIGHT = 200;
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+// Mirrors WIDGET_POSITIONS / WIDGET_ANIMATIONS. Importing those pulls zod into the
+// bundle (they share a module with the schemas); `satisfies` fails typecheck if
+// the shared lists change and these don't.
+const POSITIONS = {
+  "bottom-right": true,
+  "bottom-left": true,
+  "top-right": true,
+  "top-left": true,
+} satisfies Record<WidgetConfig["position"], true>;
+const ANIMATIONS = { fade: true, slide: true, scale: true } satisfies Record<
+  WidgetConfig["animation"],
+  true
+>;
 const OPEN: LoaderToPanelMessage = { source: WIDGET_MESSAGE_SOURCE, type: "open" };
 
 export type Unmount = () => void;
@@ -31,11 +46,26 @@ async function fetchConfig(appOrigin: string, key: string): Promise<WidgetConfig
       credentials: "omit",
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as Partial<WidgetConfigResponse>;
-    return body.config ?? null;
+    const body = (await res.json()) as Partial<WidgetConfigResponse> | null;
+    return isRenderable(body?.config) ? body.config : null;
   } catch {
     return null;
   }
+}
+
+// Hand-rolled instead of the shared zod schema: zod would push the loader past
+// its 5 kB budget (project.md §3).
+function isRenderable(config: unknown): config is WidgetConfig {
+  if (typeof config !== "object" || config === null) return false;
+  const c = config as Record<string, unknown>;
+  return (
+    Object.hasOwn(POSITIONS, String(c.position)) &&
+    Object.hasOwn(ANIMATIONS, String(c.animation)) &&
+    typeof c.buttonColor === "string" &&
+    HEX_COLOR.test(c.buttonColor) &&
+    typeof c.label === "string" &&
+    typeof c.headerText === "string"
+  );
 }
 
 function bodyReady(doc: Document): Promise<void> {
