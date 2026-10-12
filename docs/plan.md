@@ -13,6 +13,8 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 **Status values:** `todo` · `in progress` · `in review` · `done` · `blocked`
 
+> **UI track (2026-10-12, product owner):** Alice builds every remaining screen first, with mock data where there's no backend yet. Bob is paused until then. See [`docs/ui-track.md`](ui-track.md). The phases below are unchanged. Their screen work is built in the UI track, and their tasks then wire the data.
+
 ---
 
 ## Phase 0 — Setup
