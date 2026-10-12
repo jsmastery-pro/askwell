@@ -112,7 +112,7 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| P3-T01 | AI + shared foundations | Bob | P2-T03 | todo | — |
+| P3-T01 | AI + shared foundations | Bob | P2-T03 | in review | #32 |
 | P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | todo | — |
 | P3-T03 | Delete source + Knowledge page | Bob | P3-T02, P2-T04 | todo | — |
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | todo | — |
