@@ -30,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               Overview
             </NavLink>
             <NavLink href="/dashboard/projects">Projects</NavLink>
+            <NavLink href="/dashboard/billing">Billing</NavLink>
           </nav>
           <SignOutButton redirectUrl="/sign-in">
             <button

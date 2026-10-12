@@ -148,10 +148,10 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Link
-                      href={`/dashboard/projects/${project.id}/install`}
+                      href={`/dashboard/projects/${project.id}`}
                       className={`rounded-md px-3 py-1.5 text-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
                     >
-                      Install
+                      Open
                     </Link>
                     <button
                       type="button"

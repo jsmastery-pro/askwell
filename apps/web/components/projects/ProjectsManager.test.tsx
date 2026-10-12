@@ -37,15 +37,15 @@ async function submitCreate(name: string) {
 }
 
 describe("ProjectsManager", () => {
-  it("creates a project and lists it with an Install link", async () => {
+  it("creates a project and lists it with a link to its page", async () => {
     render(<ProjectsManager initialProjects={[]} limit={1} />);
     respond(201, { project: project({ name: "Docs bot" }) });
     await submitCreate("Docs bot");
 
     expect(fetchMock).toHaveBeenCalledWith("/api/projects", expect.objectContaining({ method: "POST", body: '{"name":"Docs bot"}' }));
     expect(screen.getByText("Docs bot")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Install" }).getAttribute("href")).toBe(
-      `/dashboard/projects/${project().id}/install`,
+    expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe(
+      `/dashboard/projects/${project().id}`,
     );
     expect(screen.getByText("1 of 1 project used")).toBeTruthy();
   });
