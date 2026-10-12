@@ -91,7 +91,7 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 | P2-T04 | Projects dashboard + Install page | Bob | P2-T02 | done | #28 |
 | P2-T05 | Widget loader script | Alice | P2-T01 | done | #24, #27 |
 | P2-T06 | Embed panel with mock replies | Alice | P2-T01 | done | #29 |
-| P2-T07 | Serve widget.js, frame headers, cross-origin test | Alice | P2-T05, P2-T06 | todo | — |
+| P2-T07 | Serve widget.js, frame headers, cross-origin test | Alice | P2-T05, P2-T06 | done | #34 |
 
 ---
 
@@ -114,7 +114,7 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| P3-T01 | AI + shared foundations | Bob | P2-T03 | in review | #32 |
+| P3-T01 | AI + shared foundations | Bob | P2-T03 | done | #32 |
 | P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | todo | — |
 | P3-T03 | Delete source + Knowledge page | Bob | P3-T02, P2-T04 | todo | — |
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | todo | — |

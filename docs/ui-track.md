@@ -23,7 +23,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | todo | — |
+| UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | in progress | — |
 | UI-T02 | Knowledge screen | Alice | UI-T01 | todo | — |
 | UI-T03 | Conversations screens | Alice | UI-T01 | todo | — |
 | UI-T04 | Customize screen + live preview | Alice | UI-T01 | todo | — |
@@ -34,4 +34,4 @@ UI-T02 to UI-T05 all depend only on UI-T01. Alice does them one at a time, one P
 
 ## When the UI track is done
 
-Bob resumes. In order: P3-T01 (#32, ready), then Phase 3 Lane A, wiring the Knowledge screen to the real ingest/delete routes. Then the later phases, each replacing the matching `MOCK:` functions.
+Bob resumes. P3-T01 is already merged (#32), so he starts with Phase 3 Lane A, wiring the Knowledge screen to the real ingest/delete routes. Then the later phases, each replacing the matching `MOCK:` functions.
