@@ -260,6 +260,9 @@ importers:
         specifier: ^0.0.1
         version: 0.0.1
     devDependencies:
+      '@askwell/widget':
+        specifier: workspace:*
+        version: link:../widget
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.8

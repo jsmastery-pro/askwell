@@ -4,6 +4,7 @@ import {
   isPanelToLoaderMessage,
   type LoaderToPanelMessage,
 } from "@askwell/shared/widget-messages";
+import { textColorOn } from "./contrast";
 import { CSS } from "./styles";
 
 const MIN_PANEL_HEIGHT = 200;
@@ -73,12 +74,6 @@ function bodyReady(doc: Document): Promise<void> {
   return new Promise((resolve) =>
     doc.addEventListener("DOMContentLoaded", () => resolve(), { once: true }),
   );
-}
-
-function textColorOn(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  const luminance = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  return luminance > 160 ? "#111" : "#fff";
 }
 
 function render(

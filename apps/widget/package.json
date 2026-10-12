@@ -7,7 +7,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "build": "esbuild src/index.ts --bundle --outfile=dist/widget.js --format=iife --minify"
+    "build": "esbuild src/index.ts --bundle --outfile=dist/widget.js --format=iife --minify",
+    "test:page": "node test/serve.mjs"
   },
   "devDependencies": {
     "esbuild": "catalog:",

@@ -3,7 +3,12 @@
   "agentGuidance": false,
   "tasks": {
     "build": {
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"]
+    },
+    "@askwell/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "public/widget.js"]
     },
     "typecheck": {
       "outputs": []
@@ -15,6 +20,7 @@
       "outputs": []
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

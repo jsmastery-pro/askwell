@@ -9,7 +9,7 @@ WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN mkdir -p apps/web/public
-RUN pnpm --filter @askwell/web build
+RUN pnpm --filter @askwell/widget build && pnpm --filter @askwell/web build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
