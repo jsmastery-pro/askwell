@@ -15,6 +15,7 @@ const project = (overrides: Partial<Project> = {}): Project => ({
   ...overrides,
 });
 
+const NOW = "2026-10-20T12:00:00.000Z";
 const fetchMock = vi.fn();
 const respond = (status: number, body: unknown) =>
   fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(body), { status }));
@@ -38,7 +39,7 @@ async function submitCreate(name: string) {
 
 describe("ProjectsManager", () => {
   it("creates a project and lists it with a link to its page", async () => {
-    render(<ProjectsManager initialProjects={[]} plan="free" limit={1} messagesLimit={100} />);
+    render(<ProjectsManager initialProjects={[]} plan="free" limit={1} messagesLimit={100} resetsAt={{}} now={NOW} />);
     respond(201, { project: project({ name: "Docs bot" }) });
     await submitCreate("Docs bot");
 
@@ -56,6 +57,8 @@ describe("ProjectsManager", () => {
         plan="pro"
         limit={5}
         messagesLimit={2000}
+        resetsAt={{}}
+        now={NOW}
       />,
     );
 
@@ -66,24 +69,43 @@ describe("ProjectsManager", () => {
     expect(screen.getByRole("meter", { name: "Docs: messages used this month" }).getAttribute("aria-valuenow")).toBe("0");
   });
 
+  it("shows 0 for a project whose period has ended, before the count is reset", () => {
+    const ended = project({ name: "Ended", messagesUsed: 100 });
+    const current = project({ id: "22222222-2222-4222-8222-222222222222", name: "Current", messagesUsed: 40 });
+    render(
+      <ProjectsManager
+        initialProjects={[ended, current]}
+        plan="free"
+        limit={5}
+        messagesLimit={100}
+        resetsAt={{ [ended.id]: "2026-10-01T00:00:00.000Z", [current.id]: "2026-11-01T00:00:00.000Z" }}
+        now={NOW}
+      />,
+    );
+
+    expect(screen.getByRole("meter", { name: "Ended: messages used this month" }).getAttribute("aria-valuenow")).toBe("0");
+    expect(screen.getByText("0 of 100 messages this month")).toBeTruthy();
+    expect(screen.getByRole("meter", { name: "Current: messages used this month" }).getAttribute("aria-valuenow")).toBe("40");
+  });
+
   it("offers an upgrade on Free once the project limit is reached", () => {
-    render(<ProjectsManager initialProjects={[project()]} plan="free" limit={1} messagesLimit={100} />);
+    render(<ProjectsManager initialProjects={[project()]} plan="free" limit={1} messagesLimit={100} resetsAt={{}} now={NOW} />);
     expect(screen.getByRole("link", { name: "Upgrade to Pro" }).getAttribute("href")).toBe("/dashboard/billing");
   });
 
   it("doesn't offer an upgrade below the limit, or on Pro", () => {
-    render(<ProjectsManager initialProjects={[]} plan="free" limit={1} messagesLimit={100} />);
+    render(<ProjectsManager initialProjects={[]} plan="free" limit={1} messagesLimit={100} resetsAt={{}} now={NOW} />);
     expect(screen.queryByRole("link", { name: "Upgrade to Pro" })).toBeNull();
     cleanup();
 
     const five = Array.from({ length: 5 }, (_, i) => project({ id: `${i}1111111-1111-4111-8111-111111111111`, name: `P${i}` }));
-    render(<ProjectsManager initialProjects={five} plan="pro" limit={5} messagesLimit={2000} />);
+    render(<ProjectsManager initialProjects={five} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />);
     expect(screen.getByText("5 of 5 projects used")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Upgrade to Pro" })).toBeNull();
   });
 
   it("shows the plan-limit message when create returns 403", async () => {
-    render(<ProjectsManager initialProjects={[project()]} plan="free" limit={1} messagesLimit={100} />);
+    render(<ProjectsManager initialProjects={[project()]} plan="free" limit={1} messagesLimit={100} resetsAt={{}} now={NOW} />);
     respond(403, { error: { code: "plan_limit", message: "Your plan allows 1 project. Upgrade to add more." } });
     await submitCreate("Second");
 
@@ -92,7 +114,7 @@ describe("ProjectsManager", () => {
   });
 
   it("sends one request when create is submitted twice in the same tick", async () => {
-    render(<ProjectsManager initialProjects={[]} plan="pro" limit={5} messagesLimit={2000} />);
+    render(<ProjectsManager initialProjects={[]} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />);
     fetchMock.mockReturnValue(new Promise(() => {})); // never resolves: the first request stays in flight
     fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "Docs bot" } });
     const form = screen.getByRole("button", { name: "Create project" }).closest("form")!;
@@ -104,7 +126,7 @@ describe("ProjectsManager", () => {
   });
 
   it("renames a project", async () => {
-    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} />);
+    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />);
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
     fireEvent.change(screen.getByLabelText("New name"), { target: { value: "Support" } });
     respond(200, { project: project({ name: "Support" }) });
@@ -117,7 +139,7 @@ describe("ProjectsManager", () => {
   });
 
   it("asks first, and does nothing if cancelled", () => {
-    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} />);
+    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />);
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     const dialog = screen.getByRole("alertdialog", { name: "Delete Help center?" });
@@ -130,7 +152,7 @@ describe("ProjectsManager", () => {
   });
 
   it("deletes a project after confirming", async () => {
-    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} />);
+    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />);
     respond(200, { ok: true });
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await act(async () => {
@@ -143,7 +165,7 @@ describe("ProjectsManager", () => {
 
   it("renders project names as text, never HTML", () => {
     const { container } = render(
-      <ProjectsManager initialProjects={[project({ name: '<img src=x onerror="alert(1)">' })]} plan="pro" limit={5} messagesLimit={2000} />,
+      <ProjectsManager initialProjects={[project({ name: '<img src=x onerror="alert(1)">' })]} plan="pro" limit={5} messagesLimit={2000} resetsAt={{}} now={NOW} />,
     );
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText('<img src=x onerror="alert(1)">')).toBeTruthy();

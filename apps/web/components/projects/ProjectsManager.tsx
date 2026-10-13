@@ -10,6 +10,7 @@ import type {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
+import { currentUsage } from "../billing/level";
 import { BILLING_PATH } from "../dashboard-nav/routes";
 import { FONT_MONO } from "../landing/fonts";
 import { formatCount } from "../project-shell/format";
@@ -25,6 +26,10 @@ type Props = {
   limit: number;
   /** Messages each project gets per month on this plan. */
   messagesLimit: number;
+  /** When each listed project's message count resets, by project ID. */
+  resetsAt: Record<string, string>;
+  /** Render time, from the server. */
+  now: string;
 };
 
 async function send<T>(url: string, method: string, body?: unknown): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
@@ -42,7 +47,7 @@ async function send<T>(url: string, method: string, body?: unknown): Promise<{ o
   }
 }
 
-export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }: Props) {
+export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, resetsAt, now }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [name, setName] = useState("");
@@ -68,6 +73,13 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
   }
 
   const atLimit = projects.length >= limit;
+
+  // Shows 0 once the period has ended, like Billing (the count resets on the next message).
+  // A project created on this page has no reset entry: its period has only just started.
+  const usedThisMonth = (project: Project) => {
+    const reset = resetsAt[project.id];
+    return reset ? currentUsage(project.messagesUsed, reset, now).used : project.messagesUsed;
+  };
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -182,12 +194,12 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
                   </div>
                   <div className="md:w-56">
                     <UsageMeter
-                      used={project.messagesUsed}
+                      used={usedThisMonth(project)}
                       limit={messagesLimit}
                       label={`${project.name}: messages used this month`}
                     />
                     <p className="mt-1.5 text-xs text-[#70788D] tabular-nums">
-                      {formatCount(project.messagesUsed)} of {formatCount(messagesLimit)} messages this month
+                      {formatCount(usedThisMonth(project))} of {formatCount(messagesLimit)} messages this month
                     </p>
                   </div>
                   <div className="flex gap-2">

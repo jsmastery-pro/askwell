@@ -2,6 +2,7 @@ import { PLAN_LIMITS } from "@askwell/shared";
 import { auth } from "@clerk/nextjs/server";
 import { ProjectsManager } from "../../../components/projects/ProjectsManager";
 import { getAccountPlan } from "../../../lib/data/billing";
+import { addOneMonth } from "../../../lib/data/usage";
 import { listProjects, toProject } from "../../../lib/projects";
 import { PageHeader } from "../../../components/ui/PageHeader";
 
@@ -21,6 +22,8 @@ export default async function ProjectsPage() {
         plan={plan}
         limit={limits.projects}
         messagesLimit={limits.messagesPerMonth}
+        resetsAt={Object.fromEntries(rows.map((row) => [row.id, addOneMonth(row.periodStart).toISOString()]))}
+        now={new Date().toISOString()}
       />
     </div>
   );
