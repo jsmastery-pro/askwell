@@ -23,8 +23,8 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | in progress | — |
-| UI-T02 | Knowledge screen | Alice | UI-T01 | todo | — |
+| UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | done | #37 |
+| UI-T02 | Knowledge screen | Alice | UI-T01 | in review | #38 |
 | UI-T03 | Conversations screens | Alice | UI-T01 | todo | — |
 | UI-T04 | Customize screen + live preview | Alice | UI-T01 | todo | — |
 | UI-T05 | Billing + usage screens | Alice | UI-T01 | todo | — |
