@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DASHBOARD_HOME } from "../../components/dashboard-nav/routes";
+import { PROJECTS_PATH } from "../../components/dashboard-nav/routes";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { BUTTON_PRIMARY } from "../../components/ui/styles";
 
@@ -9,7 +9,7 @@ export default function DashboardNotFound() {
     <EmptyState
       title="We couldn't find that page"
       action={
-        <Link href={DASHBOARD_HOME} className={BUTTON_PRIMARY}>
+        <Link href={PROJECTS_PATH} className={BUTTON_PRIMARY}>
           Back to Projects
         </Link>
       }

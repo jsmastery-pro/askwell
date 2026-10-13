@@ -25,16 +25,18 @@ const nav = () => screen.getByRole("navigation", { name: "Dashboard" });
 const current = () => within(nav()).queryAllByRole("link").filter((l) => l.getAttribute("aria-current") === "page");
 
 describe("NavBar", () => {
-  it("links the app name home, and shows only Projects and Billing", () => {
+  it("links the app name to the dashboard, and shows Dashboard, Projects and Billing", () => {
     render(<NavBar />);
-    expect(screen.getByRole("link", { name: APP_NAME }).getAttribute("href")).toBe("/dashboard/projects");
+    expect(screen.getByRole("link", { name: APP_NAME }).getAttribute("href")).toBe("/dashboard");
     expect(within(nav()).getAllByRole("link").map((l) => [l.textContent, l.getAttribute("href")])).toEqual([
+      ["Dashboard", "/dashboard"],
       ["Projects", "/dashboard/projects"],
       ["Billing", "/dashboard/billing"],
     ]);
   });
 
   it.each([
+    ["/dashboard", "Dashboard"],
     ["/dashboard/projects", "Projects"],
     ["/dashboard/projects/11111111-2222-4333-8444-555555555555", "Projects"],
     ["/dashboard/projects/11111111-2222-4333-8444-555555555555/customize", "Projects"],

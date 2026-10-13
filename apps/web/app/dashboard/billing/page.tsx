@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PlanActions } from "../../../components/billing/PlanActions";
 import { PlanComparison } from "../../../components/billing/PlanComparison";
 import { UsageSummary } from "../../../components/billing/UsageSummary";
-import { DASHBOARD_HOME } from "../../../components/dashboard-nav/routes";
+import { PROJECTS_PATH } from "../../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../../components/landing/fonts";
 import { formatCount } from "../../../components/project-shell/format";
 import { BUTTON_PRIMARY, CARD, FOCUS } from "../../../components/ui/styles";
@@ -67,7 +67,7 @@ export default async function BillingPage() {
             <EmptyState
               title="No projects yet"
               action={
-                <Link href={DASHBOARD_HOME} className={BUTTON_PRIMARY}>
+                <Link href={PROJECTS_PATH} className={BUTTON_PRIMARY}>
                   Create a project
                 </Link>
               }
