@@ -18,10 +18,14 @@ Every screen is consistent and complete, and the §2 core flow can be clicked th
 3. Check at 375 px and 1280 px. Keyboard: every action reachable, visible focus, dialogs trap focus and close on Escape.
 4. Click through the §2 core flow on the `alice` deploy: sign up → create project → Knowledge (mock upload) → Install (copy) → Conversations (mock) → Customize (Free paywall) → Billing. Put a short clip in the PR.
 5. `grep -rn "MOCK:" apps/web` and paste the list in the PR. That's Bob's wiring checklist.
+6. **#45 follow-up:** the navbar's `AccountMenu` closes on `blur` when `relatedTarget` is outside it. In Safari and Firefox on macOS a clicked button doesn't take focus, so after opening the menu from the keyboard, a mouse click on **Sign out** likely blurs with `relatedTarget = null` and hides the panel before the click lands. Fix it (e.g. `tabIndex={-1}` on the panel) and check in Safari.
+7. **#47 follow-up:** the Projects page (`components/projects/ProjectsManager.tsx`) shows the stored `messagesUsed`. Use `currentUsage` from `components/billing/level.ts`, like Billing and the project Overview, so a project whose period has ended shows 0, not last month's count.
 
 ## Done when
 - [ ] The core flow clicks through with no dead ends or broken links
 - [ ] Every screen has loading, empty and error states
 - [ ] Usable at 375 px; keyboard-only works
+- [ ] Account menu: open with the keyboard, then click Sign out with the mouse in Safari. It signs out.
+- [ ] A project past its reset date shows 0 used on Projects, Billing and its Overview
 - [ ] The PR lists every `MOCK:` function
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
