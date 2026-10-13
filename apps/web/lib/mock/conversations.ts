@@ -48,3 +48,13 @@ export const MOCK_THREADS: Thread[] = [
     messages: [msg(9, "visitor", "Hi! Are you open on weekends?", "2026-10-10T08:15:00.000Z")],
   },
 ];
+
+// Belongs to a different project. Every project's data functions must leave it out,
+// the same way the real queries filter by project_id.
+export const MOCK_OTHER_PROJECT_ID = "2c9b7a61-0e4f-4d3a-9b8c-7d6e5f4a3b21";
+export const MOCK_OTHER_PROJECT_THREAD: Thread = {
+  id: id(99),
+  visitorId: "v_0ther1",
+  createdAt: "2026-10-12T18:00:00.000Z",
+  messages: [msg(99, "visitor", "This chat belongs to someone else's project.", "2026-10-12T18:00:00.000Z")],
+};
