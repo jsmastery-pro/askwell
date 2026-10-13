@@ -4,6 +4,7 @@ import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import { PLAN_LIMITS, type Plan, type Project } from "@askwell/shared";
 import { and, eq } from "drizzle-orm";
+import { isUuid } from "./ids";
 
 export type ProjectUsage = Pick<Project, "messagesUsed" | "periodStart"> & {
   plan: Plan;
@@ -17,6 +18,7 @@ export async function getProjectUsage(
   projectId: string,
   database: Database = defaultDb,
 ): Promise<ProjectUsage | null> {
+  if (!isUuid(projectId)) return null;
   const [row] = await database
     .select({ messagesUsed: projects.messagesUsed, periodStart: projects.periodStart, plan: accounts.plan })
     .from(projects)
