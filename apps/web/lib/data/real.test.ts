@@ -70,6 +70,17 @@ describe("widget config reads", () => {
   });
 });
 
+describe("malformed project IDs", () => {
+  it.each(["abc", "1", "not-a-uuid-at-all", "11111111-2222-4333-8444-55555555555z"])(
+    "%s returns null instead of a database error",
+    async (id) => {
+      expect(await getProjectUsage(freeProject.ownerId, id, db)).toBeNull();
+      expect(await getWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
+      expect(await getStoredWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
+    },
+  );
+});
+
 describe("addOneMonth", () => {
   it.each([
     ["2026-01-31T00:00:00.000Z", "2026-02-28T00:00:00.000Z"],

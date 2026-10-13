@@ -4,6 +4,7 @@ import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import { applyPlanToConfig, type Plan, type StoredWidgetConfig, type WidgetConfig } from "@askwell/shared";
 import { and, eq } from "drizzle-orm";
+import { isUuid } from "./ids";
 
 // Real reads, scoped by owner: another owner's project returns nothing.
 
@@ -12,6 +13,7 @@ export async function getStoredWidgetConfig(
   projectId: string,
   database: Database = defaultDb,
 ): Promise<StoredWidgetConfig | null> {
+  if (!isUuid(projectId)) return null;
   const [row] = await database
     .select({
       buttonColor: widgetConfigs.buttonColor,
@@ -34,6 +36,7 @@ export async function getWidgetConfig(
   projectId: string,
   database: Database = defaultDb,
 ): Promise<{ plan: Plan; stored: StoredWidgetConfig | null; config: WidgetConfig } | null> {
+  if (!isUuid(projectId)) return null;
   const [owned] = await database
     .select({ plan: accounts.plan })
     .from(projects)
