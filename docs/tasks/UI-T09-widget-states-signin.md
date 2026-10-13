@@ -1,10 +1,10 @@
-# UI-T08 — Chat panel states, sign-in redirect, preview focus
+# UI-T09 — Chat panel states, sign-in redirect, preview focus
 
 | Field | Value |
 |---|---|
 | Owner | Alice |
 | Lane | UI track |
-| Needs first | UI-T06 |
+| Needs first | UI-T08 |
 | Files allowed | `apps/web/app/embed/**`, `apps/web/components/widget-panel/**`, `apps/web/proxy.ts` (sign-in/up URLs only) |
 | project.md | §6.2 Auth, §6.5 Widget (Panel), §9 Security rules (XSS) |
 | See | `docs/ui-track.md` (rules) |

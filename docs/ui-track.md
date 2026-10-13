@@ -5,7 +5,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 - **Alice** builds all UI-track tasks, in order. **Bob is paused** until the UI track is done.
 - `plan.md` and `project.md` are unchanged. The phases still define what "functional" means. This track only changes *when* the screens get built.
 - **The UI track owns the screens.** Later phase tasks that include a screen (e.g. P3-T03's Knowledge page, the Phase 4 Conversations list, Phase 5 Customize/Billing pages) only **wire data** into the screens built here. John trims those task files when their phase starts.
-- No analytics screen: §6.11 is PostHog on our side, not an owner-facing page.
+- §6.11 Analytics is PostHog on our side. **Owner-facing analytics** (all projects, on the dashboard home) was added by the product owner on 2026-10-13 as UI-T08. Its numbers come from existing tables, so `project.md` is unchanged.
 
 ## Rules for every UI task
 
@@ -30,9 +30,10 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
 | UI-T05 | Billing + usage screens | Alice | UI-T07 | done | #47 |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | in review | #48 |
-| UI-T08 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T06 | todo | — |
+| UI-T08 | Dashboard home with analytics across all projects | Alice | UI-T06 | todo | — |
+| UI-T09 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T08 | todo | — |
 
-Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 was added the same day (product owner: finish the last UI pieces before Bob resumes).
+Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 (dashboard home with analytics; it brings back `/dashboard` as a page, partly reversing UI-T07's "merge Overview into Projects") and UI-T09 (the last panel and sign-in pieces) were added the same day, so the UI is complete before Bob resumes.
 
 ## When the UI track is done
 
