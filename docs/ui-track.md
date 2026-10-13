@@ -29,7 +29,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T04 | Customize screen + live preview | Alice | UI-T01 | done | #43 |
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
 | UI-T05 | Billing + usage screens | Alice | UI-T07 | done | #47 |
-| UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | in review | #48 |
+| UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | done | #48 |
 | UI-T08 | Dashboard home with analytics across all projects | Alice | UI-T06 | todo | — |
 | UI-T09 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T08 | todo | — |
 
