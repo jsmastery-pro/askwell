@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { BUTTON_SECONDARY } from "../projects/styles";
+import { BUTTON_SECONDARY } from "../ui/styles";
 
 // Manual refresh only: no realtime (project.md §6.7). Re-runs the page's server data.
 export function RefreshButton() {

@@ -1,9 +1,10 @@
 import { PLAN_LIMITS } from "@askwell/shared";
 import { auth } from "@clerk/nextjs/server";
-import { FONT_DISPLAY } from "../../../components/landing/fonts";
 import { ProjectsManager } from "../../../components/projects/ProjectsManager";
 import { getAccountPlan } from "../../../lib/data/billing";
+import { addOneMonth } from "../../../lib/data/usage";
 import { listProjects, toProject } from "../../../lib/projects";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -15,17 +16,14 @@ export default async function ProjectsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
-        Projects
-      </h1>
-      <p className="mt-3 mb-8 max-w-prose text-[#70788D]">
-        Each project has its own widget, knowledge and conversations.
-      </p>
+      <PageHeader title="Projects" description="Each project has its own widget, knowledge and conversations." />
       <ProjectsManager
         initialProjects={rows.map(toProject)}
         plan={plan}
         limit={limits.projects}
         messagesLimit={limits.messagesPerMonth}
+        resetsAt={Object.fromEntries(rows.map((row) => [row.id, addOneMonth(row.periodStart).toISOString()]))}
+        now={new Date().toISOString()}
       />
     </div>
   );

@@ -1,0 +1,16 @@
+"use client";
+
+import { BUTTON_SECONDARY } from "./styles";
+
+/** The body of a route's error.tsx. The navbar and tabs around it stay usable. */
+export function ErrorState({ title, reset }: { title: string; reset: () => void }) {
+  return (
+    <div role="alert" className="rounded-xl border border-[#D7DCE6] bg-white px-6 py-10 text-center">
+      <p className="font-medium text-[#161A24]">{title}</p>
+      <p className="mt-1 text-sm text-[#70788D]">Check your connection, then try again.</p>
+      <button type="button" onClick={reset} className={`mt-5 ${BUTTON_SECONDARY}`}>
+        Try again
+      </button>
+    </div>
+  );
+}

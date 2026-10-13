@@ -2,7 +2,7 @@
 
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useEffect, useId, useRef, useState } from "react";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 /** The navbar's account area: the signed-in email, and Sign out in a small disclosure menu. */
 export function AccountMenu() {
@@ -60,10 +60,13 @@ export function AccountMenu() {
         </span>
       </button>
 
+      {/* tabIndex -1: in Safari a clicked button doesn't take focus, so focus lands on the panel
+          instead of leaving the menu, and the blur above doesn't close it before the click. */}
       <div
         id={panelId}
         hidden={!open}
-        className="absolute top-full right-0 z-40 mt-2 w-64 rounded-lg border border-[#D7DCE6] bg-white p-2 shadow-lg shadow-[#10131D]/15"
+        tabIndex={-1}
+        className="absolute top-full right-0 z-40 mt-2 w-64 rounded-lg border border-[#D7DCE6] bg-white p-2 shadow-lg shadow-[#10131D]/15 focus:outline-none"
       >
         {email && (
           <p className="truncate border-b border-[#E3E7EE] px-3 pt-2 pb-3 text-sm">

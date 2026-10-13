@@ -1,8 +1,9 @@
 import type { ConversationSummary } from "@askwell/shared";
 import Link from "next/link";
 import { formatDateTime } from "../project-shell/format";
-import { BUTTON_PRIMARY, FOCUS } from "../projects/styles";
+import { BUTTON_PRIMARY, FOCUS } from "../ui/styles";
 import { formatRelative, visitorLabel } from "./format";
+import { EmptyState } from "../ui/EmptyState";
 
 type Props = { projectId: string; conversations: ConversationSummary[]; now: Date };
 
@@ -11,15 +12,16 @@ export function ConversationList({ projectId, conversations, now }: Props) {
 
   if (conversations.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-12 text-center">
-        <p className="font-medium text-[#161A24]">No chats yet</p>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-[#70788D]">
-          Add the widget to your site. Conversations show up here after a visitor sends a message.
-        </p>
-        <Link href={`${base}/install`} className={`mt-5 inline-block ${BUTTON_PRIMARY}`}>
-          Install the widget
-        </Link>
-      </div>
+      <EmptyState
+        title="No chats yet"
+        action={
+          <Link href={`${base}/install`} className={BUTTON_PRIMARY}>
+            Install the widget
+          </Link>
+        }
+      >
+        Add the widget to your site. Conversations show up here after a visitor sends a message.
+      </EmptyState>
     );
   }
 

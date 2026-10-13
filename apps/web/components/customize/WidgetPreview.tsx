@@ -4,7 +4,7 @@ import type { WidgetConfig } from "@askwell/shared";
 import { useState } from "react";
 import { textColorOn } from "../widget-panel/contrast";
 import { Panel } from "../widget-panel/Panel";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 // Mirrors the loader (apps/widget/src/styles.ts): pill button, 12px gap, panel above a bottom
 // button and below a top one, same three open animations.

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 /** Top navbar link. Current on its own page and every page under it, e.g. a project's tabs. */
 export function NavLink({ href, children }: { href: string; children: ReactNode }) {

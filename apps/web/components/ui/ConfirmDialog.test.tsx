@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConfirmDelete } from "./ConfirmDelete";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 afterEach(cleanup);
 
@@ -9,7 +9,15 @@ function renderDialog() {
   outside.textContent = "Behind the dialog";
   document.body.append(outside);
   const onCancel = vi.fn();
-  render(<ConfirmDelete title="Guide.pdf" isFile onCancel={onCancel} onConfirm={vi.fn()} />);
+  render(
+    <ConfirmDialog
+      title="Delete Guide.pdf?"
+      body="The file is removed."
+      confirmLabel="Delete"
+      onCancel={onCancel}
+      onConfirm={vi.fn()}
+    />,
+  );
   return {
     onCancel,
     outside,
@@ -18,7 +26,7 @@ function renderDialog() {
   };
 }
 
-describe("ConfirmDelete", () => {
+describe("ConfirmDialog", () => {
   it("opens with focus on Cancel", () => {
     const { cancel } = renderDialog();
     expect(document.activeElement).toBe(cancel);
@@ -41,6 +49,13 @@ describe("ConfirmDelete", () => {
     outside.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(document.activeElement).toBe(cancel);
+  });
+
+  it("names the dialog by its title and body", () => {
+    renderDialog();
+    const dialog = screen.getByRole("alertdialog", { name: "Delete Guide.pdf?" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.getElementById(dialog.getAttribute("aria-describedby")!)!.textContent).toBe("The file is removed.");
   });
 
   it("closes on Escape", () => {

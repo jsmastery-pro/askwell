@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BUTTON_PRIMARY } from "./styles";
+import { BUTTON_PRIMARY } from "../ui/styles";
 
 export function CopyButton({ text, label = "Copy snippet" }: { text: string; label?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
