@@ -16,7 +16,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | Mark mocks | Every mocked function and mocked action has a `// MOCK:` comment saying what will replace it (route or task ID). `grep -rn "MOCK:" apps/web` must list all of them. |
 | Mock actions | Mocked writes update local state only, so the UI behaves as if they worked, and show a small "Demo data" badge where the data is fake. Nothing is written to the database. |
 | No backend | No new API routes, tables, columns, or `packages/shared` changes. The types already exist (P1-T03). If a screen needs a type that isn't there, stop and ask. |
-| Security still applies | **Every page** checks ownership itself (`getOwnedProject` or an owner-scoped read → `notFound()`) **before** calling any `lib/data` function. Never rely on the project layout's check alone: in Next.js, layouts and pages render in parallel. All user/visitor text renders as text, never HTML. Plan gating reads the plan on the server. |
+| Security still applies | **Every page** checks ownership itself (`getOwnedProject` or an owner-scoped read → `notFound()`) **before** calling any `lib/data` function. Never rely on the project layout's check alone: in Next.js, layouts and pages render in parallel. Any `lib/data` read that takes an ID from the URL rejects a malformed ID (`isUuid` in `lib/data/ids.ts`) and returns `null`, so `/projects/abc` is a 404, not a 500. All user/visitor text renders as text, never HTML. Plan gating reads the plan on the server. |
 | Reuse | Reuse `apps/web/components/**` and the dashboard's look (fonts, colors, `FOCUS`). Responsive down to 375 px. Empty, loading and error states on every screen. |
 
 ## Tasks
