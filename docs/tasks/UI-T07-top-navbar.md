@@ -4,7 +4,7 @@
 |---|---|
 | Owner | Alice |
 | Lane | UI track |
-| Needs first | UI-T03 |
+| Needs first | UI-T04 |
 | Files allowed | `apps/web/app/dashboard/layout.tsx`, `apps/web/app/dashboard/page.tsx`, `apps/web/app/dashboard/projects/page.tsx`, `apps/web/components/projects/**`, `apps/web/components/project-shell/**`, `apps/web/components/dashboard-nav/**` |
 | project.md | §6.2 Auth (sign-out), §6.3 Projects, §6.12 Usage |
 | See | `docs/ui-track.md` (rules) |
@@ -29,5 +29,5 @@ Product owner decision (2026-10-13): replace the dashboard sidebar with a **top 
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
-- Do this **before UI-T04**, so Customize and Billing are built against the final layout.
+- Do this right after UI-T04 (#43) and **before UI-T05**, so Billing is built against the final layout. Re-check the Customize page under the new navbar.
 - The project page's tabs (UI-T01) don't change.

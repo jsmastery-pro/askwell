@@ -25,12 +25,13 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 |---|---|---|---|---|---|
 | UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | done | #37 |
 | UI-T02 | Knowledge screen | Alice | UI-T01 | done | #38 |
-| UI-T03 | Conversations screens | Alice | UI-T01 | todo | — |
-| UI-T04 | Customize screen + live preview | Alice | UI-T01 | todo | — |
-| UI-T05 | Billing + usage screens | Alice | UI-T01 | todo | — |
+| UI-T03 | Conversations screens | Alice | UI-T01 | done | #41 |
+| UI-T04 | Customize screen + live preview | Alice | UI-T01 | in review | #43 |
+| UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | todo | — |
+| UI-T05 | Billing + usage screens | Alice | UI-T07 | todo | — |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | todo | — |
 
-UI-T02 to UI-T05 all depend only on UI-T01. Alice does them one at a time, one PR each.
+Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout.
 
 ## When the UI track is done
 
