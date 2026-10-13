@@ -28,11 +28,13 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T03 | Conversations screens | Alice | UI-T01 | done | #41 |
 | UI-T04 | Customize screen + live preview | Alice | UI-T01 | done | #43 |
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
-| UI-T05 | Billing + usage screens | Alice | UI-T07 | in review | #47 |
-| UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | todo | — |
+| UI-T05 | Billing + usage screens | Alice | UI-T07 | done | #47 |
+| UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | in review | #48 |
 
 Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout.
 
 ## When the UI track is done
+
+**Carried to Phase 6 polish** (found in UI-T06, outside its files): in Customize's live preview, the widget panel's chat box shows focus only as a border colour change (`widget-panel/`, about 4.4:1). Give it a visible focus outline.
 
 Bob resumes. P3-T01 is already merged (#32), so he starts with Phase 3 Lane A, wiring the Knowledge screen to the real ingest/delete routes. Then the later phases, each replacing the matching `MOCK:` functions.
