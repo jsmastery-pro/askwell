@@ -15,6 +15,8 @@ The build order for Askwell. `docs/project.md` describes each feature in detail.
 
 > **UI track (2026-10-12, product owner):** Alice builds every remaining screen first, with mock data where there's no backend yet. Bob is paused until then. See [`docs/ui-track.md`](ui-track.md). The phases below are unchanged. Their screen work is built in the UI track, and their tasks then wire the data.
 
+> **Review rule (2026-10-13, product owner):** CodeRabbit is required only where a miss is costly. **Required:** PRs touching API routes, auth, the database/migrations, `packages/shared`, the widget bundle, billing, or chat/RAG. If it's rate limited, wait for the free slot; never use paid on-demand reviews. **Not required:** UI-track (mock data) PRs merge on John's review plus all checks; if CodeRabbit does review, its threads still get fixed or answered. Docs-only PRs merge on sight.
+
 ---
 
 ## Phase 0 — Setup
