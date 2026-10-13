@@ -109,6 +109,29 @@ describe("CustomizeForm on Pro", () => {
     expect(save.disabled).toBe(true);
   });
 
+  it("locks the fields while a save is pending, so mid-save edits can't be lost", async () => {
+    let finish: () => void = () => {};
+    vi.mocked(saveWidgetConfig).mockImplementationOnce(
+      (_p, current, changes) =>
+        new Promise((resolve) => (finish = () => resolve({ config: { ...current, ...changes } as WidgetConfig }))),
+    );
+    renderForm("pro");
+    fireEvent.change(screen.getByLabelText("Header text"), { target: { value: "Talk to Acme" } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    });
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeTruthy();
+    expect(isDisabled(screen.getByLabelText("Header text"))).toBe(true);
+    expect(isDisabled(screen.getByRole("radio", { name: "Top left" }))).toBe(true);
+    expect((screen.getByRole("button", { name: "Discard changes" }) as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => finish());
+    expect(screen.getByText("Saved")).toBeTruthy();
+    expect(isDisabled(screen.getByLabelText("Header text"))).toBe(false);
+    expect((screen.getByLabelText("Header text") as HTMLInputElement).value).toBe("Talk to Acme");
+  });
+
   it("doesn't save an invalid form", async () => {
     renderForm("pro");
     fireEvent.change(screen.getByLabelText("Button label"), { target: { value: "   " } });

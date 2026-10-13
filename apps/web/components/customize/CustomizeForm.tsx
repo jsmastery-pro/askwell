@@ -35,6 +35,7 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  const saving = status === "saving";
   const changes = buildChanges(saved, draft);
   const dirty = Object.keys(changes).length > 0 || colorText !== draft.buttonColor;
 
@@ -98,7 +99,9 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
           </div>
         )}
 
-        <fieldset disabled={locked} className="space-y-6 disabled:opacity-60">
+        {/* Locked on Free; also locked while saving, so edits made mid-save can't be
+            overwritten when the response comes back. */}
+        <fieldset disabled={locked || saving} aria-busy={saving} className={`space-y-6 ${locked ? "disabled:opacity-60" : ""}`}>
           <legend className="sr-only">Widget settings</legend>
 
           <div>
@@ -203,11 +206,11 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
 
         {!locked && (
           <div className="flex flex-wrap items-center gap-3 border-t border-[#D7DCE6] pt-5">
-            <button type="submit" disabled={!dirty || status === "saving"} className={BUTTON_PRIMARY}>
-              {status === "saving" ? "Saving…" : "Save changes"}
+            <button type="submit" disabled={!dirty || saving} className={BUTTON_PRIMARY}>
+              {saving ? "Saving…" : "Save changes"}
             </button>
             {dirty && (
-              <button type="button" onClick={discard} className={BUTTON_SECONDARY}>
+              <button type="button" onClick={discard} disabled={saving} className={BUTTON_SECONDARY}>
                 Discard changes
               </button>
             )}
