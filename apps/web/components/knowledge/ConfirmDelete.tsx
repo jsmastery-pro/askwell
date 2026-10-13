@@ -7,6 +7,7 @@ type Props = { title: string; isFile: boolean; onCancel: () => void; onConfirm: 
 
 export function ConfirmDelete({ title, isFile, onCancel, onConfirm }: Props) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   // The parent re-renders while this is open (status updates), so read the latest
   // callback from a ref and set up focus and Escape only once.
   const onCancelRef = useRef(onCancel);
@@ -17,8 +18,25 @@ export function ConfirmDelete({ title, isFile, onCancel, onConfirm }: Props) {
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     cancelRef.current?.focus();
+    // aria-modal only tells assistive tech; keep Tab and Shift+Tab inside the dialog too.
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancelRef.current();
+      if (event.key === "Escape") {
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const first = cancelRef.current;
+      const last = confirmRef.current;
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const inside = active === first || active === last;
+      if (event.shiftKey && (active === first || !inside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !inside)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -49,6 +67,7 @@ export function ConfirmDelete({ title, isFile, onCancel, onConfirm }: Props) {
             Cancel
           </button>
           <button
+            ref={confirmRef}
             type="button"
             onClick={onConfirm}
             className={`rounded-md bg-[#B42318] px-4 py-2 text-sm font-medium text-white hover:bg-[#912018] ${FOCUS}`}
