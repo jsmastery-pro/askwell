@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { PLAN_LIMITS, type Plan } from "@askwell/shared";
 import { FONT_DISPLAY } from "./fonts";
+import { Reveal } from "./Reveal";
 import { Section } from "./Section";
+import { BUTTON_GLASS, BUTTON_PRIMARY, CARD } from "./styles";
 
 export const formatLimit = (n: number) => n.toLocaleString("en-US");
 
@@ -33,58 +35,44 @@ const PLANS = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="bg-[#EEF1F6] py-24">
+    <section id="pricing" className="scroll-mt-24 py-24 sm:py-28">
       <Section>
-        <div className="text-center">
-          <h2 className="text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+        <Reveal className="text-center">
+          <h2 className="text-3xl font-semibold tracking-[-0.02em] text-ink sm:text-4xl" style={FONT_DISPLAY}>
             Simple pricing. Upgrade when you outgrow Free.
           </h2>
-        </div>
-        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-2">
-          {PLANS.map((plan) => (
-            <div
+        </Reveal>
+        <div className="mx-auto mt-14 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+          {PLANS.map((plan, index) => (
+            <Reveal
               key={plan.key}
-              className={
-                plan.highlight
-                  ? "rounded-xl border border-[#F2A33C] bg-white p-8 shadow-xl shadow-black/5 ring-1 ring-[#F2A33C]"
-                  : "rounded-xl border border-[#D7DCE6] bg-white p-8"
-              }
+              delay={index * 120}
+              className={`${CARD} p-7 sm:p-8 ${plan.highlight ? "border-line-strong ring-1 ring-line-strong" : ""}`}
             >
-              <h3 className="text-xl font-semibold text-[#161A24]">{plan.name}</h3>
-              <p className="mt-1 text-sm text-[#70788D]">{plan.caption}</p>
-              <Link
-                href="/sign-up"
-                className={
-                  plan.highlight
-                    ? "mt-6 inline-block w-full rounded-md bg-[#F2A33C] px-4 py-2 text-center text-sm font-medium text-[#161A24] transition hover:bg-[#F5B35C]"
-                    : "mt-6 inline-block w-full rounded-md border border-[#D7DCE6] px-4 py-2 text-center text-sm font-medium text-[#161A24] transition hover:border-[#9aa5b8]"
-                }
-              >
+              <h3 className="text-xl font-semibold text-ink">{plan.name}</h3>
+              <p className="mt-1 text-sm text-muted">{plan.caption}</p>
+              <Link href="/sign-up" className={`mt-6 w-full py-2.5 text-sm ${plan.highlight ? BUTTON_PRIMARY : BUTTON_GLASS}`}>
                 Start free
               </Link>
               {plan.highlight && (
-                <p className="mt-3 text-xs text-[#70788D]">
-                  Upgrade to Pro from your dashboard once you&apos;re signed in.
-                </p>
+                <p className="mt-3 text-xs text-muted">Upgrade to Pro from your dashboard once you&apos;re signed in.</p>
               )}
               <div className="mt-8 space-y-6">
                 {GROUPS.map((group) => (
                   <div key={group}>
-                    <p className="text-xs font-medium text-[#70788D]">{group}</p>
-                    <dl className="mt-3 space-y-2 border-t border-[#EEF1F6] pt-3">
+                    <p className="text-xs font-medium text-muted">{group}</p>
+                    <dl className="mt-3 space-y-2 border-t border-line pt-3">
                       {PRICING_ROWS.filter((row) => row.group === group).map((row) => (
                         <div key={row.feature} className="flex justify-between gap-4 text-sm">
-                          <dt className="text-[#70788D]">{row.feature}</dt>
-                          <dd className="text-right font-medium text-[#161A24]">
-                            {row[plan.key]}
-                          </dd>
+                          <dt className="text-muted">{row.feature}</dt>
+                          <dd className="text-right font-medium text-ink">{row[plan.key]}</dd>
                         </div>
                       ))}
                     </dl>
                   </div>
                 ))}
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </Section>
