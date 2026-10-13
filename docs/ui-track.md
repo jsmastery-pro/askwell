@@ -30,10 +30,12 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
 | UI-T05 | Billing + usage screens | Alice | UI-T07 | done | #47 |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | done | #48 |
-| UI-T08 | Dashboard home with analytics across all projects | Alice | UI-T06 | todo | — |
+| UI-T08 | Dashboard home with analytics across all projects | Alice | UI-T06 | in review | #51 |
 | UI-T09 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T08 | todo | — |
+| UI-T10 | Design tokens + landing redesign (dark, glass, motion) | Alice | UI-T09 | todo | — |
+| UI-T11 | Dashboard redesign (light monochrome, glass) | Alice | UI-T10 + PO approval | todo | — |
 
-Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 (dashboard home with analytics; it brings back `/dashboard` as a page, partly reversing UI-T07's "merge Overview into Projects") and UI-T09 (the last panel and sign-in pieces) were added the same day, so the UI is complete before Bob resumes.
+Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 (dashboard home with analytics; it brings back `/dashboard` as a page, partly reversing UI-T07's "merge Overview into Projects") and UI-T09 (the last panel and sign-in pieces) were added the same day, so the UI is complete before Bob resumes. UI-T10 and UI-T11 are a visual redesign (product owner, 2026-10-13): black and white with glass, a dark landing page with simple motion, and a light app. The landing page comes first, and the product owner approves its look before the dashboard follows.
 
 ## When the UI track is done
 
