@@ -30,8 +30,9 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
 | UI-T05 | Billing + usage screens | Alice | UI-T07 | done | #47 |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | in review | #48 |
+| UI-T08 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T06 | todo | — |
 
-Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout.
+Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 was added the same day (product owner: finish the last UI pieces before Bob resumes).
 
 ## When the UI track is done
 
