@@ -11,6 +11,10 @@ const isProtectedRoute = createRouteMatcher([
 
 const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
+// Signed-out visitors go to our own sign-in/up pages, not Clerk's hosted ones,
+// even where the NEXT_PUBLIC_CLERK_SIGN_*_URL env vars aren't set.
+const AUTH_PAGES = { signInUrl: "/sign-in", signUpUrl: "/sign-up" };
+
 export default clerkMiddleware(async (auth, req) => {
   if (!isProtectedRoute(req)) return;
 
@@ -25,7 +29,7 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   await auth.protect();
-});
+}, AUTH_PAGES);
 
 export const config = {
   matcher: [
