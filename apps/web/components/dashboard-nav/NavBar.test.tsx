@@ -96,6 +96,19 @@ describe("AccountMenu", () => {
     expect(panel().hidden).toBe(true);
   });
 
+  it("stays open when focus moves to the panel, as a Safari click on Sign out does", () => {
+    render(<NavBar />);
+    act(() => toggle().focus());
+    fireEvent.click(toggle());
+
+    // Safari doesn't focus a clicked button; focus goes to the nearest focusable ancestor.
+    act(() => panel().focus());
+
+    expect(document.activeElement).toBe(panel());
+    expect(panel().hidden).toBe(false);
+    expect(toggle().getAttribute("aria-expanded")).toBe("true");
+  });
+
   it("still offers Sign out before the user has loaded", () => {
     email.current = null;
     render(<NavBar />);
