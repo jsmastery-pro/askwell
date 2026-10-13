@@ -28,7 +28,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T03 | Conversations screens | Alice | UI-T01 | done | #41 |
 | UI-T04 | Customize screen + live preview | Alice | UI-T01 | done | #43 |
 | UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
-| UI-T05 | Billing + usage screens | Alice | UI-T07 | todo | — |
+| UI-T05 | Billing + usage screens | Alice | UI-T07 | in review | #47 |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | todo | — |
 
 Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout.
