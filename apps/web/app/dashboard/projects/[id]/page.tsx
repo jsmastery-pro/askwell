@@ -2,9 +2,11 @@ import { PLAN_LIMITS } from "@askwell/shared";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { UsageSummary } from "../../../../components/billing/UsageSummary";
+import { BILLING_PATH } from "../../../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../../../components/landing/fonts";
 import { DemoBadge } from "../../../../components/project-shell/DemoBadge";
-import { formatCount, formatDate, formatDateTime } from "../../../../components/project-shell/format";
+import { formatDateTime } from "../../../../components/project-shell/format";
 import { UsageMeter } from "../../../../components/project-shell/UsageMeter";
 import { FOCUS } from "../../../../components/projects/styles";
 import { listConversations } from "../../../../lib/data/conversations";
@@ -35,20 +37,18 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   return (
     <div className="space-y-12">
       <section aria-labelledby="usage-heading">
-        <h2 id="usage-heading" className="text-sm font-medium text-[#70788D]">
-          Messages this month
+        <h2 id="usage-heading" className="mb-2 text-sm font-medium text-[#70788D]">
+          Messages this month, {PLAN_NAME[usage.plan]} plan
         </h2>
-        <p className="mt-2 flex items-baseline gap-2 text-[#161A24]" style={FONT_DISPLAY}>
-          <span className="text-5xl font-semibold tabular-nums">{formatCount(usage.messagesUsed)}</span>
-          <span className="text-xl text-[#70788D]">of {formatCount(usage.messagesLimit)}</span>
-        </p>
-        <div className="mt-4 max-w-xl">
-          <UsageMeter used={usage.messagesUsed} limit={usage.messagesLimit} label="Messages used this month" />
-        </div>
-        <p className="mt-3 text-sm text-[#70788D]">
-          {PLAN_NAME[usage.plan]} plan. Resets on {formatDate(usage.resetsAt)}.
-          {usage.messagesUsed >= usage.messagesLimit && " Until then, visitors see a message that the chat limit is reached."}
-        </p>
+        <UsageSummary
+          size="large"
+          used={usage.messagesUsed}
+          limit={usage.messagesLimit}
+          resetsAt={usage.resetsAt}
+          now={new Date().toISOString()}
+          label="Messages used this month"
+          upgradeHref={usage.plan === "free" ? BILLING_PATH : undefined}
+        />
       </section>
 
       <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
