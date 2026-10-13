@@ -32,6 +32,11 @@ describe("mock reads match their shared schemas", () => {
     expect(new Set(sources.map((s) => s.status))).toEqual(new Set(SOURCE_STATUSES));
   });
 
+  it("returns nothing for a malformed project ID", async () => {
+    expect(await listKnowledgeSources("abc")).toEqual([]);
+    expect(await countKnowledgeFiles("abc")).toBe(0);
+  });
+
   it("counts only uploaded files toward the file limit", async () => {
     const sources = await listKnowledgeSources(PROJECT);
     expect(await countKnowledgeFiles(PROJECT)).toBe(sources.filter((s) => s.type !== "text").length);
