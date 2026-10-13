@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { APP_NAME } from "@askwell/shared";
 import { FONT_DISPLAY } from "../landing/fonts";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 import { AccountMenu } from "./AccountMenu";
 import { NavLink } from "./NavLink";
 import { BILLING_PATH, DASHBOARD_HOME } from "./routes";

@@ -11,9 +11,10 @@ import {
 } from "../../lib/data/knowledge-actions";
 import { formatDateTime } from "../project-shell/format";
 import { UsageMeter } from "../project-shell/UsageMeter";
-import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../projects/styles";
-import { ConfirmDelete } from "./ConfirmDelete";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../ui/styles";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ACCEPT, checkFile, checkText } from "./validate";
+import { EmptyState } from "../ui/EmptyState";
 
 // MOCK: processing finishes on its own here so the status change is visible.
 // P3-T02 makes status real; this timer goes away then.
@@ -307,12 +308,11 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
           Sources
         </h3>
         {sources.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-10 text-center">
-            <p className="font-medium text-[#161A24]">No knowledge yet</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-[#70788D]">
-              Your bot answers only from what you add here. Upload your product docs or paste an FAQ, and
-              visitors get answers from it.
-            </p>
+          <div className="mt-3">
+            <EmptyState title="No knowledge yet">
+              Your bot answers only from what you add here. Upload your product docs or paste an FAQ, and visitors
+              get answers from it.
+            </EmptyState>
           </div>
         ) : (
           <ul className="mt-3 divide-y divide-[#D7DCE6] border-y border-[#D7DCE6]">
@@ -363,9 +363,10 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       </section>
 
       {confirming && (
-        <ConfirmDelete
-          title={confirming.title}
-          isFile={isFile(confirming)}
+        <ConfirmDialog
+          title={`Delete ${confirming.title}?`}
+          body={`The ${isFile(confirming) ? "file" : "text"} and everything learned from it are removed. The bot stops using it right away.`}
+          confirmLabel="Delete"
           onCancel={() => setConfirming(null)}
           onConfirm={() => remove(confirming)}
         />

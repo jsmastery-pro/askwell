@@ -1,12 +1,11 @@
 import { getOwnedProject } from "@askwell/db/queries";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FONT_DISPLAY, FONT_MONO } from "../../../../../components/landing/fonts";
 import { CopyButton } from "../../../../../components/projects/CopyButton";
 import { buildInstallSnippet, resolveAppUrl } from "../../../../../components/projects/snippet";
-import { FOCUS } from "../../../../../components/projects/styles";
+import { SectionHeader } from "../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +26,10 @@ export default async function InstallPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="max-w-3xl">
-      <Link href="/dashboard/projects" className={`text-sm text-[#70788D] hover:text-[#161A24] ${FOCUS}`}>
-        ← Projects
-      </Link>
-      <h1 className="mt-3 text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
-        Install {project.name}
-      </h1>
+      <SectionHeader
+        title="Install"
+        description="Add one script tag to your site. The chat button then shows on every page that has it."
+      />
       <ol className="mt-6 space-y-3">
         {STEPS.map((step, index) => (
           <li key={step} className="flex gap-3 text-[#3D4456]">

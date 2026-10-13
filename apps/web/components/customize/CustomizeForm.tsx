@@ -9,8 +9,8 @@ import {
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { saveWidgetConfig } from "../../lib/data/config-actions";
-import { DemoBadge } from "../project-shell/DemoBadge";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../projects/styles";
+import { DemoBadge } from "../ui/DemoBadge";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../ui/styles";
 import { buildChanges, isHexColor, validateDraft, type FieldErrors } from "./changes";
 import { WidgetPreview } from "./WidgetPreview";
 

@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { BUTTON_SECONDARY, FOCUS } from "../projects/styles";
+import { useEffect, useId, useRef } from "react";
+import { BUTTON_DESTRUCTIVE, BUTTON_SECONDARY } from "./styles";
 
-type Props = { title: string; isFile: boolean; onCancel: () => void; onConfirm: () => void };
+type Props = {
+  /** The question, e.g. `Delete "Help center"?` */
+  title: string;
+  /** What happens if they go ahead. */
+  body: string;
+  /** The confirm button, named for the action, e.g. "Delete project". */
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
 
-export function ConfirmDelete({ title, isFile, onCancel, onConfirm }: Props) {
+/** Asks before a destructive action. Focus starts on Cancel, stays inside, and Escape cancels. */
+export function ConfirmDialog({ title, body, confirmLabel, onCancel, onConfirm }: Props) {
+  const id = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   // The parent re-renders while this is open (status updates), so read the latest
@@ -50,29 +61,22 @@ export function ConfirmDelete({ title, isFile, onCancel, onConfirm }: Props) {
       <div
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirm-delete-title"
-        aria-describedby="confirm-delete-body"
+        aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-body`}
         className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
       >
-        <h2 id="confirm-delete-title" className="break-words font-semibold text-[#161A24]">
-          Delete {title}?
+        <h2 id={`${id}-title`} className="font-semibold break-words text-[#161A24]">
+          {title}
         </h2>
-        <p id="confirm-delete-body" className="mt-2 text-sm text-[#70788D]">
-          {isFile
-            ? "The file and everything learned from it are removed. The bot stops using it right away."
-            : "The text and everything learned from it are removed. The bot stops using it right away."}
+        <p id={`${id}-body`} className="mt-2 text-sm text-[#70788D]">
+          {body}
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button ref={cancelRef} type="button" onClick={onCancel} className={BUTTON_SECONDARY}>
             Cancel
           </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            onClick={onConfirm}
-            className={`rounded-md bg-[#B42318] px-4 py-2 text-sm font-medium text-white hover:bg-[#912018] ${FOCUS}`}
-          >
-            Delete
+          <button ref={confirmRef} type="button" onClick={onConfirm} className={BUTTON_DESTRUCTIVE}>
+            {confirmLabel}
           </button>
         </div>
       </div>

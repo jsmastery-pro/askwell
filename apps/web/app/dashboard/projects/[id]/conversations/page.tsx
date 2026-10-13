@@ -3,9 +3,9 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { ConversationList } from "../../../../../components/conversations/ConversationList";
 import { RefreshButton } from "../../../../../components/conversations/RefreshButton";
-import { FONT_DISPLAY } from "../../../../../components/landing/fonts";
-import { DemoBadge } from "../../../../../components/project-shell/DemoBadge";
+import { DemoBadge } from "../../../../../components/ui/DemoBadge";
 import { listConversations } from "../../../../../lib/data/conversations";
+import { SectionHeader } from "../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -20,20 +20,12 @@ export default async function ConversationsPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
-              Conversations
-            </h2>
-            <DemoBadge />
-          </div>
-          <p className="mt-2 max-w-xl text-sm text-[#70788D]">
-            What visitors asked your bot, newest first. Refresh to see new chats.
-          </p>
-        </div>
-        <RefreshButton />
-      </div>
+      <SectionHeader
+        title="Conversations"
+        badge={<DemoBadge />}
+        description="What visitors asked your bot, newest first. Refresh to see new chats."
+        actions={<RefreshButton />}
+      />
       <ConversationList projectId={project.id} conversations={conversations} now={new Date()} />
     </div>
   );

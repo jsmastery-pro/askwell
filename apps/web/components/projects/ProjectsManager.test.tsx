@@ -116,12 +116,25 @@ describe("ProjectsManager", () => {
     expect(screen.getByText("Support")).toBeTruthy();
   });
 
+  it("asks first, and does nothing if cancelled", () => {
+    render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    const dialog = screen.getByRole("alertdialog", { name: "Delete Help center?" });
+    expect(dialog.textContent).toMatch(/can't be undone/);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Help center")).toBeTruthy();
+  });
+
   it("deletes a project after confirming", async () => {
-    vi.stubGlobal("confirm", () => true);
     render(<ProjectsManager initialProjects={[project()]} plan="pro" limit={5} messagesLimit={2000} />);
     respond(200, { ok: true });
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete project" }));
     });
 
     expect(fetchMock).toHaveBeenCalledWith(`/api/projects/${project().id}`, expect.objectContaining({ method: "DELETE" }));

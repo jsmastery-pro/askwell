@@ -2,7 +2,7 @@
 
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useEffect, useId, useRef, useState } from "react";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 /** The navbar's account area: the signed-in email, and Sign out in a small disclosure menu. */
 export function AccountMenu() {

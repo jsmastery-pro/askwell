@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 const TABS = [
   { label: "Overview", path: "" },

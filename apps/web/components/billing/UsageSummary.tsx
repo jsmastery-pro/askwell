@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { FONT_DISPLAY } from "../landing/fonts";
 import { formatCount, formatDate } from "../project-shell/format";
 import { UsageMeter } from "../project-shell/UsageMeter";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 import { currentUsage, usageLevel } from "./level";
 
 type Props = {

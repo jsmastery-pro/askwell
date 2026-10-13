@@ -14,7 +14,9 @@ import { BILLING_PATH } from "../dashboard-nav/routes";
 import { FONT_MONO } from "../landing/fonts";
 import { formatCount } from "../project-shell/format";
 import { UsageMeter } from "../project-shell/UsageMeter";
-import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "./styles";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { EmptyState } from "../ui/EmptyState";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, CARD, FOCUS, INPUT } from "../ui/styles";
 
 type Props = {
   initialProjects: Project[];
@@ -50,6 +52,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
   const inFlight = useRef(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [confirming, setConfirming] = useState<Project | null>(null);
 
   async function run<T>(request: () => Promise<T>): Promise<T | undefined> {
     if (inFlight.current) return undefined;
@@ -87,7 +90,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
   }
 
   async function remove(project: Project) {
-    if (!window.confirm(`Delete "${project.name}"? Its widget, knowledge and conversations are deleted too.`)) return;
+    setConfirming(null);
     const result = await run(() => send<{ ok: true }>(`/api/projects/${project.id}`, "DELETE"));
     if (!result) return;
     if (!result.ok) return setError(result.message);
@@ -134,14 +137,13 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
       )}
 
       {projects.length === 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-12 text-center">
-          <p className="font-medium text-[#161A24]">No projects yet</p>
-          <p className="mt-1 text-sm text-[#70788D]">
+        <div className="mt-8">
+          <EmptyState title="No projects yet">
             Name your first project above to get a chat widget and its install snippet.
-          </p>
+          </EmptyState>
         </div>
       ) : (
-        <ul className="mt-8 divide-y divide-[#E3E7EE] rounded-xl border border-[#E3E7EE] bg-white">
+        <ul className={`mt-8 divide-y divide-[#E3E7EE] ${CARD}`}>
           {projects.map((project) => (
             <li key={project.id} className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:gap-6">
               {editingId === project.id ? (
@@ -199,7 +201,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
                     >
                       Rename
                     </button>
-                    <button type="button" onClick={() => remove(project)} disabled={busy} className={BUTTON_DANGER}>
+                    <button type="button" onClick={() => setConfirming(project)} disabled={busy} className={BUTTON_DANGER}>
                       Delete
                     </button>
                   </div>
@@ -208,6 +210,15 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }:
             </li>
           ))}
         </ul>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title={`Delete ${confirming.name}?`}
+          body="Its widget stops working, and its knowledge and conversations are deleted. This can't be undone."
+          confirmLabel="Delete project"
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => remove(confirming)}
+        />
       )}
     </div>
   );

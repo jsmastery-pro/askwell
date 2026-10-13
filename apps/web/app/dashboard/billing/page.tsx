@@ -7,9 +7,11 @@ import { UsageSummary } from "../../../components/billing/UsageSummary";
 import { DASHBOARD_HOME } from "../../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../../components/landing/fonts";
 import { formatCount } from "../../../components/project-shell/format";
-import { BUTTON_PRIMARY, FOCUS } from "../../../components/projects/styles";
+import { BUTTON_PRIMARY, CARD, FOCUS } from "../../../components/ui/styles";
 import { getAccountPlan } from "../../../lib/data/billing";
 import { listProjectUsage } from "../../../lib/data/usage";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { PageHeader } from "../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +31,7 @@ export default async function BillingPage() {
 
   return (
     <div className="space-y-12">
-      <div>
-        <h1 className="text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
-          Billing
-        </h1>
-        <p className="mt-3 max-w-prose text-[#70788D]">Your plan covers every project on your account.</p>
-      </div>
+      <PageHeader title="Billing" description="Your plan covers every project on your account." />
 
       <section
         aria-labelledby="plan-heading"
@@ -66,15 +63,20 @@ export default async function BillingPage() {
         </h2>
         <p className="mt-1 text-sm text-[#70788D]">Each project has its own monthly limit. Counts update after every bot reply.</p>
         {usage.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-10 text-center">
-            <p className="font-medium text-[#161A24]">No projects yet</p>
-            <p className="mt-1 text-sm text-[#70788D]">Usage shows here once a project has its widget installed.</p>
-            <Link href={DASHBOARD_HOME} className={`mt-5 inline-block ${BUTTON_PRIMARY}`}>
-              Create a project
-            </Link>
+          <div className="mt-4">
+            <EmptyState
+              title="No projects yet"
+              action={
+                <Link href={DASHBOARD_HOME} className={BUTTON_PRIMARY}>
+                  Create a project
+                </Link>
+              }
+            >
+              Usage shows here once a project has its widget installed.
+            </EmptyState>
           </div>
         ) : (
-          <ul className="mt-4 divide-y divide-[#E3E7EE] rounded-xl border border-[#E3E7EE] bg-white">
+          <ul className={`mt-4 divide-y divide-[#E3E7EE] ${CARD}`}>
             {usage.map((project) => (
               <li key={project.id} className="px-5 py-4">
                 <UsageSummary

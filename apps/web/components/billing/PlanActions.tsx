@@ -3,7 +3,7 @@
 import type { Plan } from "@askwell/shared";
 import { useState } from "react";
 import { openBillingPortal, startCheckout } from "../../lib/data/billing-actions";
-import { FOCUS } from "../projects/styles";
+import { FOCUS } from "../ui/styles";
 
 const ACTION = {
   free: {

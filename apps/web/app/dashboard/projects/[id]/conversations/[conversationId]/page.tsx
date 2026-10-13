@@ -5,11 +5,11 @@ import { notFound } from "next/navigation";
 import { visitorLabel } from "../../../../../../components/conversations/format";
 import { RefreshButton } from "../../../../../../components/conversations/RefreshButton";
 import { Thread } from "../../../../../../components/conversations/Thread";
-import { FONT_DISPLAY } from "../../../../../../components/landing/fonts";
-import { DemoBadge } from "../../../../../../components/project-shell/DemoBadge";
+import { DemoBadge } from "../../../../../../components/ui/DemoBadge";
 import { formatDateTime } from "../../../../../../components/project-shell/format";
-import { FOCUS } from "../../../../../../components/projects/styles";
+import { FOCUS } from "../../../../../../components/ui/styles";
 import { getConversation } from "../../../../../../lib/data/conversations";
+import { SectionHeader } from "../../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -35,21 +35,14 @@ export default async function ConversationPage({
       >
         ← All conversations
       </Link>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
-              {visitorLabel(conversation.visitorId)}
-            </h2>
-            <DemoBadge />
-          </div>
-          <p className="mt-1 text-sm text-[#70788D]">
-            Started {formatDateTime(conversation.createdAt)}, {conversation.messages.length}{" "}
-            {conversation.messages.length === 1 ? "message" : "messages"}
-          </p>
-        </div>
-        <RefreshButton />
-      </div>
+      <SectionHeader
+        title={visitorLabel(conversation.visitorId)}
+        badge={<DemoBadge />}
+        description={`Started ${formatDateTime(conversation.createdAt)}, ${conversation.messages.length} ${
+          conversation.messages.length === 1 ? "message" : "messages"
+        }`}
+        actions={<RefreshButton />}
+      />
       <div className="rounded-xl bg-[#E6EAF1] p-4 sm:p-6">
         <Thread messages={conversation.messages} />
       </div>

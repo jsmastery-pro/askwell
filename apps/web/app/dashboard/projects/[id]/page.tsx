@@ -5,17 +5,16 @@ import { notFound } from "next/navigation";
 import { UsageSummary } from "../../../../components/billing/UsageSummary";
 import { BILLING_PATH } from "../../../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../../../components/landing/fonts";
-import { DemoBadge } from "../../../../components/project-shell/DemoBadge";
+import { DemoBadge } from "../../../../components/ui/DemoBadge";
 import { formatDateTime } from "../../../../components/project-shell/format";
 import { UsageMeter } from "../../../../components/project-shell/UsageMeter";
-import { FOCUS } from "../../../../components/projects/styles";
+import { FOCUS, TEXT_LINK } from "../../../../components/ui/styles";
 import { listConversations } from "../../../../lib/data/conversations";
 import { countKnowledgeFiles, listKnowledgeSources } from "../../../../lib/data/knowledge";
 import { getProjectUsage } from "../../../../lib/data/usage";
 
 export const dynamic = "force-dynamic";
 
-const LINK = `text-sm font-medium text-[#161A24] underline decoration-[#CBD2DE] underline-offset-4 hover:decoration-[#161A24] ${FOCUS}`;
 const PLAN_NAME = { free: "Free", pro: "Pro" } as const;
 
 export default async function ProjectOverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -82,7 +81,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             </ul>
           )}
           <p className="mt-4">
-            <Link href={`${base}/conversations`} className={LINK}>
+            <Link href={`${base}/conversations`} className={TEXT_LINK}>
               View all conversations
             </Link>
           </p>
@@ -109,7 +108,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
               </p>
             )}
             <p className="mt-4">
-              <Link href={`${base}/knowledge`} className={LINK}>
+              <Link href={`${base}/knowledge`} className={TEXT_LINK}>
                 Manage knowledge
               </Link>
             </p>
@@ -121,7 +120,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             </h2>
             <p className="mt-2 text-sm text-[#70788D]">Add one script tag to your site to show the chat button.</p>
             <p className="mt-4">
-              <Link href={`${base}/install`} className={LINK}>
+              <Link href={`${base}/install`} className={TEXT_LINK}>
                 Get the install snippet
               </Link>
             </p>
