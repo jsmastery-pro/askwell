@@ -26,8 +26,8 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T01 | Data seam + mocks + project shell | Alice | P2-T07 | done | #37 |
 | UI-T02 | Knowledge screen | Alice | UI-T01 | done | #38 |
 | UI-T03 | Conversations screens | Alice | UI-T01 | done | #41 |
-| UI-T04 | Customize screen + live preview | Alice | UI-T01 | in review | #43 |
-| UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | todo | — |
+| UI-T04 | Customize screen + live preview | Alice | UI-T01 | done | #43 |
+| UI-T07 | Top navbar + merge Overview into Projects | Alice | UI-T04 | done | #45 |
 | UI-T05 | Billing + usage screens | Alice | UI-T07 | todo | — |
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | todo | — |
 
