@@ -3,7 +3,7 @@ import { accounts, projects } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import { PLAN_LIMITS, type Plan, type Project } from "@askwell/shared";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { isUuid } from "./ids";
 
 export type ProjectUsage = Pick<Project, "messagesUsed" | "periodStart"> & {
@@ -25,8 +25,29 @@ export async function getProjectUsage(
     .innerJoin(accounts, eq(accounts.clerkUserId, projects.ownerId))
     .where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)))
     .limit(1);
-  if (!row) return null;
+  return row ? toUsage(row) : null;
+}
 
+export type ProjectUsageRow = ProjectUsage & Pick<Project, "id" | "name">;
+
+// Real: every project the owner has, oldest first (the Projects page order), with its usage.
+export async function listProjectUsage(ownerId: string, database: Database = defaultDb): Promise<ProjectUsageRow[]> {
+  const rows = await database
+    .select({
+      id: projects.id,
+      name: projects.name,
+      messagesUsed: projects.messagesUsed,
+      periodStart: projects.periodStart,
+      plan: accounts.plan,
+    })
+    .from(projects)
+    .innerJoin(accounts, eq(accounts.clerkUserId, projects.ownerId))
+    .where(eq(projects.ownerId, ownerId))
+    .orderBy(asc(projects.createdAt));
+  return rows.map(({ id, name, ...row }) => ({ id, name, ...toUsage(row) }));
+}
+
+function toUsage(row: { messagesUsed: number; periodStart: Date; plan: Plan }): ProjectUsage {
   return {
     plan: row.plan,
     messagesUsed: row.messagesUsed,
