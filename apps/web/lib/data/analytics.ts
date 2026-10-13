@@ -41,7 +41,8 @@ export type Dashboard = {
   recentChats: RecentChat[];
 };
 
-const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 
 /** The `days` UTC days ending `endOffset` days before `now`, oldest first. */
@@ -62,7 +63,7 @@ export async function getDashboard(
   const [rows, plan] = await Promise.all([listProjects(ownerId, database), getAccountPlan(ownerId, database)]);
   const limits = PLAN_LIMITS[plan];
   const days = RANGE_DAYS[range];
-  const daily = mockDailyMessages(rows, daysBack(now, days));
+  const daily = mockDailyMessages(rows, daysBack(now, days), limits.messagesPerMonth);
 
   return {
     plan,
@@ -79,8 +80,8 @@ export async function getDashboard(
     })),
     daily,
     current: totals(daily),
-    previous: totals(mockDailyMessages(rows, daysBack(now, days, days))),
-    recentChats: mockRecentChats(rows),
+    previous: totals(mockDailyMessages(rows, daysBack(now, days, days), limits.messagesPerMonth)),
+    recentChats: mockRecentChats(rows, now),
   };
 }
 
@@ -88,12 +89,12 @@ export async function getDashboard(
  * A new project has had no chats yet: demo activity starts the day after it was created.
  * MOCK: owner analytics query over messages/conversations (wiring task TBD by John)
  */
-export function mockDailyMessages(projects: ProjectRow[], days: string[]): DayCount[] {
+export function mockDailyMessages(projects: ProjectRow[], days: string[], monthlyLimit: number): DayCount[] {
   return days.map((day) => ({
     day,
     messages: projects
       .filter((project) => day > isoDay(project.createdAt))
-      .reduce((sum, project) => sum + mockMessagesOn(project.id, day), 0),
+      .reduce((sum, project) => sum + mockMessagesOn(project.id, day, monthlyLimit), 0),
   }));
 }
 
@@ -105,23 +106,27 @@ function totals(daily: DayCount[]): Totals {
 
 /**
  * The 5 newest chats across the owner's projects. The shared fixtures are spread over the
- * owner's real projects (so each link opens that project's thread page), and a chat never
- * predates its project.
+ * owner's real projects (so each link opens that project's thread page). Their times move
+ * with `now`, the newest an hour ago, so they stay as fresh as the chart. Like the chart, a
+ * project has no chats until the day after it was created.
  * MOCK: owner analytics query over messages/conversations (wiring task TBD by John)
  */
-export function mockRecentChats(projects: ProjectRow[]): RecentChat[] {
+export function mockRecentChats(projects: ProjectRow[], now: Date): RecentChat[] {
   if (projects.length === 0) return [];
   const byAge = [...projects].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const newest = Math.max(...MOCK_THREADS.map((thread) => Date.parse(thread.createdAt)));
+  const shift = now.getTime() - HOUR_MS - newest;
   return MOCK_THREADS.flatMap((thread, i) => {
     const project = byAge[i % byAge.length]!;
-    if (Date.parse(thread.createdAt) <= project.createdAt.getTime()) return [];
+    const createdAt = new Date(Date.parse(thread.createdAt) + shift);
+    if (isoDay(createdAt) <= isoDay(project.createdAt)) return [];
     return [
       {
         projectId: project.id,
         projectName: project.name,
         conversationId: thread.id,
         preview: thread.messages.find((message) => message.role === "visitor")?.body ?? "",
-        createdAt: thread.createdAt,
+        createdAt: createdAt.toISOString(),
       },
     ];
   })
