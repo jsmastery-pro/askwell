@@ -14,8 +14,8 @@ The `/embed` panel sends real messages to `POST /api/widget/chat` instead of the
 ## Steps
 1. Replace `getReply` with a call to `/api/widget/chat` (key, visitor ID, conversation ID, message).
 2. Keep the returned `conversationId` in the iframe's `localStorage` next to the visitor ID (try/catch, in-memory fallback) and send it on later messages.
-3. Error states, by `error.code`: `rate_limited` → "You're sending messages too fast, try again in a minute"; `quota_exceeded` → "This assistant is unavailable right now"; network/other → a retry option. Never show raw error text.
-4. Enforce the 1,000-character limit in the input (server still checks).
+3. Error states are already built (UI-T09). Map the route's `error.code` (`rate_limited`, `quota_exceeded`, other) to them. Never show raw error text.
+4. The 1,000-character input limit is already built (UI-T09). The server still checks.
 5. Replies still render as text only.
 6. Tests: success path shows the reply; `429` shows the friendly message; `conversationId` is reused on the second message.
 
