@@ -69,8 +69,9 @@ describe("getDashboard", () => {
     const { daily } = await getDashboard(owner, "30d", NOW, db);
     const on = (day: string) => daily.find((d) => d.day === day)!.messages;
     // The newer project was created on Oct 1: only the older one counts that day; both from Oct 2.
-    expect(on("2026-10-01")).toBe(mockMessagesOn(older.id, "2026-10-01"));
-    expect(on("2026-10-02")).toBe(mockMessagesOn(older.id, "2026-10-02") + mockMessagesOn(newer.id, "2026-10-02"));
+    const limit = PLAN_LIMITS.pro.messagesPerMonth;
+    expect(on("2026-10-01")).toBe(mockMessagesOn(older.id, "2026-10-01", limit));
+    expect(on("2026-10-02")).toBe(mockMessagesOn(older.id, "2026-10-02", limit) + mockMessagesOn(newer.id, "2026-10-02", limit));
 
     const fresh = await seedProject(db, { plan: "free", publicKey: "pk_fresh" });
     const empty = await getDashboard(fresh.ownerId, "30d", new Date(fresh.createdAt.getTime() + 60_000), db);
@@ -100,6 +101,34 @@ describe("getDashboard", () => {
     const theirs = await getDashboard(other.ownerId, "90d", NOW, db);
     expect(theirs.usage.map((u) => u.id)).toEqual([other.id]);
     expect(theirs.recentChats.every((c) => c.projectId === other.id)).toBe(true);
+  });
+
+  it("keeps demo volume in proportion to the plan's monthly limit", async () => {
+    const pro = await getDashboard(owner, "30d", NOW, db);
+    const perProject = pro.current.messages / 2;
+    expect(perProject).toBeGreaterThan(PLAN_LIMITS.pro.messagesPerMonth * 0.3);
+    expect(perProject).toBeLessThan(PLAN_LIMITS.pro.messagesPerMonth);
+
+    await db.update(projects).set({ createdAt: new Date("2026-06-01T00:00:00.000Z") }).where(eq(projects.id, other.id));
+    const free = await getDashboard(other.ownerId, "30d", NOW, db);
+    expect(free.current.messages).toBeGreaterThan(PLAN_LIMITS.free.messagesPerMonth * 0.3);
+    expect(free.current.messages).toBeLessThan(PLAN_LIMITS.free.messagesPerMonth);
+  });
+
+  it("moves recent chats with now: the newest an hour ago, a week later too", async () => {
+    for (const now of [NOW, new Date(NOW.getTime() + 7 * 86_400_000)]) {
+      const { recentChats } = await getDashboard(owner, "30d", now, db);
+      expect(Date.parse(recentChats[0]!.createdAt)).toBe(now.getTime() - 3_600_000);
+    }
+  });
+
+  it("gives a project created yesterday its chats from today, but none before", async () => {
+    const fresh = await seedProject(db, { plan: "pro", publicKey: "pk_yesterday" });
+    const created = new Date(NOW.getTime() - 86_400_000);
+    await db.update(projects).set({ createdAt: created }).where(eq(projects.id, fresh.id));
+    const { recentChats } = await getDashboard(fresh.ownerId, "30d", NOW, db);
+    expect(recentChats.length).toBeGreaterThan(0);
+    expect(recentChats.every((chat) => chat.createdAt.slice(0, 10) > created.toISOString().slice(0, 10))).toBe(true);
   });
 
   it("returns an empty dashboard for an owner with no projects", async () => {
