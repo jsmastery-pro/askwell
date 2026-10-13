@@ -1,6 +1,6 @@
 "use client";
 
-import type { KnowledgeSource, Plan } from "@askwell/shared";
+import { PLAN_LIMITS, type KnowledgeSource, type Plan } from "@askwell/shared";
 import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import {
@@ -43,6 +43,8 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
   const [savingText, setSavingText] = useState(false);
   const [confirming, setConfirming] = useState<KnowledgeSource | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // Per-row failures (retry or delete), shown under the row and announced.
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -50,6 +52,14 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
 
   const files = sources.filter(isFile).length;
   const atLimit = files >= filesLimit;
+
+  const setRowError = (id: string, message: string | null) =>
+    setRowErrors((current) => {
+      const next = { ...current };
+      if (message) next[id] = message;
+      else delete next[id];
+      return next;
+    });
 
   const setBusy = (id: string, busy: boolean) =>
     setBusyIds((current) => {
@@ -123,11 +133,15 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
 
   async function retry(source: KnowledgeSource) {
     setBusy(source.id, true);
+    setRowError(source.id, null);
     try {
       const { source: updated } = await retryKnowledgeSource(source);
       setSources((current) => current.map((s) => (s.id === source.id ? updated : s)));
       setAnnouncement(`Processing ${source.title} again.`);
       finishProcessingLater(updated);
+    } catch {
+      setRowError(source.id, "Couldn't start processing again. Try again in a moment.");
+      setAnnouncement(`${source.title} wasn't retried. Try again.`);
     } finally {
       setBusy(source.id, false);
     }
@@ -136,11 +150,13 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
   async function remove(source: KnowledgeSource) {
     setConfirming(null);
     setBusy(source.id, true);
+    setRowError(source.id, null);
     try {
       await deleteKnowledgeSource(source.id);
       setSources((current) => current.filter((s) => s.id !== source.id));
       setAnnouncement(`${source.title} deleted.`);
     } catch {
+      setRowError(source.id, "Couldn't delete this. Try again in a moment.");
       setAnnouncement(`${source.title} wasn't deleted. Try again.`);
     } finally {
       setBusy(source.id, false);
@@ -205,7 +221,7 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
               <Link href="/dashboard/billing" className={`font-medium text-[#161A24] underline underline-offset-4 ${FOCUS}`}>
                 Upgrade to Pro
               </Link>{" "}
-              for up to 25.
+              for up to {PLAN_LIMITS.pro.knowledgeFilesPerProject}.
             </p>
           )}
           <p id="upload-error" role="alert" className="mt-3 text-sm text-[#B42318] empty:hidden">
@@ -314,6 +330,11 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                         {isFile(source)
                           ? "We couldn't read this file. Scanned or password-protected files don't work; try a text-based copy."
                           : "We couldn't process this text."}
+                      </p>
+                    )}
+                    {rowErrors[source.id] && (
+                      <p role="alert" className="mt-2 text-sm font-medium text-[#B42318]">
+                        {rowErrors[source.id]}
                       </p>
                     )}
                   </div>

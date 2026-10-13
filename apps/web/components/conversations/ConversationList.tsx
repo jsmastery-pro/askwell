@@ -1,0 +1,55 @@
+import type { ConversationSummary } from "@askwell/shared";
+import Link from "next/link";
+import { formatDateTime } from "../project-shell/format";
+import { BUTTON_PRIMARY, FOCUS } from "../projects/styles";
+import { formatRelative, visitorLabel } from "./format";
+
+type Props = { projectId: string; conversations: ConversationSummary[]; now: Date };
+
+export function ConversationList({ projectId, conversations, now }: Props) {
+  const base = `/dashboard/projects/${projectId}`;
+
+  if (conversations.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-12 text-center">
+        <p className="font-medium text-[#161A24]">No chats yet</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-[#70788D]">
+          Add the widget to your site. Conversations show up here after a visitor sends a message.
+        </p>
+        <Link href={`${base}/install`} className={`mt-5 inline-block ${BUTTON_PRIMARY}`}>
+          Install the widget
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-[#D7DCE6] border-y border-[#D7DCE6]">
+      {conversations.map((conversation) => (
+        <li key={conversation.id}>
+          <Link
+            href={`${base}/conversations/${conversation.id}`}
+            className={`flex flex-col gap-1 py-4 hover:bg-white/60 sm:flex-row sm:items-baseline sm:gap-6 ${FOCUS}`}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-[#161A24]">
+                {conversation.preview || "No visitor message"}
+              </span>
+              <span className="mt-1 block text-xs text-[#70788D]">
+                {visitorLabel(conversation.visitorId)}, {conversation.messageCount}{" "}
+                {conversation.messageCount === 1 ? "message" : "messages"}
+              </span>
+            </span>
+            <time
+              dateTime={conversation.createdAt}
+              title={formatDateTime(conversation.createdAt)}
+              className="shrink-0 text-xs text-[#70788D]"
+            >
+              {formatRelative(conversation.createdAt, now)}
+            </time>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}

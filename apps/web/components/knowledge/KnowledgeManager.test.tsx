@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MAX_KNOWLEDGE_FILE_BYTES, type KnowledgeSource } from "@askwell/shared";
+import { MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS, type KnowledgeSource } from "@askwell/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addFileKnowledge,
@@ -190,6 +190,37 @@ describe("KnowledgeManager", () => {
     expect(deleteKnowledgeSource).toHaveBeenCalledWith(drop.id);
     expect(screen.queryByText("Delete me")).toBeNull();
     expect(screen.getByText("Keep me")).toBeTruthy();
+  });
+
+  it("shows an error and keeps the source failed when retry fails", async () => {
+    vi.mocked(retryKnowledgeSource).mockRejectedValueOnce(new Error("network"));
+    renderManager([source({ title: "Scan.pdf", status: "failed" })]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+
+    expect(within(row("Scan.pdf")).getByText("Couldn't start processing again. Try again in a moment.")).toBeTruthy();
+    expect(within(row("Scan.pdf")).getByText("Failed")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Try again" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows an error and keeps the row when delete fails", async () => {
+    vi.mocked(deleteKnowledgeSource).mockRejectedValueOnce(new Error("network"));
+    renderManager([source({ title: "Keep me" })]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Keep me" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    });
+
+    expect(within(row("Keep me")).getByText("Couldn't delete this. Try again in a moment.")).toBeTruthy();
+  });
+
+  it("reads the Pro file limit in the upgrade message from PLAN_LIMITS", () => {
+    renderManager([source(), source({ type: "md" }), source({ type: "txt" })]);
+    const message = screen.getByRole("link", { name: "Upgrade to Pro" }).closest("p")!.textContent;
+    expect(message).toContain(`for up to ${PLAN_LIMITS.pro.knowledgeFilesPerProject}.`);
   });
 
   it("explains what Knowledge is for when there are no sources", () => {
