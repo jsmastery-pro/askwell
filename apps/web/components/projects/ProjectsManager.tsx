@@ -3,15 +3,27 @@
 import type {
   ApiError,
   CreateProjectResponse,
+  Plan,
   Project,
   UpdateProjectResponse,
 } from "@askwell/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
+import { BILLING_PATH } from "../dashboard-nav/routes";
+import { FONT_MONO } from "../landing/fonts";
+import { formatCount } from "../project-shell/format";
+import { UsageMeter } from "../project-shell/UsageMeter";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "./styles";
 
-type Props = { initialProjects: Project[]; limit: number };
+type Props = {
+  initialProjects: Project[];
+  plan: Plan;
+  /** Projects the plan allows. */
+  limit: number;
+  /** Messages each project gets per month on this plan. */
+  messagesLimit: number;
+};
 
 async function send<T>(url: string, method: string, body?: unknown): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
   try {
@@ -28,7 +40,7 @@ async function send<T>(url: string, method: string, body?: unknown): Promise<{ o
   }
 }
 
-export function ProjectsManager({ initialProjects, limit }: Props) {
+export function ProjectsManager({ initialProjects, plan, limit, messagesLimit }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [name, setName] = useState("");
@@ -51,6 +63,8 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
       setBusy(false);
     }
   }
+
+  const atLimit = projects.length >= limit;
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -102,6 +116,15 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
       </form>
       <p className="mt-2 text-sm text-[#70788D]">
         {projects.length} of {limit} project{limit === 1 ? "" : "s"} used
+        {atLimit && plan === "free" && (
+          <>
+            .{" "}
+            <Link href={BILLING_PATH} className={`font-medium text-[#161A24] underline underline-offset-4 ${FOCUS}`}>
+              Upgrade to Pro
+            </Link>{" "}
+            for more projects and messages.
+          </>
+        )}
       </p>
 
       {error && (
@@ -113,12 +136,14 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
       {projects.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-[#CBD2DE] bg-white px-6 py-12 text-center">
           <p className="font-medium text-[#161A24]">No projects yet</p>
-          <p className="mt-1 text-sm text-[#70788D]">Create one to get your widget and install snippet.</p>
+          <p className="mt-1 text-sm text-[#70788D]">
+            Name your first project above to get a chat widget and its install snippet.
+          </p>
         </div>
       ) : (
         <ul className="mt-8 divide-y divide-[#E3E7EE] rounded-xl border border-[#E3E7EE] bg-white">
           {projects.map((project) => (
-            <li key={project.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
+            <li key={project.id} className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:gap-6">
               {editingId === project.id ? (
                 <form onSubmit={(e) => rename(e, project.id)} className="flex flex-1 flex-col gap-2 sm:flex-row">
                   <label htmlFor={`rename-${project.id}`} className="sr-only">
@@ -143,16 +168,27 @@ export function ProjectsManager({ initialProjects, limit }: Props) {
               ) : (
                 <>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-[#161A24]">{project.name}</p>
-                    <p className="truncate text-xs text-[#70788D]">{project.publicKey}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/dashboard/projects/${project.id}`}
-                      className={`rounded-md px-3 py-1.5 text-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
+                      className={`block truncate rounded-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
                     >
-                      Open
+                      {project.name}
                     </Link>
+                    <p className="mt-0.5 truncate text-xs text-[#70788D]" style={FONT_MONO}>
+                      {project.publicKey}
+                    </p>
+                  </div>
+                  <div className="md:w-56">
+                    <UsageMeter
+                      used={project.messagesUsed}
+                      limit={messagesLimit}
+                      label={`${project.name}: messages used this month`}
+                    />
+                    <p className="mt-1.5 text-xs text-[#70788D] tabular-nums">
+                      {formatCount(project.messagesUsed)} of {formatCount(messagesLimit)} messages this month
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => {
