@@ -3,6 +3,7 @@ import {
   type AddKnowledgeResponse,
   type AddTextKnowledgeRequest,
   type DeleteKnowledgeResponse,
+  type KnowledgeSource,
 } from "@askwell/shared";
 import { demoDelay } from "./demo";
 
@@ -45,6 +46,13 @@ export async function addFileKnowledge(
       createdAt: new Date().toISOString(),
     },
   };
+}
+
+// There's no retry route in project.md §8 yet; the real one re-runs ingest for the source.
+// MOCK: replace with a re-ingest route if P3-T02 adds one, otherwise remove "Try again".
+export async function retryKnowledgeSource(source: KnowledgeSource): Promise<AddKnowledgeResponse> {
+  await demoDelay();
+  return { source: { ...source, status: "processing" } };
 }
 
 // MOCK: replace with DELETE /api/knowledge/:id (P3-T03).
