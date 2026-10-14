@@ -26,18 +26,18 @@ export function ConversationList({ projectId, conversations, now }: Props) {
   }
 
   return (
-    <ul className="divide-y divide-[#D7DCE6] border-y border-[#D7DCE6]">
+    <ul className="divide-y divide-line border-y border-line">
       {conversations.map((conversation) => (
         <li key={conversation.id}>
           <Link
             href={`${base}/conversations/${conversation.id}`}
-            className={`flex flex-col gap-1 py-4 hover:bg-white/60 sm:flex-row sm:items-baseline sm:gap-6 ${FOCUS}`}
+            className={`flex flex-col gap-1 py-4 hover:bg-surface/60 sm:flex-row sm:items-baseline sm:gap-6 ${FOCUS}`}
           >
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-[#161A24]">
+              <span className="block truncate text-sm font-medium text-ink">
                 {conversation.preview || "No visitor message"}
               </span>
-              <span className="mt-1 block text-xs text-[#70788D]">
+              <span className="mt-1 block text-xs text-muted">
                 {visitorLabel(conversation.visitorId)}, {conversation.messageCount}{" "}
                 {conversation.messageCount === 1 ? "message" : "messages"}
               </span>
@@ -45,7 +45,7 @@ export function ConversationList({ projectId, conversations, now }: Props) {
             <time
               dateTime={conversation.createdAt}
               title={formatDateTime(conversation.createdAt)}
-              className="shrink-0 text-xs text-[#70788D]"
+              className="shrink-0 text-xs text-muted"
             >
               {formatRelative(conversation.createdAt, now)}
             </time>

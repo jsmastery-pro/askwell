@@ -57,18 +57,18 @@ export function ConfirmDialog({ title, body, confirmLabel, onCancel, onConfirm }
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#10131D]/40 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-body`}
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-xl"
       >
-        <h2 id={`${id}-title`} className="font-semibold break-words text-[#161A24]">
+        <h2 id={`${id}-title`} className="font-semibold break-words text-ink">
           {title}
         </h2>
-        <p id={`${id}-body`} className="mt-2 text-sm text-[#70788D]">
+        <p id={`${id}-body`} className="mt-2 text-sm text-muted">
           {body}
         </p>
         <div className="mt-6 flex justify-end gap-2">

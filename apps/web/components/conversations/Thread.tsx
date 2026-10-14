@@ -5,7 +5,7 @@ import { formatDateTime } from "../project-shell/format";
 // Each message is labelled in text too, so the roles don't rely on color or position.
 export function Thread({ messages }: { messages: Message[] }) {
   if (messages.length === 0) {
-    return <p className="text-sm text-[#70788D]">This conversation has no messages.</p>;
+    return <p className="text-sm text-muted">This conversation has no messages.</p>;
   }
 
   return (
@@ -14,13 +14,13 @@ export function Thread({ messages }: { messages: Message[] }) {
         const bot = message.role === "bot";
         return (
           <li key={message.id} className={`flex max-w-[85%] flex-col sm:max-w-[70%] ${bot ? "self-end items-end" : "self-start items-start"}`}>
-            <p className="mb-1 text-xs text-[#70788D]">
-              <span className="font-medium text-[#3D4456]">{bot ? "Bot" : "Visitor"}</span>{" "}
+            <p className="mb-1 text-xs text-muted">
+              <span className="font-medium text-ink">{bot ? "Bot" : "Visitor"}</span>{" "}
               <time dateTime={message.createdAt}>{formatDateTime(message.createdAt)}</time>
             </p>
             <p
               className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm ${
-                bot ? "rounded-br-md bg-[#161A24] text-white" : "rounded-bl-md border border-[#D7DCE6] bg-white text-[#161A24]"
+                bot ? "rounded-br-md bg-ink text-inverse" : "rounded-bl-md border border-line bg-surface text-ink"
               }`}
             >
               {message.body}

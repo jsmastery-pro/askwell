@@ -90,6 +90,15 @@
   }
 }
 
+/* The app's background: the canvas with a soft white light at the top, so glass cards read as glass. */
+.app-canvas {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(1100px 520px at 50% -120px, var(--color-surface), transparent 70%),
+    radial-gradient(700px 420px at 100% 30%, var(--color-surface-strong), transparent 70%);
+  background-repeat: no-repeat;
+}
+
 /* Scroll reveal (components/landing/Reveal.tsx). Content is visible in the HTML; the client only
    hides what's still below the fold, then shows it as it enters. */
 [data-reveal] {
@@ -125,9 +134,9 @@
   .ambient-drift {
     animation: none;
   }
-  .theme-dark *,
-  .theme-dark *::before,
-  .theme-dark *::after {
+  *,
+  *::before,
+  *::after {
     transition-duration: 0ms !important;
   }
 }

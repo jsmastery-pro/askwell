@@ -129,12 +129,12 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, r
           Create project
         </button>
       </form>
-      <p className="mt-2 text-sm text-[#70788D]">
+      <p className="mt-2 text-sm text-muted">
         {projects.length} of {limit} project{limit === 1 ? "" : "s"} used
         {atLimit && plan === "free" && (
           <>
             .{" "}
-            <Link href={BILLING_PATH} className={`font-medium text-[#161A24] underline underline-offset-4 ${FOCUS}`}>
+            <Link href={BILLING_PATH} className={`font-medium text-ink underline underline-offset-4 ${FOCUS}`}>
               Upgrade to Pro
             </Link>{" "}
             for more projects and messages.
@@ -143,7 +143,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, r
       </p>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-md border border-[#FDA29B] bg-[#FEF3F2] px-4 py-3 text-sm text-[#B42318]">
+        <p role="alert" className="mt-4 rounded-md border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -155,7 +155,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, r
           </EmptyState>
         </div>
       ) : (
-        <ul className={`mt-8 divide-y divide-[#E3E7EE] ${CARD}`}>
+        <ul className={`mt-8 divide-y divide-line ${CARD}`}>
           {projects.map((project) => (
             <li key={project.id} className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:gap-6">
               {editingId === project.id ? (
@@ -184,11 +184,11 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, r
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/dashboard/projects/${project.id}`}
-                      className={`block truncate rounded-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
+                      className={`block truncate rounded-sm font-medium text-ink underline-offset-4 hover:underline ${FOCUS}`}
                     >
                       {project.name}
                     </Link>
-                    <p className="mt-0.5 truncate text-xs text-[#70788D]" style={FONT_MONO}>
+                    <p className="mt-0.5 truncate text-xs text-muted" style={FONT_MONO}>
                       {project.publicKey}
                     </p>
                   </div>
@@ -198,7 +198,7 @@ export function ProjectsManager({ initialProjects, plan, limit, messagesLimit, r
                       limit={messagesLimit}
                       label={`${project.name}: messages used this month`}
                     />
-                    <p className="mt-1.5 text-xs text-[#70788D] tabular-nums">
+                    <p className="mt-1.5 text-xs text-muted tabular-nums">
                       {formatCount(usedThisMonth(project))} of {formatCount(messagesLimit)} messages this month
                     </p>
                   </div>

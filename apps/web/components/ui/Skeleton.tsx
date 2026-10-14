@@ -11,5 +11,5 @@ export function LoadingState({ label, children }: { label: string; children: Rea
 
 /** One grey placeholder block. Size it with classes, e.g. "h-6 w-40". */
 export function Bone({ className }: { className: string }) {
-  return <div className={`rounded-md bg-[#DDE2EA] ${className}`} />;
+  return <div className={`rounded-md bg-surface-strong ${className}`} />;
 }

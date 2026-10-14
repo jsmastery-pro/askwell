@@ -31,7 +31,7 @@ export default async function ConversationPage({
     <div className="space-y-6">
       <Link
         href={`/dashboard/projects/${project.id}/conversations`}
-        className={`text-sm text-[#70788D] hover:text-[#161A24] ${FOCUS}`}
+        className={`text-sm text-muted hover:text-ink ${FOCUS}`}
       >
         ← All conversations
       </Link>
@@ -43,7 +43,7 @@ export default async function ConversationPage({
         }`}
         actions={<RefreshButton />}
       />
-      <div className="rounded-xl bg-[#E6EAF1] p-4 sm:p-6">
+      <div className="rounded-xl bg-surface-strong p-4 sm:p-6">
         <Thread messages={conversation.messages} />
       </div>
     </div>

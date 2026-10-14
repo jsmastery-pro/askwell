@@ -35,21 +35,21 @@ export default async function BillingPage() {
 
       <section
         aria-labelledby="plan-heading"
-        className="flex flex-col gap-8 rounded-xl bg-[#10131D] p-6 sm:flex-row sm:items-start sm:justify-between sm:p-8"
+        className="flex flex-col gap-8 rounded-xl bg-ink p-6 sm:flex-row sm:items-start sm:justify-between sm:p-8"
       >
         <div>
-          <h2 id="plan-heading" className="text-sm text-[#AEB5C4]">
+          <h2 id="plan-heading" className="text-sm text-inverse/70">
             Current plan
           </h2>
           <p
-            className={`mt-1 text-4xl font-semibold ${plan === "pro" ? "text-[#F2A33C]" : "text-white"}`}
+            className={`mt-1 text-4xl font-semibold text-inverse`}
             style={FONT_DISPLAY}
           >
             {PLAN_NAME[plan]}
           </p>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-[#DDE2EA]">{planSummary(plan)}.</p>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-inverse/85">{planSummary(plan)}.</p>
           {plan === "free" && (
-            <p className="mt-1 max-w-md text-sm leading-relaxed text-[#AEB5C4]">
+            <p className="mt-1 max-w-md text-sm leading-relaxed text-inverse/70">
               Pro gives you {planSummary("pro")}, and lets you customize the widget.
             </p>
           )}
@@ -58,10 +58,10 @@ export default async function BillingPage() {
       </section>
 
       <section aria-labelledby="usage-heading">
-        <h2 id="usage-heading" className="text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+        <h2 id="usage-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
           Messages this month
         </h2>
-        <p className="mt-1 text-sm text-[#70788D]">Each project has its own monthly limit. Counts update after every bot reply.</p>
+        <p className="mt-1 text-sm text-muted">Each project has its own monthly limit. Counts update after every bot reply.</p>
         {usage.length === 0 ? (
           <div className="mt-4">
             <EmptyState
@@ -76,7 +76,7 @@ export default async function BillingPage() {
             </EmptyState>
           </div>
         ) : (
-          <ul className={`mt-4 divide-y divide-[#E3E7EE] ${CARD}`}>
+          <ul className={`mt-4 divide-y divide-line ${CARD}`}>
             {usage.map((project) => (
               <li key={project.id} className="px-5 py-4">
                 <UsageSummary
@@ -88,7 +88,7 @@ export default async function BillingPage() {
                   title={
                     <Link
                       href={`/dashboard/projects/${project.id}`}
-                      className={`block truncate rounded-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
+                      className={`block truncate rounded-sm font-medium text-ink underline-offset-4 hover:underline ${FOCUS}`}
                     >
                       {project.name}
                     </Link>
@@ -101,7 +101,7 @@ export default async function BillingPage() {
       </section>
 
       <section aria-labelledby="compare-heading">
-        <h2 id="compare-heading" className="mb-4 text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+        <h2 id="compare-heading" className="mb-4 text-lg font-semibold text-ink" style={FONT_DISPLAY}>
           Compare plans
         </h2>
         <PlanComparison plan={plan} />

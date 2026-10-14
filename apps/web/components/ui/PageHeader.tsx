@@ -5,10 +5,10 @@ import { FONT_DISPLAY } from "../landing/fonts";
 export function PageHeader({ title, description }: { title: ReactNode; description?: ReactNode }) {
   return (
     <header className="mb-8">
-      <h1 className="text-3xl font-semibold break-words text-[#161A24]" style={FONT_DISPLAY}>
+      <h1 className="text-3xl font-semibold break-words text-ink" style={FONT_DISPLAY}>
         {title}
       </h1>
-      {description && <p className="mt-3 max-w-prose text-[#70788D]">{description}</p>}
+      {description && <p className="mt-3 max-w-prose text-muted">{description}</p>}
     </header>
   );
 }
@@ -29,12 +29,12 @@ export function SectionHeader({
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+          <h2 className="text-xl font-semibold text-ink" style={FONT_DISPLAY}>
             {title}
           </h2>
           {badge}
         </div>
-        {description && <p className="mt-2 max-w-xl text-sm text-[#70788D]">{description}</p>}
+        {description && <p className="mt-2 max-w-xl text-sm text-muted">{description}</p>}
       </div>
       {actions}
     </div>

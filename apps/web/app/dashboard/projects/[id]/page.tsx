@@ -36,7 +36,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   return (
     <div className="space-y-12">
       <section aria-labelledby="usage-heading">
-        <h2 id="usage-heading" className="mb-2 text-sm font-medium text-[#70788D]">
+        <h2 id="usage-heading" className="mb-2 text-sm font-medium text-muted">
           Messages this month, {PLAN_NAME[usage.plan]} plan
         </h2>
         <UsageSummary
@@ -53,25 +53,25 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
       <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
         <section aria-labelledby="conversations-heading">
           <div className="flex items-center gap-3">
-            <h2 id="conversations-heading" className="text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+            <h2 id="conversations-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
               Recent conversations
             </h2>
             <DemoBadge />
           </div>
           {conversations.length === 0 ? (
-            <p className="mt-4 text-sm text-[#70788D]">
+            <p className="mt-4 text-sm text-muted">
               No conversations yet. They show up here after a visitor sends a message.
             </p>
           ) : (
-            <ul className="mt-4 divide-y divide-[#D7DCE6] border-y border-[#D7DCE6]">
+            <ul className="mt-4 divide-y divide-line border-y border-line">
               {conversations.slice(0, 3).map((conversation) => (
                 <li key={conversation.id}>
                   <Link
                     href={`${base}/conversations/${conversation.id}`}
-                    className={`block py-3 hover:bg-white/60 ${FOCUS}`}
+                    className={`block py-3 hover:bg-surface/60 ${FOCUS}`}
                   >
-                    <p className="truncate text-sm text-[#161A24]">{conversation.preview}</p>
-                    <p className="mt-1 text-xs text-[#70788D]">
+                    <p className="truncate text-sm text-ink">{conversation.preview}</p>
+                    <p className="mt-1 text-xs text-muted">
                       {conversation.messageCount} {conversation.messageCount === 1 ? "message" : "messages"},{" "}
                       {formatDateTime(conversation.createdAt)}
                     </p>
@@ -90,19 +90,19 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
         <div className="space-y-10">
           <section aria-labelledby="knowledge-heading">
             <div className="flex items-center gap-3">
-              <h2 id="knowledge-heading" className="text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+              <h2 id="knowledge-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
                 Knowledge
               </h2>
               <DemoBadge />
             </div>
-            <p className="mt-4 text-sm text-[#161A24]">
+            <p className="mt-4 text-sm text-ink">
               {files} of {filesLimit} files
             </p>
             <div className="mt-2">
               <UsageMeter used={files} limit={filesLimit} label="Knowledge files used" />
             </div>
             {(processing > 0 || failed > 0) && (
-              <p className="mt-3 text-sm text-[#70788D]">
+              <p className="mt-3 text-sm text-muted">
                 {processing > 0 && `${processing} still processing. `}
                 {failed > 0 && `${failed} failed to process.`}
               </p>
@@ -115,10 +115,10 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           </section>
 
           <section aria-labelledby="install-heading">
-            <h2 id="install-heading" className="text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+            <h2 id="install-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
               Widget
             </h2>
-            <p className="mt-2 text-sm text-[#70788D]">Add one script tag to your site to show the chat button.</p>
+            <p className="mt-2 text-sm text-muted">Add one script tag to your site to show the chat button.</p>
             <p className="mt-4">
               <Link href={`${base}/install`} className={TEXT_LINK}>
                 Get the install snippet

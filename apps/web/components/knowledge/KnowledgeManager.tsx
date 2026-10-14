@@ -171,13 +171,13 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       </p>
 
       <div className="max-w-md">
-        <p className="text-sm text-[#161A24]">
+        <p className="text-sm text-ink">
           {files} of {filesLimit} files
         </p>
         <div className="mt-2">
           <UsageMeter used={files} limit={filesLimit} label="Knowledge files used" />
         </div>
-        <p className="mt-2 text-xs text-[#70788D]">Pasted text doesn&apos;t count toward the file limit.</p>
+        <p className="mt-2 text-xs text-muted">Pasted text doesn&apos;t count toward the file limit.</p>
       </div>
 
       <section aria-label="Add knowledge" className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
@@ -189,12 +189,12 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={`flex min-h-36 flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#F2A33C] ${
+            className={`flex min-h-36 flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus ${
               atLimit
-                ? "cursor-not-allowed border-[#D7DCE6] bg-[#F5F7FA] text-[#70788D]"
+                ? "cursor-not-allowed border-line bg-canvas text-muted"
                 : dragging
-                  ? "cursor-copy border-[#161A24] bg-white"
-                  : "cursor-pointer border-[#CBD2DE] bg-white hover:border-[#70788D]"
+                  ? "cursor-copy border-ink bg-surface"
+                  : "cursor-pointer border-line-strong bg-surface hover:border-muted"
             }`}
           >
             <input
@@ -209,32 +209,32 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                 if (file) void upload(file);
               }}
             />
-            <span className="font-medium text-[#161A24]">
+            <span className="font-medium text-ink">
               {uploading ? "Uploading…" : atLimit ? "File limit reached" : "Upload a file"}
             </span>
-            <span id="upload-help" className="mt-1 text-sm text-[#70788D]">
+            <span id="upload-help" className="mt-1 text-sm text-muted">
               {atLimit ? "Delete a file to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 10 MB."}
             </span>
           </label>
           {atLimit && plan === "free" && (
-            <p className="mt-3 text-sm text-[#70788D]">
+            <p className="mt-3 text-sm text-muted">
               The Free plan includes {filesLimit} files per project.{" "}
-              <Link href="/dashboard/billing" className={`font-medium text-[#161A24] underline underline-offset-4 ${FOCUS}`}>
+              <Link href="/dashboard/billing" className={`font-medium text-ink underline underline-offset-4 ${FOCUS}`}>
                 Upgrade to Pro
               </Link>{" "}
               for up to {PLAN_LIMITS.pro.knowledgeFilesPerProject}.
             </p>
           )}
-          <p id="upload-error" role="alert" className="mt-3 text-sm text-[#B42318] empty:hidden">
+          <p id="upload-error" role="alert" className="mt-3 text-sm text-danger empty:hidden">
             {uploadError}
           </p>
         </div>
 
-        <div className="rounded-xl border border-[#D7DCE6] bg-white p-5">
+        <div className="rounded-xl border border-line bg-surface p-5">
           {textOpen ? (
             <form onSubmit={submitText} noValidate className="space-y-3">
               <div>
-                <label htmlFor="knowledge-title" className="block text-sm font-medium text-[#161A24]">
+                <label htmlFor="knowledge-title" className="block text-sm font-medium text-ink">
                   Title
                 </label>
                 <input
@@ -248,13 +248,13 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                   placeholder="Shipping FAQ"
                 />
                 {textErrors.title && (
-                  <p id="knowledge-title-error" className="mt-1 text-sm text-[#B42318]">
+                  <p id="knowledge-title-error" className="mt-1 text-sm text-danger">
                     {textErrors.title}
                   </p>
                 )}
               </div>
               <div>
-                <label htmlFor="knowledge-content" className="block text-sm font-medium text-[#161A24]">
+                <label htmlFor="knowledge-content" className="block text-sm font-medium text-ink">
                   Text
                 </label>
                 <textarea
@@ -268,7 +268,7 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                   placeholder="Paste answers your visitors often need."
                 />
                 {textErrors.content && (
-                  <p id="knowledge-content-error" className="mt-1 text-sm text-[#B42318]">
+                  <p id="knowledge-content-error" className="mt-1 text-sm text-danger">
                     {textErrors.content}
                   </p>
                 )}
@@ -291,8 +291,8 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
             </form>
           ) : (
             <div>
-              <p className="font-medium text-[#161A24]">Paste text</p>
-              <p className="mt-1 text-sm text-[#70788D]">
+              <p className="font-medium text-ink">Paste text</p>
+              <p className="mt-1 text-sm text-muted">
                 For FAQs, policies or anything not in a file. Doesn&apos;t count toward the file limit.
               </p>
               <button type="button" onClick={() => setTextOpen(true)} className={`mt-4 ${BUTTON_SECONDARY}`}>
@@ -304,7 +304,7 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       </section>
 
       <section aria-labelledby="sources-heading">
-        <h3 id="sources-heading" className="text-base font-semibold text-[#161A24]">
+        <h3 id="sources-heading" className="text-base font-semibold text-ink">
           Sources
         </h3>
         {sources.length === 0 ? (
@@ -315,25 +315,25 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
             </EmptyState>
           </div>
         ) : (
-          <ul className="mt-3 divide-y divide-[#D7DCE6] border-y border-[#D7DCE6]">
+          <ul className="mt-3 divide-y divide-line border-y border-line">
             {sources.map((source) => {
               const busy = busyIds.has(source.id);
               return (
                 <li key={source.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="break-words font-medium text-[#161A24]">{source.title}</p>
-                    <p className="mt-1 text-xs text-[#70788D]">
+                    <p className="break-words font-medium text-ink">{source.title}</p>
+                    <p className="mt-1 text-xs text-muted">
                       {TYPE_LABEL[source.type]}, added {formatDateTime(source.createdAt)}
                     </p>
                     {source.status === "failed" && (
-                      <p className="mt-2 text-sm text-[#B42318]">
+                      <p className="mt-2 text-sm text-danger">
                         {isFile(source)
                           ? "We couldn't read this file. Scanned or password-protected files don't work; try a text-based copy."
                           : "We couldn't process this text."}
                       </p>
                     )}
                     {rowErrors[source.id] && (
-                      <p role="alert" className="mt-2 text-sm font-medium text-[#B42318]">
+                      <p role="alert" className="mt-2 text-sm font-medium text-danger">
                         {rowErrors[source.id]}
                       </p>
                     )}
@@ -378,23 +378,23 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
 function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
   if (status === "processing") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF4E0] px-2.5 py-1 text-xs font-medium text-[#8A5A00]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#F2A33C] motion-safe:animate-pulse" aria-hidden />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
+        <span className="h-1.5 w-1.5 rounded-full bg-warning motion-safe:animate-pulse" aria-hidden />
         Processing
       </span>
     );
   }
   if (status === "failed") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FEF3F2] px-2.5 py-1 text-xs font-medium text-[#B42318]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#B42318]" aria-hidden />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-medium text-danger">
+        <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden />
         Failed
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ECFDF3] px-2.5 py-1 text-xs font-medium text-[#067647]">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#12B76A]" aria-hidden />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
       Ready
     </span>
   );
