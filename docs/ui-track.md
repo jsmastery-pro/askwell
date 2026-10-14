@@ -41,6 +41,4 @@ Alice does them one at a time, one PR each, in table order. UI-T07 was added on 
 
 **Done on 2026-10-14** (UI-T01…UI-T11 merged). Every screen is built in the final look; the `MOCK:` markers are Bob's wiring checklist (see #48).
 
-**Carried to Phase 6 polish** (found in UI-T06, outside its files): in Customize's live preview, the widget panel's chat box shows focus only as a border colour change (`widget-panel/`, about 4.4:1). Give it a visible focus outline.
-
 Bob resumes. P3-T01 is already merged (#32), so he starts with Phase 3 Lane A, wiring the Knowledge screen to the real ingest/delete routes. Then the later phases, each replacing the matching `MOCK:` functions.
