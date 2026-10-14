@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { FONT_DISPLAY } from "./fonts";
+import { Reveal } from "./Reveal";
 import { Section } from "./Section";
+import { CARD } from "./styles";
 
 const STEPS: { number: string; title: string; detail: string; icon: ReactNode }[] = [
   {
@@ -52,35 +54,32 @@ const STEPS: { number: string; title: string; detail: string; icon: ReactNode }[
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-[#EEF1F6] py-24">
+    <section id="how-it-works" className="scroll-mt-24 py-24 sm:py-28">
       <Section>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <h2 className="max-w-md text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+        <Reveal className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <h2 className="max-w-md text-3xl font-semibold tracking-[-0.02em] text-ink sm:text-4xl" style={FONT_DISPLAY}>
             From your docs to an answer in three steps.
           </h2>
-          <p className="max-w-sm text-[#70788D]">
-            No code beyond one script tag. No retraining, no prompt engineering.
-          </p>
-        </div>
-        <div className="mt-16 grid grid-cols-1 gap-12 md:grid-cols-3">
+          <p className="max-w-sm text-muted">No code beyond one script tag. No retraining, no prompt engineering.</p>
+        </Reveal>
+        <ol className="mt-14 grid grid-cols-1 gap-4 md:grid-cols-3">
           {STEPS.map((step, index) => (
-            <div key={step.title} className="relative pl-6">
-              {index > 0 && (
-                <span className="absolute left-0 top-2 hidden h-px w-6 -translate-x-full bg-[#CBD2DE] md:block" />
-              )}
-              <div className="flex items-center gap-3 text-[#161A24]">
-                <svg viewBox="0 0 24 24" className="h-6 w-6 text-[#70788D]" aria-hidden>
-                  {step.icon}
-                </svg>
-                <span className="text-2xl font-semibold" style={FONT_DISPLAY}>
-                  {step.number}
-                </span>
-              </div>
-              <h3 className="mt-4 font-medium text-[#161A24]">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#70788D]">{step.detail}</p>
-            </div>
+            <li key={step.title}>
+              <Reveal delay={index * 120} className={`${CARD} h-full p-6 sm:p-7`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-4xl font-semibold text-ink" style={FONT_DISPLAY}>
+                    {step.number}
+                  </span>
+                  <svg viewBox="0 0 24 24" className="h-6 w-6 text-muted" aria-hidden>
+                    {step.icon}
+                  </svg>
+                </div>
+                <h3 className="mt-8 font-medium text-ink">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{step.detail}</p>
+              </Reveal>
+            </li>
           ))}
-        </div>
+        </ol>
       </Section>
     </section>
   );

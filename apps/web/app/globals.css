@@ -1,1 +1,133 @@
 @import "tailwindcss";
+
+/*
+ * Design tokens, named by role. Light is the default (the app); `.theme-dark` switches the same
+ * roles to dark (the landing and sign-in pages). Use them as Tailwind utilities:
+ * bg-canvas, bg-surface, text-ink, text-muted, border-line, outline-focus, backdrop-blur-glass…
+ */
+@theme static {
+  --color-canvas: #f5f5f6;
+  --color-surface: #ffffff;
+  --color-surface-strong: #ebebed;
+  --color-line: #e4e4e7;
+  --color-line-strong: #c4c4c9;
+  --color-ink: #09090b;
+  --color-muted: #52525b;
+  --color-inverse: #ffffff;
+  --color-focus: #09090b;
+
+  /* Glass: a translucent fill over the canvas, and a solid fallback without backdrop-filter. */
+  --color-glass: rgb(255 255 255 / 0.72);
+  --color-glass-solid: #ffffff;
+  --color-glass-line: rgb(9 9 11 / 0.08);
+  --color-glass-hover: rgb(255 255 255 / 0.88);
+  --blur-glass: 16px;
+
+  /* The landing backdrop's light, and the lift under a hovered primary button. */
+  --color-glow: rgb(9 9 11 / 0.06);
+  --color-glow-soft: rgb(9 9 11 / 0.03);
+  --shadow-lift: 0 8px 30px rgb(9 9 11 / 0.12);
+
+  /* Semantic colours keep their hue in every theme: they carry meaning. */
+  --color-warning: #b54708;
+  --color-warning-soft: #fef6e7;
+  --color-danger: #b42318;
+  --color-danger-soft: #fef3f2;
+  --color-success: #067647;
+  --color-success-soft: #ecfdf3;
+}
+
+.theme-dark {
+  --color-canvas: #000000;
+  --color-surface: #0f0f11;
+  --color-surface-strong: #1c1c1f;
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-line-strong: rgb(255 255 255 / 0.24);
+  --color-ink: #fafafa;
+  --color-muted: #a1a1aa;
+  --color-inverse: #09090b;
+  --color-focus: #ffffff;
+
+  --color-glass: rgb(255 255 255 / 0.05);
+  --color-glass-solid: #141416;
+  --color-glass-line: rgb(255 255 255 / 0.14);
+  --color-glass-hover: rgb(255 255 255 / 0.09);
+  --color-glow: rgb(255 255 255 / 0.13);
+  --color-glow-soft: rgb(255 255 255 / 0.05);
+  --shadow-lift: 0 8px 30px rgb(255 255 255 / 0.12);
+
+  --color-warning: #fdb022;
+  --color-warning-soft: rgb(253 176 34 / 0.12);
+  --color-danger: #f97066;
+  --color-danger-soft: rgb(249 112 102 / 0.12);
+  --color-success: #47cd89;
+  --color-success-soft: rgb(71 205 137 / 0.12);
+
+  color-scheme: dark;
+}
+
+/* Arial scaled to Sora's width, used until Sora loads, so headlines keep their line breaks and
+   nothing below them shifts (measured: Sora is 106.4 % as wide as Arial at weight 600). */
+@font-face {
+  font-family: "Sora Fallback";
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold");
+  font-weight: 500 700;
+  size-adjust: 106.4%;
+}
+
+@layer components {
+  /* Frosted glass for surfaces only (nav, cards). Text inside sits on the fill, never on the blur alone. */
+  .glass {
+    background-color: var(--color-glass-solid);
+    border: 1px solid var(--color-glass-line);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background-color: var(--color-glass);
+      -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+      backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+    }
+  }
+}
+
+/* Scroll reveal (components/landing/Reveal.tsx). Content is visible in the HTML; the client only
+   hides what's still below the fold, then shows it as it enters. */
+[data-reveal] {
+  transition:
+    opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal="hidden"] {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+/* The hero's ambient light: a slow drift on a compositor-only transform. */
+@keyframes drift {
+  from {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
+}
+.ambient-drift {
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .ambient-drift {
+    animation: none;
+  }
+  .theme-dark *,
+  .theme-dark *::before,
+  .theme-dark *::after {
+    transition-duration: 0ms !important;
+  }
+}
