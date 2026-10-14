@@ -11,7 +11,7 @@ import { PROJECTS_PATH } from "../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../components/landing/fonts";
 import { DemoBadge } from "../../components/ui/DemoBadge";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { CARD, FOCUS, TEXT_LINK } from "../../components/ui/styles";
+import { CARD, FOCUS, GLASS_CARD, TEXT_LINK } from "../../components/ui/styles";
 import { getDashboard, parseRange, RANGE_DAYS } from "../../lib/data/analytics";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ const PLAN_NAME = { free: "Free", pro: "Pro" } as const;
 function SectionTitle({ id, children, badge }: { id: string; children: string; badge?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <h2 id={id} className="text-lg font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+      <h2 id={id} className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
         {children}
       </h2>
       {badge && <DemoBadge />}
@@ -80,18 +80,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <StatCard
           label="Projects"
           value={`${data.projectCount} of ${data.projectLimit}`}
-          footer={<span className="text-[#70788D]">{PLAN_NAME[data.plan]} plan</span>}
+          footer={<span className="text-muted">{PLAN_NAME[data.plan]} plan</span>}
         />
       </section>
 
-      <section aria-labelledby="chart-heading" className={`${CARD} p-4 sm:p-6`}>
+      <section aria-labelledby="chart-heading" className={`${GLASS_CARD} p-4 sm:p-6`}>
         <SectionTitle id="chart-heading" badge>
           Messages per day, all projects
         </SectionTitle>
         <div className="mt-5">
           {noChats ? (
-            <div className="rounded-lg border border-dashed border-[#CBD2DE] px-6 py-10 text-center">
-              <p className="font-medium text-[#161A24]">No chats yet. Install the widget to start.</p>
+            <div className="rounded-lg border border-dashed border-line-strong px-6 py-10 text-center">
+              <p className="font-medium text-ink">No chats yet. Install the widget to start.</p>
               <Link href={`/dashboard/projects/${busiest[0]!.id}/install`} className={`mt-3 inline-block ${TEXT_LINK}`}>
                 Install the widget on {busiest[0]!.name}
               </Link>
@@ -110,7 +110,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               Manage projects
             </Link>
           </div>
-          <ul className="mt-4 divide-y divide-[#E3E7EE]">
+          <ul className="mt-4 divide-y divide-line">
             {busiest.map((project) => (
               <li key={project.id} className="py-4 first:pt-0 last:pb-0">
                 <UsageSummary
@@ -122,7 +122,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   title={
                     <Link
                       href={`/dashboard/projects/${project.id}`}
-                      className={`block truncate rounded-sm font-medium text-[#161A24] underline-offset-4 hover:underline ${FOCUS}`}
+                      className={`block truncate rounded-sm font-medium text-ink underline-offset-4 hover:underline ${FOCUS}`}
                     >
                       {project.name}
                     </Link>

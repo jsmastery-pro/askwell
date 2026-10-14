@@ -32,16 +32,16 @@ export default async function InstallPage({ params }: { params: Promise<{ id: st
       />
       <ol className="mt-6 space-y-3">
         {STEPS.map((step, index) => (
-          <li key={step} className="flex gap-3 text-[#3D4456]">
-            <span className="font-semibold text-[#F2A33C]" style={FONT_DISPLAY}>
+          <li key={step} className="flex gap-3 text-ink">
+            <span className="font-semibold text-ink" style={FONT_DISPLAY}>
               {index + 1}
             </span>
             <span>{step}</span>
           </li>
         ))}
       </ol>
-      <div className="mt-8 rounded-xl bg-[#10131D] p-5">
-        <pre className="overflow-x-auto text-sm text-[#C3C9D6]" style={FONT_MONO}>
+      <div className="mt-8 rounded-xl bg-ink p-5">
+        <pre className="overflow-x-auto text-sm text-inverse/85" style={FONT_MONO}>
           <code>{snippet}</code>
         </pre>
       </div>

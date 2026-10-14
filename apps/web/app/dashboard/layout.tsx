@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <ClerkProvider>
-      <div className="min-h-screen bg-[#EEF1F6]" style={FONT_BODY}>
+      <div className="app-canvas min-h-screen" style={FONT_BODY}>
         <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
         <NavBar />
         <main className={`py-10 md:py-14 ${DASHBOARD_FRAME}`}>{children}</main>

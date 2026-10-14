@@ -23,10 +23,10 @@ export default async function ProjectLayout({
   return (
     <div className="max-w-5xl">
       <header className="mb-6">
-        <h1 className="break-words text-3xl font-semibold text-[#161A24]" style={FONT_DISPLAY}>
+        <h1 className="break-words text-3xl font-semibold text-ink" style={FONT_DISPLAY}>
           {project.name}
         </h1>
-        <p className="mt-1 truncate text-xs text-[#70788D]" style={FONT_MONO}>
+        <p className="mt-1 truncate text-xs text-muted" style={FONT_MONO}>
           {project.publicKey}
         </p>
       </header>
