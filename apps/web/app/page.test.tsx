@@ -1,6 +1,6 @@
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import Home from "./page";
 
 const HEADINGS = [
@@ -10,6 +10,9 @@ const HEADINGS = [
   "Simple pricing. Upgrade when you outgrow Free.",
   "Install in one line.",
 ];
+
+// Home now has client components (Reveal), so unmount before the environment goes away.
+afterEach(cleanup);
 
 describe("Home", () => {
   it("shows the app name", () => {
