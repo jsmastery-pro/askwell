@@ -42,13 +42,13 @@ export function AccountMenu() {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
-        className={`flex items-center gap-2.5 rounded-full py-1 pr-1 pl-1 text-sm text-[#C3C9D6] hover:text-white sm:pl-3 ${FOCUS}`}
+        className={`flex items-center gap-2.5 rounded-full py-1 pr-1 pl-1 text-sm text-muted transition-colors hover:text-ink sm:pl-3 ${FOCUS}`}
       >
         <span className="sr-only">Account{email ? ": " : ""}</span>
         {email && <span className="hidden max-w-56 truncate sm:block">{email}</span>}
         <span
           aria-hidden="true"
-          className="grid size-8 place-items-center rounded-full bg-[#F2A33C] text-sm font-semibold text-[#10131D] uppercase"
+          className="grid size-8 place-items-center rounded-full bg-ink text-sm font-semibold text-inverse uppercase"
         >
           {email ? (
             email[0]
@@ -66,18 +66,18 @@ export function AccountMenu() {
         id={panelId}
         hidden={!open}
         tabIndex={-1}
-        className="absolute top-full right-0 z-40 mt-2 w-64 rounded-lg border border-[#D7DCE6] bg-white p-2 shadow-lg shadow-[#10131D]/15 focus:outline-none"
+        className="absolute top-full right-0 z-40 mt-2 w-64 rounded-lg border border-line bg-surface p-2 shadow-lg shadow-ink/15 focus:outline-none"
       >
         {email && (
-          <p className="truncate border-b border-[#E3E7EE] px-3 pt-2 pb-3 text-sm">
-            <span className="block text-xs text-[#70788D]">Signed in as</span>
-            <span className="text-[#161A24]">{email}</span>
+          <p className="truncate border-b border-line px-3 pt-2 pb-3 text-sm">
+            <span className="block text-xs text-muted">Signed in as</span>
+            <span className="text-ink">{email}</span>
           </p>
         )}
         <SignOutButton redirectUrl="/sign-in">
           <button
             type="button"
-            className={`mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-[#161A24] hover:bg-[#F5F7FA] ${FOCUS}`}
+            className={`mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-canvas ${FOCUS}`}
           >
             Sign out
           </button>

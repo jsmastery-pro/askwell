@@ -12,7 +12,7 @@ export function chartSummary(days: Day[]): string {
   return `${formatCount(total)} ${total === 1 ? "message" : "messages"}, busiest day ${label(busiest.day)}: ${formatCount(busiest.messages)}`;
 }
 
-/** One bar per day; the busiest day in amber. Inline SVG, scaled to the container's width. */
+/** One bar per day in gray; the busiest day in black. Inline SVG, scaled to the container's width. */
 export function MessagesChart({ days }: { days: Day[] }) {
   const max = Math.max(...days.map((d) => d.messages), 1);
   const busiest = days.findIndex((d) => d.messages === max);
@@ -23,7 +23,7 @@ export function MessagesChart({ days }: { days: Day[] }) {
   return (
     <figure>
       <div className="flex items-stretch gap-3">
-        <div aria-hidden="true" className="flex flex-col justify-between py-0.5 text-right text-xs text-[#70788D] tabular-nums">
+        <div aria-hidden="true" className="flex flex-col justify-between py-0.5 text-right text-xs text-muted tabular-nums">
           <span>{formatCount(max)}</span>
           <span>0</span>
         </div>
@@ -32,7 +32,7 @@ export function MessagesChart({ days }: { days: Day[] }) {
           aria-label={`Messages per day: ${summary}`}
           viewBox={`0 0 ${days.length * slot} 100`}
           preserveAspectRatio="none"
-          className="h-44 w-full min-w-0 border-b border-[#CBD2DE]"
+          className="h-44 w-full min-w-0 border-b border-line-strong"
         >
           {days.map((d, i) => {
             const height = (d.messages / max) * 96;
@@ -44,7 +44,7 @@ export function MessagesChart({ days }: { days: Day[] }) {
                 width={slot - gap}
                 height={height}
                 rx={1}
-                className={i === busiest && d.messages > 0 ? "fill-[#F2A33C]" : "fill-[#161A24]"}
+                className={i === busiest && d.messages > 0 ? "fill-ink" : "fill-muted"}
               >
                 <title>{`${label(d.day)}: ${formatCount(d.messages)}`}</title>
               </rect>
@@ -52,11 +52,11 @@ export function MessagesChart({ days }: { days: Day[] }) {
           })}
         </svg>
       </div>
-      <div aria-hidden="true" className="mt-2 flex justify-between pl-9 text-xs text-[#70788D]">
+      <div aria-hidden="true" className="mt-2 flex justify-between pl-9 text-xs text-muted">
         <span>{label(days[0]!.day)}</span>
         <span>{label(days[days.length - 1]!.day)}</span>
       </div>
-      <figcaption className="mt-3 text-sm text-[#4A5163]">{summary}.</figcaption>
+      <figcaption className="mt-3 text-sm text-muted">{summary}.</figcaption>
     </figure>
   );
 }

@@ -87,9 +87,9 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
     <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <form onSubmit={save} noValidate className="space-y-6">
         {locked && (
-          <div className="rounded-xl border border-[#F2A33C] bg-[#FFF8EC] p-5">
-            <p className="font-medium text-[#161A24]">Customizing the widget is a Pro feature</p>
-            <p className="mt-1 text-sm text-[#5C4A26]">
+          <div className="rounded-xl border border-line-strong bg-surface p-5">
+            <p className="font-medium text-ink">Customizing the widget is a Pro feature</p>
+            <p className="mt-1 text-sm text-muted">
               On Free, your widget uses the default look and shows the &quot;Powered by&quot; badge. Upgrade
               to change the color, position, label, animation and header, and to hide the badge.
             </p>
@@ -105,7 +105,7 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
           <legend className="sr-only">Widget settings</legend>
 
           <div>
-            <label htmlFor="buttonColor" className="block text-sm font-medium text-[#161A24]">
+            <label htmlFor="buttonColor" className="block text-sm font-medium text-ink">
               Button color
             </label>
             <div className="mt-1 flex items-center gap-3">
@@ -114,7 +114,7 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
                 aria-label="Pick a button color"
                 value={draft.buttonColor}
                 onChange={(event) => setColor(event.target.value)}
-                className={`h-10 w-12 cursor-pointer rounded-md border border-[#CBD2DE] bg-white p-1 disabled:cursor-not-allowed ${FOCUS}`}
+                className={`h-10 w-12 cursor-pointer rounded-md border border-line-strong bg-surface p-1 disabled:cursor-not-allowed ${FOCUS}`}
               />
               <input
                 id="buttonColor"
@@ -135,7 +135,7 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
           </div>
 
           <fieldset>
-            <legend className="text-sm font-medium text-[#161A24]">Position</legend>
+            <legend className="text-sm font-medium text-ink">Position</legend>
             <div className="mt-2 grid max-w-xs grid-cols-2 gap-2">
               {POSITION_ORDER.map((position) => (
                 <Choice
@@ -161,7 +161,7 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
           />
 
           <fieldset>
-            <legend className="text-sm font-medium text-[#161A24]">Open animation</legend>
+            <legend className="text-sm font-medium text-ink">Open animation</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {WIDGET_ANIMATIONS.map((animation) => (
                 <Choice
@@ -195,17 +195,17 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
               type="checkbox"
               checked={draft.showBadge}
               onChange={(event) => update("showBadge", event.target.checked)}
-              className={`mt-0.5 h-4 w-4 accent-[#161A24] ${FOCUS}`}
+              className={`mt-0.5 h-4 w-4 accent-ink ${FOCUS}`}
             />
             <span>
-              <span className="block text-sm font-medium text-[#161A24]">Show &quot;Powered by&quot; badge</span>
-              <span className="block text-sm text-[#70788D]">The small credit line under the chat.</span>
+              <span className="block text-sm font-medium text-ink">Show &quot;Powered by&quot; badge</span>
+              <span className="block text-sm text-muted">The small credit line under the chat.</span>
             </span>
           </label>
         </fieldset>
 
         {!locked && (
-          <div className="flex flex-wrap items-center gap-3 border-t border-[#D7DCE6] pt-5">
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
             <button type="submit" disabled={!dirty || saving} className={BUTTON_PRIMARY}>
               {saving ? "Saving…" : "Save changes"}
             </button>
@@ -215,8 +215,8 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
               </button>
             )}
             <span aria-live="polite" className="text-sm">
-              {status === "saved" && <span className="text-[#067647]">Saved</span>}
-              {status === "error" && <span className="text-[#B42318]">Changes weren&apos;t saved. Try again.</span>}
+              {status === "saved" && <span className="text-success">Saved</span>}
+              {status === "error" && <span className="text-danger">Changes weren&apos;t saved. Try again.</span>}
             </span>
             <span className="ml-auto">
               <DemoBadge />
@@ -235,11 +235,11 @@ export function CustomizeForm({ projectId, plan, initialConfig }: Props) {
 function Choice({ name, label, checked, onChange }: { name: string; label: string; checked: boolean; onChange: () => void }) {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm has-[:disabled]:cursor-not-allowed has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#F2A33C] ${
-        checked ? "border-[#161A24] bg-white font-medium text-[#161A24]" : "border-[#CBD2DE] bg-white/60 text-[#3D4456]"
+      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm has-[:disabled]:cursor-not-allowed has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${
+        checked ? "border-ink bg-surface font-medium text-ink" : "border-line-strong bg-surface/60 text-ink"
       }`}
     >
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="accent-[#161A24]" />
+      <input type="radio" name={name} checked={checked} onChange={onChange} className="accent-ink" />
       {label}
     </label>
   );
@@ -257,7 +257,7 @@ function TextField(props: {
 }) {
   return (
     <div>
-      <label htmlFor={props.id} className="block text-sm font-medium text-[#161A24]">
+      <label htmlFor={props.id} className="block text-sm font-medium text-ink">
         {props.label}
       </label>
       <div className="mt-1 flex items-center gap-3">
@@ -280,7 +280,7 @@ function TextField(props: {
 function ResetButton({ visible, onClick }: { visible: boolean; onClick: () => void }) {
   if (!visible) return null;
   return (
-    <button type="button" onClick={onClick} className={`shrink-0 text-sm text-[#70788D] underline underline-offset-4 hover:text-[#161A24] ${FOCUS}`}>
+    <button type="button" onClick={onClick} className={`shrink-0 text-sm text-muted underline underline-offset-4 hover:text-ink ${FOCUS}`}>
       Reset to default
     </button>
   );
@@ -289,7 +289,7 @@ function ResetButton({ visible, onClick }: { visible: boolean; onClick: () => vo
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="mt-1 text-sm text-[#B42318]">
+    <p id={id} className="mt-1 text-sm text-danger">
       {message}
     </p>
   );

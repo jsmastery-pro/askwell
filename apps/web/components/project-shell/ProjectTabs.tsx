@@ -18,7 +18,7 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
 
   return (
     <nav aria-label="Project" className="-mx-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
-      <ul className="flex min-w-max gap-6 border-b border-[#D7DCE6]">
+      <ul className="flex min-w-max gap-6 border-b border-line">
         {TABS.map((tab) => {
           const href = base + tab.path;
           const active = tab.path === "" ? pathname === base : pathname === href || pathname.startsWith(`${href}/`);
@@ -29,8 +29,8 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
                 aria-current={active ? "page" : undefined}
                 className={`-mb-px block border-b-2 py-3 text-sm font-medium ${
                   active
-                    ? "border-[#F2A33C] text-[#161A24]"
-                    : "border-transparent text-[#70788D] hover:text-[#161A24]"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 } ${FOCUS}`}
               >
                 {tab.label}

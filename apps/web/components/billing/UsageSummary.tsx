@@ -24,8 +24,8 @@ type Props = {
 };
 
 const NOTE = {
-  warning: "border-[#F2A33C] bg-[#FEF6EA] text-[#7A4A06]",
-  limit: "border-[#FDA29B] bg-[#FEF3F2] text-[#B42318]",
+  warning: "border-warning bg-warning-soft text-warning",
+  limit: "border-danger/40 bg-danger-soft text-danger",
 } as const;
 
 /** Messages used this month against the plan limit, with the reset date and limit warnings. */
@@ -47,22 +47,22 @@ export function UsageSummary({ used: stored, limit, resetsAt, now, label, size =
   return (
     <div>
       {size === "large" ? (
-        <p className="flex items-baseline gap-2 text-[#161A24]" style={FONT_DISPLAY}>
+        <p className="flex items-baseline gap-2 text-ink" style={FONT_DISPLAY}>
           <span className="text-5xl font-semibold tabular-nums">{formatCount(used)}</span>
-          <span className="text-xl text-[#70788D]">of {formatCount(limit)} messages</span>
+          <span className="text-xl text-muted">of {formatCount(limit)} messages</span>
         </p>
       ) : (
         <div className="flex items-baseline justify-between gap-4">
           <div className="min-w-0">{title}</div>
-          <p className="shrink-0 text-sm text-[#161A24] tabular-nums">
-            {formatCount(used)} <span className="text-[#70788D]">/ {formatCount(limit)}</span>
+          <p className="shrink-0 text-sm text-ink tabular-nums">
+            {formatCount(used)} <span className="text-muted">/ {formatCount(limit)}</span>
           </p>
         </div>
       )}
       <div className={size === "large" ? "mt-4 max-w-xl" : "mt-2"}>
         <UsageMeter used={used} limit={limit} label={label} />
       </div>
-      <p className="mt-2 text-sm text-[#70788D]">
+      <p className="mt-2 text-sm text-muted">
         {periodEnded ? "A new month starts with the next message." : `Resets on ${resetDate}.`}
       </p>
       {level !== "ok" && (

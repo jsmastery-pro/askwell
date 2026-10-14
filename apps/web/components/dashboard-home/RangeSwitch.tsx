@@ -10,7 +10,7 @@ const OPTIONS = [
 /** Links, not client state: the range lives in the URL and the page renders on the server. */
 export function RangeSwitch({ current }: { current: string }) {
   return (
-    <div role="group" aria-label="Time range" className="inline-flex rounded-lg border border-[#D7DCE6] bg-white p-1">
+    <div role="group" aria-label="Time range" className="inline-flex rounded-lg border border-line bg-surface p-1">
       {OPTIONS.map((option) => {
         const active = option.range === current;
         return (
@@ -21,7 +21,7 @@ export function RangeSwitch({ current }: { current: string }) {
             aria-current={active ? "true" : undefined}
             title={option.name}
             className={`rounded-md px-3 py-1.5 text-sm font-medium tabular-nums ${
-              active ? "bg-[#10131D] text-white" : "text-[#4A5163] hover:bg-[#F5F7FA] hover:text-[#161A24]"
+              active ? "bg-ink text-inverse" : "text-muted hover:bg-canvas hover:text-ink"
             } ${FOCUS}`}
           >
             {option.range}
