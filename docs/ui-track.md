@@ -32,13 +32,13 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T06 | Polish pass + core-flow click-through | Alice | UI-T02…T05 | done | #48 |
 | UI-T08 | Dashboard home with analytics across all projects | Alice | UI-T06 | done | #51, #52 |
 | UI-T09 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T08 | done | #53 |
-| UI-T10 | Design tokens + landing redesign (dark, glass, motion) | Alice | UI-T09 | in review | #54 |
-| UI-T11 | Dashboard redesign (light monochrome, glass) | Alice | UI-T10 + PO approval | todo | — |
+| UI-T10 | Design tokens + landing redesign (dark, glass, motion) | Alice | UI-T09 | done | #54 |
+| UI-T11 | Dashboard redesign (light monochrome, glass) | Alice | UI-T10 + PO approval | done | #56 |
 
 Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 (dashboard home with analytics; it brings back `/dashboard` as a page, partly reversing UI-T07's "merge Overview into Projects") and UI-T09 (the last panel and sign-in pieces) were added the same day, so the UI is complete before Bob resumes. UI-T10 and UI-T11 are a visual redesign (product owner, 2026-10-13): black and white with glass, a dark landing page with simple motion, and a light app. The landing page comes first, and the product owner approves its look before the dashboard follows. The landing look was approved on 2026-10-14; the sign-in/up pages keep Clerk's default look.
 
 ## When the UI track is done
 
-**Carried to Phase 6 polish** (found in UI-T06, outside its files): in Customize's live preview, the widget panel's chat box shows focus only as a border colour change (`widget-panel/`, about 4.4:1). Give it a visible focus outline.
+**Done on 2026-10-14** (UI-T01…UI-T11 merged). Every screen is built in the final look; the `MOCK:` markers are Bob's wiring checklist (see #48).
 
 Bob resumes. P3-T01 is already merged (#32), so he starts with Phase 3 Lane A, wiring the Knowledge screen to the real ingest/delete routes. Then the later phases, each replacing the matching `MOCK:` functions.
