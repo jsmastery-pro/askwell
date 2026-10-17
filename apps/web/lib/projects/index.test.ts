@@ -2,9 +2,13 @@
 import { accounts, projects, widgetConfigs } from "@askwell/db";
 import { publicKeySchema } from "@askwell/shared";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestDb, type TestDb } from "../widget-config/test-db";
-import { createProject, deleteProject, generatePublicKey, listProjects, renameProject } from "./index";
+
+const captureServerEvent = vi.hoisted(() => vi.fn());
+vi.mock("../posthog/server", () => ({ captureServerEvent }));
+
+const { createProject, deleteProject, generatePublicKey, listProjects, renameProject } = await import("./index");
 
 let db: TestDb;
 let close: () => Promise<void>;
@@ -14,6 +18,10 @@ beforeAll(async () => {
 });
 
 afterAll(() => close());
+
+afterEach(() => {
+  captureServerEvent.mockClear();
+});
 
 async function create(ownerId: string, name = "Docs bot") {
   const result = await createProject(ownerId, name, db);
@@ -62,6 +70,35 @@ describe("createProject", () => {
     const results = await Promise.all([createProject("user_race", "A", db), createProject("user_race", "B", db)]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(await listProjects("user_race", db)).toHaveLength(1);
+  });
+});
+
+describe("PostHog events", () => {
+  it("sends project_created with the project id after a successful create", async () => {
+    const project = await create("user_events_project");
+    expect(captureServerEvent).toHaveBeenCalledWith("user_events_project", "project_created", {
+      project_id: project.id,
+    });
+  });
+
+  it("sends nothing for a create refused by the plan limit", async () => {
+    await create("user_events_limit");
+    captureServerEvent.mockClear();
+    const result = await createProject("user_events_limit", "Second", db);
+    expect(result.ok).toBe(false);
+    expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("sends signed_up only when the account row is actually created, not on later calls", async () => {
+    await create("user_events_signup");
+    expect(captureServerEvent.mock.calls.filter(([, event]) => event === "signed_up")).toEqual([
+      ["user_events_signup", "signed_up"],
+    ]);
+
+    captureServerEvent.mockClear();
+    await db.update(accounts).set({ plan: "pro" }).where(eq(accounts.clerkUserId, "user_events_signup"));
+    await create("user_events_signup", "Another");
+    expect(captureServerEvent.mock.calls.some(([, event]) => event === "signed_up")).toBe(false);
   });
 });
 

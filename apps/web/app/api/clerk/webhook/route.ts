@@ -4,6 +4,7 @@ import type { Plan } from "@askwell/shared";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
+import { captureServerEvent } from "../../../../lib/posthog/server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,10 @@ export async function POST(request: NextRequest) {
   // The payer on a user-type subscription carries the Clerk user id (project.md §9 Webhook).
   if (event.type === "subscriptionItem.active" && event.data.plan?.slug === PRO_PLAN_SLUG) {
     const userId = event.data.payer?.user_id;
-    if (userId) await setPlan(userId, "pro");
+    if (userId) {
+      await setPlan(userId, "pro");
+      captureServerEvent(userId, "upgraded", { plan: "pro" });
+    }
   } else if (event.type === "subscriptionItem.ended" && event.data.plan?.slug === PRO_PLAN_SLUG) {
     // Not "canceled": Clerk keeps Pro access through the paid period after a cancellation
     // request, so only the subscription actually ending should downgrade the account.

@@ -5,8 +5,12 @@ import * as schema from "@askwell/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ensureAccount } from "./account";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const captureServerEvent = vi.hoisted(() => vi.fn());
+vi.mock("../../lib/posthog/server", () => ({ captureServerEvent }));
+
+const { ensureAccount } = await import("./account");
 
 const client = new PGlite({ extensions: { vector } });
 const db = drizzle(client, { schema });
@@ -18,6 +22,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await client.close();
+});
+
+afterEach(() => {
+  captureServerEvent.mockClear();
 });
 
 const rowsFor = (clerkUserId: string) =>
@@ -47,5 +55,20 @@ describe("ensureAccount", () => {
     const rows = await rowsFor("user_pro");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.plan).toBe("pro");
+  });
+});
+
+describe("signed_up", () => {
+  it("fires once, on the call that creates the account", async () => {
+    expect(await ensureAccount("user_signup", db)).toBe(true);
+    expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("user_signup", "signed_up");
+  });
+
+  it("doesn't fire on later visits by the same user", async () => {
+    await ensureAccount("user_signup_again", db);
+    captureServerEvent.mockClear();
+
+    expect(await ensureAccount("user_signup_again", db)).toBe(false);
+    expect(captureServerEvent).not.toHaveBeenCalled();
   });
 });
