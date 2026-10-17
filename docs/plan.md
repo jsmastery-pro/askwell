@@ -177,7 +177,7 @@ Lane B builds the 402 path first, then tests Pro by setting `accounts.plan` by h
 |---|---|---|---|---|---|
 | P5-T01 | Clerk Billing: webhook, pricing table, drop Stripe | Bob | P1-T02 | done | #66 |
 | P5-T02 | Fix Clerk webhook plan-write bugs | Bob | P5-T01 | done | #67 |
-| P5-T03 | Customize save: PATCH /api/projects/:id/config | Bob | P1-T02, P5-T01 | in progress | — |
+| P5-T03 | Customize save: PATCH /api/projects/:id/config | Bob | P1-T02, P5-T01 | in review | #68 |
 
 Lane B is normally Alice's, but she's still on Phase 3 Lane B (Arcjet/chat route/panel) — product owner approved giving P5-T03 to Bob since it doesn't overlap her work, 2026-10-17.
 
