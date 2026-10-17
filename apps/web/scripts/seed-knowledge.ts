@@ -5,24 +5,32 @@
 // Usage:
 //   pnpm seed-knowledge <publicKey> <path-to-text-file> [title]
 //
-// Reads DATABASE_URL and OPENAI_API_KEY from .env.local (falls back to .env), same as `next dev`.
+// Reads DATABASE_URL and OPENAI_API_KEY from .env.local / .env, checking this app's own
+// directory first and the repo root second (where this monorepo's secrets actually live).
+// Run with `insta run --` to get DATABASE_URL from the branch instead (project.md env vars).
 
-import { knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
-import { db } from "@askwell/db/client";
 import { CHUNKING } from "@askwell/shared";
 import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { embedTexts } from "../lib/ai";
 
-for (const file of [".env.local", ".env"]) {
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+// Earlier files win: loadEnvFile never overwrites a variable that's already set.
+for (const file of [".env.local", ".env", join(repoRoot, ".env.local"), join(repoRoot, ".env")]) {
   try {
     process.loadEnvFile(file);
-    break;
   } catch {
-    // Try the next candidate; it's fine if neither exists (env may already be set).
+    // Fine if a candidate doesn't exist; env may already be set some other way (e.g. `insta run`).
   }
 }
+
+// Imported dynamically, after the env-loading loop above: @askwell/db/client reads
+// DATABASE_URL at module load (to construct its pg Pool), so a static import would run
+// before .env.local/.env are loaded and could capture an empty connection string.
+const { knowledgeChunks, knowledgeSources, projects } = await import("@askwell/db");
+const { db } = await import("@askwell/db/client");
 
 // No real tokenizer here — this is a seeding tool, not the ingest pipeline (P3-T02 owns that).
 // ~0.75 words per token is a common rough approximation for English text.
@@ -63,23 +71,28 @@ async function main() {
     process.exit(1);
   }
 
-  const title = titleArg ?? basename(filePath);
-  const [source] = await db
-    .insert(knowledgeSources)
-    .values({ projectId: project.id, title, type: "text", status: "ready" })
-    .returning();
-
+  // Embed before writing anything, then insert the source and its chunks in one transaction —
+  // otherwise a failure partway through could leave a `ready` source with zero chunks.
   const embeddings = await embedTexts(chunks);
-  await db.insert(knowledgeChunks).values(
-    chunks.map((chunkContent, i) => ({
-      projectId: project.id,
-      sourceId: source!.id,
-      content: chunkContent,
-      embedding: embeddings[i]!,
-    })),
-  );
 
-  console.log(`Seeded ${chunks.length} chunks for "${project.name}" from ${filePath} (source ${source!.id})`);
+  const title = titleArg ?? basename(filePath);
+  const sourceId = await db.transaction(async (tx) => {
+    const [source] = await tx
+      .insert(knowledgeSources)
+      .values({ projectId: project.id, title, type: "text", status: "ready" })
+      .returning();
+    await tx.insert(knowledgeChunks).values(
+      chunks.map((chunkContent, i) => ({
+        projectId: project.id,
+        sourceId: source!.id,
+        content: chunkContent,
+        embedding: embeddings[i]!,
+      })),
+    );
+    return source!.id;
+  });
+
+  console.log(`Seeded ${chunks.length} chunks for "${project.name}" from ${filePath} (source ${sourceId})`);
   process.exit(0);
 }
 
