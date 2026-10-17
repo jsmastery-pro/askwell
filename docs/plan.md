@@ -148,11 +148,13 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 
 **Goal:** Free vs Pro works end to end.
 
-**Keys before start:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` (test mode)
+**Keys before start:** `CLERK_WEBHOOK_SIGNING_SECRET`. In the Clerk dashboard: Billing on (development gateway, test mode), plans `free` and `pro`, and a webhook to `/api/clerk/webhook` with the subscription events.
+
+> **Billing provider (2026-10-17, product owner):** Clerk Billing replaces Stripe Checkout and the portal. Stripe still processes payments behind Clerk; we hold no Stripe keys.
 
 | Lane              | Includes                                                                                                                       | project.md |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------- |
-| **A — Billing**   | Stripe Checkout, customer portal, webhook → `accounts.plan`, billing page                                                      | §6.10      |
+| **A — Billing**   | Clerk webhook → `accounts.plan`, billing page with Clerk's pricing table, drop `stripe_customer_id` and the checkout/portal types | §6.10      |
 | **B — Customize** | Customize page with live preview, `PATCH /api/projects/:id/config` with 402 for Free, plan-applied config in the widget, badge | §6.8       |
 
 Lane B builds the 402 path first, then tests Pro by setting `accounts.plan` by hand until Lane A is merged.
