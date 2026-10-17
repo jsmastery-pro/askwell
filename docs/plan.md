@@ -176,7 +176,7 @@ Lane B builds the 402 path first, then tests Pro by setting `accounts.plan` by h
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | P5-T01 | Clerk Billing: webhook, pricing table, drop Stripe | Bob | P1-T02 | done | #66 |
-| P5-T02 | Fix Clerk webhook plan-write bugs | Bob | P5-T01 | in review | #67 |
+| P5-T02 | Fix Clerk webhook plan-write bugs | Bob | P5-T01 | in review | #67 (CodeRabbit clean, merge-ready) |
 
 **P5-T02 note:** #66 merged before 2 unresolved CodeRabbit findings on the webhook route were fixed: (1) plan writes aren't gated by `event.data.plan?.slug`, so a non-Pro plan's events could still flip `accounts.plan`; (2) the account is downgraded to `free` on `subscriptionItem.canceled`, but Clerk's own docs say paid access should continue until `subscriptionItem.ended` — canceling shouldn't cut off access immediately. Both are live on `main`. Also: `apps/web/lib/data/billing-actions.ts` is still a dead empty-module stub (asked for deletion, didn't land) — fold that cleanup in too.
 
