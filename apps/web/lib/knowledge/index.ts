@@ -3,13 +3,17 @@ import { knowledgeChunks, knowledgeSources } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import { SOURCE_TYPES, type KnowledgeSource } from "@askwell/shared";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { embedTexts } from "../ai";
 import { chunkText } from "./chunk";
 
 export type SourceType = (typeof SOURCE_TYPES)[number];
 export type KnowledgeSourceRow = typeof knowledgeSources.$inferSelect;
+
+// Same shape check as getOwnedProject in packages/db: a malformed id would make Postgres
+// throw on the uuid cast, so callers treat it as "not found" instead.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function toKnowledgeSource(row: KnowledgeSourceRow): KnowledgeSource {
   return {
@@ -19,6 +23,28 @@ export function toKnowledgeSource(row: KnowledgeSourceRow): KnowledgeSource {
     status: row.status,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** A project's sources, newest first. The caller is trusted to have already checked ownership. */
+export async function listProjectKnowledgeSources(
+  projectId: string,
+  database: Database = defaultDb,
+): Promise<KnowledgeSourceRow[]> {
+  return database
+    .select()
+    .from(knowledgeSources)
+    .where(eq(knowledgeSources.projectId, projectId))
+    .orderBy(desc(knowledgeSources.createdAt));
+}
+
+/** A single source by id, or `null` if it doesn't exist. Doesn't check ownership. */
+export async function getKnowledgeSourceById(
+  sourceId: string,
+  database: Database = defaultDb,
+): Promise<KnowledgeSourceRow | null> {
+  if (!UUID_RE.test(sourceId)) return null;
+  const [row] = await database.select().from(knowledgeSources).where(eq(knowledgeSources.id, sourceId)).limit(1);
+  return row ?? null;
 }
 
 /** Files count toward the plan limit; pasted text doesn't (project.md §6.4). */
@@ -56,8 +82,9 @@ async function setSourceStatus(
 }
 
 /**
- * Removes a source that never reached storage, so it doesn't permanently occupy a file slot
- * (the plan's file count only reflects files actually stored).
+ * Deletes a source row. Its chunks cascade (FK `onDelete: "cascade"`). Used both to free a
+ * file slot when an upload never reached storage, and for a real owner-requested delete —
+ * callers handle the storage object themselves first in the latter case.
  */
 export async function deleteKnowledgeSource(sourceId: string, database: Database = defaultDb): Promise<void> {
   await database.delete(knowledgeSources).where(eq(knowledgeSources.id, sourceId));

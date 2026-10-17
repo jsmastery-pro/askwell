@@ -1,13 +1,8 @@
 import {
-  addKnowledgeResponseSchema,
   checkoutResponseSchema,
-  deleteKnowledgeResponseSchema,
   getConversationResponseSchema,
-  knowledgeSourceSchema,
   listConversationsResponseSchema,
   portalResponseSchema,
-  SOURCE_STATUSES,
-  SOURCE_TYPES,
   updateWidgetConfigResponseSchema,
   WIDGET_DEFAULTS,
 } from "@askwell/shared";
@@ -16,8 +11,6 @@ import { MOCK_THREADS } from "../mock/conversations";
 import { openBillingPortal, startCheckout } from "./billing-actions";
 import { saveWidgetConfig } from "./config-actions";
 import { getConversation, listConversations } from "./conversations";
-import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "./knowledge-actions";
-import { countKnowledgeFiles, listKnowledgeSources } from "./knowledge";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./demo", () => ({ demoDelay: async () => {} }));
@@ -25,23 +18,6 @@ vi.mock("./demo", () => ({ demoDelay: async () => {} }));
 const PROJECT = "11111111-2222-4333-8444-555555555555";
 
 describe("mock reads match their shared schemas", () => {
-  it("knowledge sources cover every type and status", async () => {
-    const sources = await listKnowledgeSources(PROJECT);
-    for (const source of sources) knowledgeSourceSchema.parse(source);
-    expect(new Set(sources.map((s) => s.type))).toEqual(new Set(SOURCE_TYPES));
-    expect(new Set(sources.map((s) => s.status))).toEqual(new Set(SOURCE_STATUSES));
-  });
-
-  it("returns nothing for a malformed project ID", async () => {
-    expect(await listKnowledgeSources("abc")).toEqual([]);
-    expect(await countKnowledgeFiles("abc")).toBe(0);
-  });
-
-  it("counts only uploaded files toward the file limit", async () => {
-    const sources = await listKnowledgeSources(PROJECT);
-    expect(await countKnowledgeFiles(PROJECT)).toBe(sources.filter((s) => s.type !== "text").length);
-  });
-
   it("conversation summaries are newest first", async () => {
     const conversations = await listConversations(PROJECT);
     listConversationsResponseSchema.parse({ conversations });
@@ -63,14 +39,6 @@ describe("mock reads match their shared schemas", () => {
 });
 
 describe("mock writes match their shared schemas", () => {
-  it("knowledge writes", async () => {
-    addKnowledgeResponseSchema.parse(await addTextKnowledge(PROJECT, { type: "text", title: "FAQ", content: "Hi" }));
-    const file = await addFileKnowledge(PROJECT, new File(["%PDF"], "guide.pdf"));
-    addKnowledgeResponseSchema.parse(file);
-    expect(file.source.type).toBe("pdf");
-    deleteKnowledgeResponseSchema.parse(await deleteKnowledgeSource(PROJECT));
-  });
-
   it("config save, including null resetting a field to its default", async () => {
     const current = { ...WIDGET_DEFAULTS, label: "Ask us" };
     const saved = await saveWidgetConfig(PROJECT, current, { label: null, position: "top-left" });

@@ -2,23 +2,14 @@
 
 import { PLAN_LIMITS, type KnowledgeSource, type Plan } from "@askwell/shared";
 import Link from "next/link";
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import {
-  addFileKnowledge,
-  addTextKnowledge,
-  deleteKnowledgeSource,
-  retryKnowledgeSource,
-} from "../../lib/data/knowledge-actions";
+import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "../../lib/data/knowledge-actions";
 import { formatDateTime } from "../project-shell/format";
 import { UsageMeter } from "../project-shell/UsageMeter";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../ui/styles";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ACCEPT, checkFile, checkText } from "./validate";
 import { EmptyState } from "../ui/EmptyState";
-
-// MOCK: processing finishes on its own here so the status change is visible.
-// P3-T02 makes status real; this timer goes away then.
-const DEMO_PROCESSING_MS = 2500;
 
 const TYPE_LABEL: Record<KnowledgeSource["type"], string> = {
   pdf: "PDF",
@@ -46,10 +37,7 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
   const [announcement, setAnnouncement] = useState("");
   // Per-row failures (retry or delete), shown under the row and announced.
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const files = sources.filter(isFile).length;
   const atLimit = files >= filesLimit;
@@ -70,19 +58,9 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       return next;
     });
 
-  const finishProcessingLater = (source: KnowledgeSource) => {
-    timers.current.push(
-      setTimeout(() => {
-        setSources((current) => current.map((s) => (s.id === source.id ? { ...s, status: "ready" } : s)));
-        setAnnouncement(`${source.title} is ready.`);
-      }, DEMO_PROCESSING_MS),
-    );
-  };
-
   const added = (source: KnowledgeSource) => {
     setSources((current) => [source, ...current]);
     setAnnouncement(`${source.title} added. Processing.`);
-    finishProcessingLater(source);
   };
 
   async function upload(file: File) {
@@ -129,22 +107,6 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       setTextErrors({ content: "The text didn't save. Try again." });
     } finally {
       setSavingText(false);
-    }
-  }
-
-  async function retry(source: KnowledgeSource) {
-    setBusy(source.id, true);
-    setRowError(source.id, null);
-    try {
-      const { source: updated } = await retryKnowledgeSource(source);
-      setSources((current) => current.map((s) => (s.id === source.id ? updated : s)));
-      setAnnouncement(`Processing ${source.title} again.`);
-      finishProcessingLater(updated);
-    } catch {
-      setRowError(source.id, "Couldn't start processing again. Try again in a moment.");
-      setAnnouncement(`${source.title} wasn't retried. Try again.`);
-    } finally {
-      setBusy(source.id, false);
     }
   }
 
@@ -340,11 +302,6 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={source.status} />
-                    {source.status === "failed" && (
-                      <button type="button" onClick={() => retry(source)} disabled={busy} className={BUTTON_SECONDARY}>
-                        Try again
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setConfirming(source)}
