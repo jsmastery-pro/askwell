@@ -29,7 +29,14 @@ async function usedThisPeriod(
   const [reset] = await database
     .update(projects)
     .set({ messagesUsed: 0, periodStart: now })
-    .where(and(eq(projects.id, project.id), eq(projects.periodStart, project.periodStart)))
+    // Postgres keeps microseconds but the Date we read back has only milliseconds, so compare at
+    // millisecond precision. A plain equality would never match a database-written period_start.
+    .where(
+      and(
+        eq(projects.id, project.id),
+        sql`date_trunc('milliseconds', ${projects.periodStart}) = ${project.periodStart.toISOString()}::timestamptz`,
+      ),
+    )
     .returning({ messagesUsed: projects.messagesUsed });
   if (reset) return reset.messagesUsed;
   const [current] = await database

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { conversations, knowledgeChunks, knowledgeSources, messages, projects } from "@askwell/db";
 import { DONT_KNOW_REPLY, EMBEDDING_DIMENSIONS, PLAN_LIMITS } from "@askwell/shared";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, seedProject, type TestDb } from "../../../../lib/widget-config/test-db";
 
@@ -264,6 +264,16 @@ describe("monthly quota", () => {
     const after = await usage(shop.id);
     expect(after.messagesUsed).toBe(1);
     expect(after.periodStart.getTime()).toBeGreaterThan(Date.now() - 60_000);
+  });
+
+  it("resets a period_start the database wrote itself (microsecond precision)", async () => {
+    await db
+      .update(projects)
+      .set({ messagesUsed: freeLimit, periodStart: sql`now() - interval '62 days' + interval '123 microseconds'` })
+      .where(eq(projects.id, shop.id));
+
+    expect((await ask("How fast do you ship?")).status).toBe(200);
+    expect((await usage(shop.id)).messagesUsed).toBe(1);
   });
 });
 
