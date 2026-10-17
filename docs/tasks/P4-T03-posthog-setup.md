@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | B (normally Alice's — she's on Phase 3 Lane B; product owner approved giving this to Bob, 2026-10-17) |
 | Needs first | — |
-| Files allowed | `apps/web/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/instrumentation*.ts`, `apps/web/app/layout.tsx`, `apps/web/app/dashboard/account.ts`, `apps/web/lib/projects/**`, `apps/web/app/api/projects/[id]/knowledge/route.ts` (knowledge_added, via the shared `created()` helper), `apps/web/components/projects/CopyButton.tsx` (snippet_copied), `apps/web/app/api/clerk/webhook/route.ts` (upgraded, on `setPlan(userId, "pro")`), `apps/web/next.config.ts` (add the `/ingest` reverse-proxy `rewrites()` entry only — never touch `headers()`), `pnpm-workspace.yaml` (one line: `core-js: false` under `allowBuilds`, so `pnpm install --frozen-lockfile` in the Dockerfile doesn't fail on core-js's postinstall) — plus any other existing file where you add a **single PostHog event call and nothing else**. Ask before touching anything that needs more than that one-line addition. |
+| Files allowed | `apps/web/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/instrumentation*.ts`, `apps/web/app/layout.tsx`, `apps/web/app/dashboard/account.ts`, `apps/web/lib/projects/**`, `apps/web/app/api/projects/[id]/knowledge/route.ts` (knowledge_added, via the shared `created()` helper), `apps/web/components/projects/CopyButton.tsx` (snippet_copied), `apps/web/app/api/clerk/webhook/route.ts` (upgraded, on `setPlan(userId, "pro")`), `apps/web/next.config.ts` (add the `/ingest` reverse-proxy `rewrites()` entry only — never touch `headers()`), `pnpm-workspace.yaml` (one line: `core-js: false` under `allowBuilds`, so `pnpm install --frozen-lockfile` in the Dockerfile doesn't fail on core-js's postinstall), `apps/web/lib/posthog/**` (shared server client + never-throws capture helper), `apps/web/app/api/posthog-config/**` (runtime config route, see Notes) — plus any other existing file where you add a **single PostHog event call and nothing else**. Ask before touching anything that needs more than that one-line addition. |
 | project.md | §6.11 Analytics |
 
 ## Background
@@ -34,6 +34,7 @@ Product owner has a PostHog account/project ready. This is **not** the owner-fac
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
+- **Client key at runtime (decided 2026-10-17):** InstaCloud injects env only at runtime and has no build-arg flag, so a `NEXT_PUBLIC_POSTHOG_KEY` inlined at build is empty in deployed images. The client fetches the public key and host from `GET /api/posthog-config` (public, short cache, returns nothing else) before `posthog.init`, and init is a no-op without a key. Same reason `components/projects/snippet.ts` reads `NEXT_PUBLIC_APP_URL` at request time. Never fetched from `/embed`.
 - No secret in `NEXT_PUBLIC_*` beyond what PostHog's own client key is designed for (it's meant to be public).
 - Don't touch anything in Alice's Phase 3 Lane B territory (`lib/chat`, `app/embed`, `components/widget-panel`) — `first_chat` and AI tracing come later.
 - This is cross-cutting by nature (small additions across several existing files) — ask for any file not already listed before touching it, same as every other task this session.
