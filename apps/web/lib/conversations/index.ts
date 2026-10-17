@@ -3,7 +3,7 @@ import { conversations, messages } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import type { ConversationSummary, Message } from "@askwell/shared";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, count, desc, eq, sql } from "drizzle-orm";
 
 export type ConversationRow = typeof conversations.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
@@ -17,44 +17,46 @@ function toMessage(row: MessageRow): Message {
   return { id: row.id, role: row.role, body: row.body, createdAt: row.createdAt.toISOString() };
 }
 
+// Correlated subquery: the body of a conversation's earliest visitor message, or null.
+// Independent of the outer join, so it's correct even for a conversation with no messages.
+const previewColumn = sql<string | null>`(
+  select ${messages.body}
+  from ${messages}
+  where ${messages.conversationId} = ${conversations.id} and ${messages.role} = 'visitor'
+  order by ${messages.createdAt} asc
+  limit 1
+)`;
+
 /**
  * A project's conversations, newest first, with each one's message count and the body of its
- * first visitor message (the preview). The caller is trusted to have already checked ownership.
+ * first visitor message (the preview), aggregated in SQL rather than loading every message.
+ * The caller is trusted to have already checked ownership.
  */
 export async function listProjectConversations(
   projectId: string,
   database: Database = defaultDb,
 ): Promise<ConversationSummary[]> {
-  const convRows = await database
-    .select()
+  const rows = await database
+    .select({
+      id: conversations.id,
+      visitorId: conversations.visitorId,
+      createdAt: conversations.createdAt,
+      messageCount: count(messages.id),
+      preview: previewColumn,
+    })
     .from(conversations)
+    .leftJoin(messages, eq(messages.conversationId, conversations.id))
     .where(eq(conversations.projectId, projectId))
+    .groupBy(conversations.id)
     .orderBy(desc(conversations.createdAt));
-  if (convRows.length === 0) return [];
 
-  const msgRows = await database
-    .select()
-    .from(messages)
-    .where(inArray(messages.conversationId, convRows.map((c) => c.id)))
-    .orderBy(asc(messages.createdAt));
-
-  const byConversation = new Map<string, MessageRow[]>();
-  for (const message of msgRows) {
-    const list = byConversation.get(message.conversationId) ?? [];
-    list.push(message);
-    byConversation.set(message.conversationId, list);
-  }
-
-  return convRows.map((conversation) => {
-    const its = byConversation.get(conversation.id) ?? [];
-    return {
-      id: conversation.id,
-      visitorId: conversation.visitorId,
-      preview: its.find((m) => m.role === "visitor")?.body ?? "",
-      messageCount: its.length,
-      createdAt: conversation.createdAt.toISOString(),
-    };
-  });
+  return rows.map((row) => ({
+    id: row.id,
+    visitorId: row.visitorId,
+    preview: row.preview ?? "",
+    messageCount: row.messageCount,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }
 
 /** A conversation with its full message history, or `null` if it doesn't exist. Doesn't check ownership. */

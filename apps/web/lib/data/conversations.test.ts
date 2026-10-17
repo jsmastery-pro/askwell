@@ -39,12 +39,14 @@ beforeAll(async () => {
   threadId = thread!.id;
   otherThreadId = otherThread!.id;
 
+  // Explicit, distinct timestamps: a multi-row insert can give every row the same
+  // defaultNow(), which would make the chronological-order assertion below ambiguous.
   await db
     .insert(messages)
     .values([
-      { conversationId: threadId, role: "visitor", body: "Hi there" },
-      { conversationId: threadId, role: "bot", body: "Hello!" },
-      { conversationId: otherThreadId, role: "visitor", body: "Different project" },
+      { conversationId: threadId, role: "visitor", body: "Hi there", createdAt: new Date("2026-01-01T00:00:00.000Z") },
+      { conversationId: threadId, role: "bot", body: "Hello!", createdAt: new Date("2026-01-01T00:00:01.000Z") },
+      { conversationId: otherThreadId, role: "visitor", body: "Different project", createdAt: new Date("2026-01-01T00:00:00.000Z") },
     ]);
 });
 
