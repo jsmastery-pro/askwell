@@ -123,7 +123,7 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | P3-T03 | Delete source + wire Knowledge screen | Bob | P3-T02, P2-T04 | done | #63 |
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | done | #62 |
 | P3-T07 | Arcjet rate limit | Bob | P3-T04 | done | #70 |
-| P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | in review | #72 |
+| P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | in review | #72 (merge-ready, live check passed) |
 | P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | todo | — |
 
 > **Lane B reassigned (2026-10-17, product owner):** Alice's session failed before P3-T07 started (no branch or PR). P3-T07, P3-T05 and P3-T06 move to Bob, in that order. P3-T07 branches after #69 merges, since both add dependencies.
