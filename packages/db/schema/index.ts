@@ -122,10 +122,3 @@ export const messages = pgTable(
   },
   (t) => [index("messages_conversation_id_idx").on(t.conversationId)],
 );
-
-// key = public key + IP. One row per key; the window resets in place.
-export const rateLimits = pgTable("rate_limits", {
-  key: text("key").primaryKey(),
-  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-  count: integer("count").notNull().default(0),
-});

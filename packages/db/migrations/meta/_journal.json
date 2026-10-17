@@ -15,6 +15,13 @@
       "when": 1792230849240,
       "tag": "0001_graceful_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792263342039,
+      "tag": "0002_sweet_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }
