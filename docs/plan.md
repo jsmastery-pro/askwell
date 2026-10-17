@@ -148,9 +148,9 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 
 **Goal:** Free vs Pro works end to end.
 
-**Keys before start:** `CLERK_WEBHOOK_SIGNING_SECRET`. In the Clerk dashboard: Billing on (development gateway, test mode), plans `free` and `pro`, and a webhook to `/api/clerk/webhook` with the subscription events.
+**Keys before start:** `CLERK_WEBHOOK_SIGNING_SECRET`. In the Clerk dashboard: Billing on with the Clerk payment gateway (test mode), plans `free` and `pro`, and a webhook to `/api/clerk/webhook` with the subscription events.
 
-> **Billing provider (2026-10-17, product owner):** Clerk Billing replaces Stripe Checkout and the portal. Stripe still processes payments behind Clerk; we hold no Stripe keys.
+> **Billing provider (2026-10-17, product owner):** Clerk Billing replaces Stripe Checkout and the portal. We use the Clerk payment gateway, so there is no Stripe account and no Stripe keys.
 
 | Lane              | Includes                                                                                                                       | project.md |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------- |
