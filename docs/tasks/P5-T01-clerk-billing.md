@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | A |
 | Needs first | P1-T02 |
-| Files allowed | `apps/web/app/api/clerk/webhook/**`, `apps/web/components/billing/**`, `apps/web/lib/data/billing.ts`, `apps/web/lib/data/billing-actions.ts`, `packages/shared/src/billing.ts`, `packages/db/schema/**`, `packages/db/migrations/**`, `.env.example`, `apps/web/lib/data/mocks.test.ts`, `apps/web/proxy.ts` (route matcher only — swap `stripe/webhook` → `clerk/webhook` in both matcher strings, nothing else) |
+| Files allowed | `apps/web/app/api/clerk/webhook/**`, `apps/web/components/billing/**`, `apps/web/lib/data/billing.ts`, `apps/web/lib/data/billing-actions.ts`, `packages/shared/src/billing.ts`, `packages/db/schema/**`, `packages/db/migrations/**`, `.env.example`, `apps/web/lib/data/mocks.test.ts`, `apps/web/proxy.ts` (route matcher only — swap `stripe/webhook` → `clerk/webhook` in both matcher strings, nothing else), `apps/web/app/dashboard/billing/page.test.tsx` (approved after the fact 2026-10-17 — `useClerk()` in `PlanActions` crashes without a Clerk mock, the old `billing-actions` mock wasn't actually inert once that landed) |
 | project.md | §6.10 Billing, §5 Plans, §7 Data model, §9 Security rules (Webhook) |
 
 ## Background
