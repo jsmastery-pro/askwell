@@ -149,7 +149,7 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 |---|---|---|---|---|---|
 | P4-T01 | Conversations API + wiring | Bob | P1-T02, P2-T02 | done | #64 |
 | P4-T02 | Owner analytics wiring (dashboard home) | Bob | P4-T01 | done | #65 |
-| P4-T03 | PostHog setup: wizard, events, funnel, replay, errors | Bob | — | in review | #69 |
+| P4-T03 | PostHog setup: wizard, events, funnel, replay, errors | Bob | — | in review | #69 (merge-ready) |
 
 Lane B is normally Alice's; product owner approved giving P4-T03 to Bob (2026-10-17) since it's independent of her Phase 3 work, while #68 is in review. Scope cut: `first_chat` event + AI tracing wait for Phase 3 Lane B to merge (a follow-up task, P4-T04).
 
