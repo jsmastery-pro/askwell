@@ -171,7 +171,13 @@ Lane B builds the 402 path first, then tests Pro by setting `accounts.plan` by h
 
 **Done when:** Free save → 402 → upgrade with a test card → save works → the widget shows the new color on reload.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P5-T01 | Clerk Billing: webhook, pricing table, drop Stripe | Bob | P1-T02 | in progress | — |
+
+Lane B (Customize) added once a developer is free for it.
 
 ---
 
