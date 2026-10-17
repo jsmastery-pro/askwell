@@ -9,7 +9,8 @@
     "lint": "eslint . --ignore-pattern public/widget.js",
     "test": "vitest run",
     "build": "pnpm copy-widget && next build",
-    "copy-widget": "node -e \"const fs=require('node:fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('../widget/dist/widget.js','public/widget.js')\""
+    "copy-widget": "node -e \"const fs=require('node:fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('../widget/dist/widget.js','public/widget.js')\"",
+    "seed-knowledge": "tsx --conditions=react-server scripts/seed-knowledge.ts"
   },
   "dependencies": {
     "@askwell/db": "workspace:*",
@@ -37,6 +38,7 @@
     "jsdom": "30.0.1",
     "postcss": "8.5.27",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "catalog:",
     "vite": "7.3.6",
     "vitest": "catalog:"
