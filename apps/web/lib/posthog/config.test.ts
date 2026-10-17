@@ -9,6 +9,14 @@ describe("recordsReplay", () => {
   it.each(["/embed", "/sign-in", "/sign-up", "/dashboards", "/api/projects"])("never records %s", (path) => {
     expect(recordsReplay(path)).toBe(false);
   });
+
+  it.each([
+    "/dashboard/projects/p_1/conversations",
+    "/dashboard/projects/p_1/conversations/c_1",
+    "/dashboard/conversations",
+  ])("never records a Conversations page: %s", (path) => {
+    expect(recordsReplay(path)).toBe(false);
+  });
 });
 
 describe("isEmbedPath", () => {

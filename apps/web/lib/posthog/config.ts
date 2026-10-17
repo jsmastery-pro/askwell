@@ -8,5 +8,10 @@ export type PostHogConfigResponse = { key: string | null; host: string };
 /** /embed runs inside customers' sites: no PostHog there, so visitors and their chats are never captured. */
 export const isEmbedPath = (path: string) => path === "/embed" || path.startsWith("/embed/");
 
-/** Session replay only on the landing page and the dashboard (project.md §6.11). */
-export const recordsReplay = (path: string) => path === "/" || path === "/dashboard" || path.startsWith("/dashboard/");
+/**
+ * Session replay only on the landing page and the dashboard (project.md §6.11), minus the
+ * Conversations pages: they show visitor chats as page text, which replay doesn't mask.
+ */
+export const recordsReplay = (path: string) =>
+  (path === "/" || path === "/dashboard" || path.startsWith("/dashboard/")) &&
+  !path.split("/").includes("conversations");
