@@ -20,15 +20,18 @@ export async function DELETE(_request: Request, { params }: Context) {
   if (!source) return sourceNotFound();
   if (!(await getOwnedProject(source.projectId, ownerId))) return sourceNotFound();
 
+  // The row goes first: if this throws, the storage object is untouched and the delete can be
+  // retried. Once the row is gone, a storage failure only orphans the file, never the reverse
+  // (P3-T03 notes: "orphan files are better than orphan chunks").
+  await deleteKnowledgeSource(source.id);
+
   if (source.storageKey) {
     try {
       await deleteKnowledgeFile(source.storageKey);
     } catch (error) {
-      // Orphan files are better than orphan chunks (P3-T03 notes): still delete the row.
       console.error(`Could not delete storage object for knowledge source ${source.id}`, error);
     }
   }
 
-  await deleteKnowledgeSource(source.id);
   return Response.json({ ok: true } satisfies DeleteKnowledgeResponse);
 }

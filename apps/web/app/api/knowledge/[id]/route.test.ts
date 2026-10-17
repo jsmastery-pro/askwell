@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
+import type { KnowledgeSource } from "@askwell/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, type TestDb } from "../../../../lib/widget-config/test-db";
@@ -44,7 +45,7 @@ const req = () => new Request("https://app.test/api/knowledge/x", { method: "DEL
 async function seedProjectWithSource(
   ownerId: string,
   publicKey: string,
-  source: { type: "text" | "pdf" | "md" | "txt"; storageKey: string | null },
+  source: { type: KnowledgeSource["type"]; storageKey: string | null },
 ) {
   await db.insert(accounts).values({ clerkUserId: ownerId, plan: "free" }).onConflictDoNothing();
   const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();

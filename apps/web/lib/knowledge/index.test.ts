@@ -87,12 +87,19 @@ describe("listProjectKnowledgeSources", () => {
     const otherProject = (
       await db.insert(projects).values({ ownerId: "owner_1", name: "List", publicKey: "pk_list" }).returning()
     )[0]!;
-    const first = await insertKnowledgeSource({ projectId: otherProject.id, title: "First", type: "text", storageKey: null }, db);
-    const second = await insertKnowledgeSource({ projectId: otherProject.id, title: "Second", type: "pdf", storageKey: "k" }, db);
+    // Explicit, distinct timestamps: two inserts can land in the same instant, which would
+    // make the ordering this test checks for ambiguous.
+    const [first, second] = await db
+      .insert(knowledgeSources)
+      .values([
+        { projectId: otherProject.id, title: "First", type: "text", createdAt: new Date("2026-01-01T00:00:00.000Z") },
+        { projectId: otherProject.id, title: "Second", type: "pdf", storageKey: "k", createdAt: new Date("2026-01-02T00:00:00.000Z") },
+      ])
+      .returning();
 
     const sources = await listProjectKnowledgeSources(otherProject.id, db);
 
-    expect(sources.map((s) => s.id)).toEqual([second.id, first.id]);
+    expect(sources.map((s) => s.id)).toEqual([second!.id, first!.id]);
   });
 
   it("returns nothing for a project with no sources", async () => {
