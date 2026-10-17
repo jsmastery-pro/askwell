@@ -99,8 +99,7 @@ describe("KnowledgeManager", () => {
     expect(screen.queryByRole("link", { name: "Upgrade to Pro" })).toBeNull();
   });
 
-  it("uploads a valid file, shows it processing, then ready", async () => {
-    vi.useFakeTimers();
+  it("uploads a valid file and shows it processing, with no client-side flip to ready", async () => {
     const { container } = renderManager([]);
 
     await pick(container, new File(["%PDF"], "Handbook.pdf"));
@@ -108,9 +107,6 @@ describe("KnowledgeManager", () => {
     expect(addFileKnowledge).toHaveBeenCalledOnce();
     expect(within(row("Handbook.pdf")).getByText("Processing")).toBeTruthy();
     expect(screen.getByText("1 of 3 files")).toBeTruthy();
-
-    act(() => vi.advanceTimersByTime(2500));
-    expect(within(row("Handbook.pdf")).getByText("Ready")).toBeTruthy();
   });
 
   it("accepts a dropped file", async () => {
