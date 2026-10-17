@@ -17,17 +17,17 @@ export function AccountMenu() {
   const userId = user?.id;
 
   // Ties this browser's PostHog person (incl. anonymous landing visits) to the Clerk user id the
-  // server-side events use, so one funnel spans both.
+  // server-side events use, so one funnel spans both. The id only: no email or name in PostHog.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     void posthogReady.then(() => {
-      if (!cancelled && posthog.get_distinct_id() !== userId) posthog.identify(userId, email ? { email } : undefined);
+      if (!cancelled && posthog.get_distinct_id() !== userId) posthog.identify(userId);
     });
     return () => {
       cancelled = true;
     };
-  }, [userId, email]);
+  }, [userId]);
 
   useEffect(() => {
     if (!open) return;
