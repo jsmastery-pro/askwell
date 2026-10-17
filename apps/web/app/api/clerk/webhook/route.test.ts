@@ -172,6 +172,19 @@ describe("upgraded", () => {
     expect(captureServerEvent).not.toHaveBeenCalled();
   });
 
+  it("fires once when the same active event is delivered twice", async () => {
+    await seedAccount("user_redelivered", "free");
+    const event = subscriptionItemEvent("subscriptionItem.active", "user_redelivered");
+    await POST(signedRequest(event));
+    await POST(signedRequest(event));
+    expect(captureServerEvent).toHaveBeenCalledOnce();
+  });
+
+  it("doesn't fire when there is no account row", async () => {
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded_missing")));
+    expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
   it("doesn't fire for a request with a bad signature", async () => {
     await seedAccount("user_upgraded_badsig", "free");
     await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded_badsig"), { badSignature: true }));
