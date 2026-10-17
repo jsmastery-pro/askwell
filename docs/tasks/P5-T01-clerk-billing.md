@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | A |
 | Needs first | P1-T02 |
-| Files allowed | `apps/web/app/api/clerk/webhook/**`, `apps/web/components/billing/**`, `apps/web/lib/data/billing.ts`, `apps/web/lib/data/billing-actions.ts`, `packages/shared/src/billing.ts`, `packages/db/schema/**`, `packages/db/migrations/**`, `.env.example` |
+| Files allowed | `apps/web/app/api/clerk/webhook/**`, `apps/web/components/billing/**`, `apps/web/lib/data/billing.ts`, `apps/web/lib/data/billing-actions.ts`, `packages/shared/src/billing.ts`, `packages/db/schema/**`, `packages/db/migrations/**`, `.env.example`, `apps/web/lib/data/mocks.test.ts` |
 | project.md | §6.10 Billing, §5 Plans, §7 Data model, §9 Security rules (Webhook) |
 
 ## Background
