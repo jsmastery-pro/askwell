@@ -148,7 +148,7 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | P4-T01 | Conversations API + wiring | Bob | P1-T02, P2-T02 | done | #64 |
-| P4-T02 | Owner analytics wiring (dashboard home) | Bob | P4-T01 | in review | #65 (merge-ready) |
+| P4-T02 | Owner analytics wiring (dashboard home) | Bob | P4-T01 | done | #65 |
 
 More Lane B tasks (PostHog setup/events/AI tracing) added once Alice frees up from Phase 3 Lane B.
 
