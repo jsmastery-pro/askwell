@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice |
+| Owner | Bob (reassigned from Alice 2026-10-17, product owner) |
 | Lane | B |
 | Needs first | P3-T04 |
 | Files allowed | `apps/web/lib/rate-limit/**`, `apps/web/app/api/widget/config/**`, `packages/db/schema/**`, `packages/db/migrations/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `.env.example` |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice |
+| Owner | Bob (reassigned from Alice 2026-10-17, product owner) |
 | Lane | B |
 | Needs first | P3-T04, P3-T07, P2-T03 |
 | Files allowed | `apps/web/app/api/widget/chat/**`, `apps/web/lib/chat/**` |

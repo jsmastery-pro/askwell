@@ -122,9 +122,11 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | done | #61 |
 | P3-T03 | Delete source + wire Knowledge screen | Bob | P3-T02, P2-T04 | done | #63 |
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | done | #62 |
-| P3-T07 | Arcjet rate limit | Alice | P3-T04 | in progress | — |
-| P3-T05 | Chat route | Alice | P3-T04, P3-T07, P2-T03 | todo | — |
-| P3-T06 | Connect the panel to chat | Alice | P3-T05, P2-T06 | todo | — |
+| P3-T07 | Arcjet rate limit | Bob | P3-T04 | in progress | — |
+| P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | todo | — |
+| P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | todo | — |
+
+> **Lane B reassigned (2026-10-17, product owner):** Alice's session failed before P3-T07 started (no branch or PR). P3-T07, P3-T05 and P3-T06 move to Bob, in that order. P3-T07 branches after #69 merges, since both add dependencies.
 
 PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-08.
 
