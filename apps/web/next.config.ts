@@ -1,11 +1,24 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+// Rewrites are fixed at build time, when InstaCloud provides no env: default to the project's US region.
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
+const posthogAssetsHost = posthogHost.replace(/^https:\/\/(\w+)\.i\.posthog\.com$/, "https://$1-assets.i.posthog.com");
+
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@askwell/shared", "@askwell/db"],
   agentRules: false,
+  // posthog-js POSTs to trailing-slash paths (/ingest/e/); Next's default 308 would break them.
+  skipTrailingSlashRedirect: true,
+  // PostHog through our own origin, so ad-blockers don't drop analytics requests.
+  async rewrites() {
+    return [
+      { source: "/ingest/static/:path*", destination: `${posthogAssetsHost}/static/:path*` },
+      { source: "/ingest/:path*", destination: `${posthogHost}/:path*` },
+    ];
+  },
   async headers() {
     return [
       // Clickjacking (project.md §9): only the widget panel may be framed by other sites.

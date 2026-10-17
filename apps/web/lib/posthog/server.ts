@@ -1,0 +1,50 @@
+import { PostHog } from "posthog-node";
+import { DEFAULT_POSTHOG_HOST, type PostHogConfigResponse } from "./config";
+
+// A computed key, so Next can't inline it at build time: InstaCloud only injects env at runtime.
+function runtimeEnv(name: "NEXT_PUBLIC_POSTHOG_KEY" | "NEXT_PUBLIC_POSTHOG_HOST"): string | undefined {
+  return process.env[name] || undefined;
+}
+
+export function getPostHogConfig(): PostHogConfigResponse {
+  return {
+    key: runtimeEnv("NEXT_PUBLIC_POSTHOG_KEY") ?? null,
+    host: runtimeEnv("NEXT_PUBLIC_POSTHOG_HOST") ?? DEFAULT_POSTHOG_HOST,
+  };
+}
+
+/** The server-side product events from project.md §6.11. */
+export type ServerEvent = "signed_up" | "project_created" | "knowledge_added" | "upgraded";
+
+let client: PostHog | null | undefined;
+
+function getClient(): PostHog | null {
+  if (client === undefined) {
+    const { key, host } = getPostHogConfig();
+    // flushAt 1: send each event right away rather than batching in a process that may scale to zero.
+    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0 }) : null;
+  }
+  return client;
+}
+
+/** Records a product event. A no-op without a key, and never throws into the caller's flow. */
+export function captureServerEvent(
+  distinctId: string,
+  event: ServerEvent,
+  properties?: Record<string, string | number | boolean>,
+): void {
+  try {
+    getClient()?.capture({ distinctId, event, properties });
+  } catch (error) {
+    console.error(`PostHog capture failed for ${event}`, error);
+  }
+}
+
+/** Records a server exception. A no-op without a key, and never throws. */
+export function captureServerException(error: unknown): void {
+  try {
+    getClient()?.captureException(error);
+  } catch (captureError) {
+    console.error("PostHog exception capture failed", captureError);
+  }
+}
