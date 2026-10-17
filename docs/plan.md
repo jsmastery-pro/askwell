@@ -122,7 +122,7 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | done | #61 |
 | P3-T03 | Delete source + wire Knowledge screen | Bob | P3-T02, P2-T04 | done | #63 |
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | done | #62 |
-| P3-T07 | Arcjet rate limit | Bob | P3-T04 | in review | #70 (merge-ready) |
+| P3-T07 | Arcjet rate limit | Bob | P3-T04 | in review | #70 (merge-ready, live 429 check passed) |
 | P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | todo | — |
 | P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | todo | — |
 
@@ -194,7 +194,7 @@ Lane B (Customize) added once a developer is free for it.
 
 **Goal:** the core flow works on `main`, with no open security issues.
 
-> **Carried into Lane A (2026-10-17, from #70 review):** a missing `ARCJET_KEY` makes the limiter allow every request, with only one log line. Before launch, confirm `ARCJET_KEY` is set on `main` and decide whether production should refuse to start without it. The monthly quota still caps cost per project.
+> **Carried into Lane A (2026-10-17, from #70 review):** a missing `ARCJET_KEY` makes the limiter allow every request, with only one log line. Before launch, confirm `ARCJET_KEY` is set on `main` and decide whether production should refuse to start without it. The monthly quota still caps cost per project. Also: Arcjet logs a WARN about resolving `ip.src` from an unverified forwarding header; our limit uses `getClientIp` instead, so it's noise, but `proxies` for InstaCloud's Cloudflare edge would silence it.
 
 **Keys before start:** none new
 
