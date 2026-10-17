@@ -119,10 +119,10 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | P3-T01 | AI + shared foundations | Bob | P2-T03 | done | #32 |
-| P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | todo | — |
-| P3-T03 | Delete source + Knowledge page | Bob | P3-T02, P2-T04 | todo | — |
-| P3-T04 | Chunk search + seed script | Alice | P3-T01 | todo | — |
-| P3-T07 | Arcjet rate limit | Alice | P3-T04 | todo | — |
+| P3-T02 | Knowledge ingest | Bob | P3-T01, P2-T02 | done | #61 |
+| P3-T03 | Delete source + wire Knowledge screen | Bob | P3-T02, P2-T04 | done | #63 |
+| P3-T04 | Chunk search + seed script | Alice | P3-T01 | done | #62 |
+| P3-T07 | Arcjet rate limit | Alice | P3-T04 | in progress | — |
 | P3-T05 | Chat route | Alice | P3-T04, P3-T07, P2-T03 | todo | — |
 | P3-T06 | Connect the panel to chat | Alice | P3-T05, P2-T06 | todo | — |
 
@@ -143,7 +143,13 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 
 **Done when:** a widget chat appears in Conversations after refresh; the usage count goes up; PostHog shows the events and an AI trace with its cost.
 
-**Tasks:** _added by John_
+**Tasks:**
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P4-T01 | Conversations API + wiring | Bob | P1-T02, P2-T02 | done | #64 |
+
+More Lane A and Lane B tasks (owner analytics wiring for UI-T08's dashboard home, PostHog setup/events/AI tracing) added as the above lands and Alice frees up from Phase 3 Lane B.
 
 ---
 
