@@ -175,7 +175,7 @@ Lane B builds the 402 path first, then tests Pro by setting `accounts.plan` by h
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| P5-T01 | Clerk Billing: webhook, pricing table, drop Stripe | Bob | P1-T02 | in progress | — |
+| P5-T01 | Clerk Billing: webhook, pricing table, drop Stripe | Bob | P1-T02 | in review | #66 |
 
 Lane B (Customize) added once a developer is free for it.
 
