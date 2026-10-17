@@ -34,13 +34,14 @@ function signedRequest(payload: unknown, { badSignature = false } = {}): NextReq
   }) as unknown as NextRequest;
 }
 
-function subscriptionItemEvent(type: string, userId: string) {
+function subscriptionItemEvent(type: string, userId: string, planSlug = "pro") {
   return {
     type,
     data: {
       object: "subscription_item",
       status: type.split(".")[1],
       payer: { object: "billing_payer", id: "payer_1", user_id: userId },
+      plan: { id: "plan_1", slug: planSlug, name: "Pro" },
     },
     event_attributes: { http_request: { client_ip: "0.0.0.0", user_agent: "vitest" } },
     timestamp: Math.floor(Date.now() / 1000),
@@ -110,11 +111,11 @@ describe("POST /api/clerk/webhook", () => {
     expect(await planOf("user_active")).toBe("pro");
   });
 
-  it("sets the account to free on subscriptionItem.canceled", async () => {
+  it("does not downgrade on subscriptionItem.canceled (Pro access continues until ended)", async () => {
     await seedAccount("user_canceled", "pro");
     const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.canceled", "user_canceled")));
     expect(res.status).toBe(200);
-    expect(await planOf("user_canceled")).toBe("free");
+    expect(await planOf("user_canceled")).toBe("pro");
   });
 
   it("sets the account to free on subscriptionItem.ended", async () => {
@@ -122,6 +123,20 @@ describe("POST /api/clerk/webhook", () => {
     const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.ended", "user_ended")));
     expect(res.status).toBe(200);
     expect(await planOf("user_ended")).toBe("free");
+  });
+
+  it("ignores a non-Pro plan's active event", async () => {
+    await seedAccount("user_other_active", "free");
+    const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_other_active", "starter")));
+    expect(res.status).toBe(200);
+    expect(await planOf("user_other_active")).toBe("free");
+  });
+
+  it("ignores a non-Pro plan's ended event", async () => {
+    await seedAccount("user_other_ended", "pro");
+    const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.ended", "user_other_ended", "starter")));
+    expect(res.status).toBe(200);
+    expect(await planOf("user_other_ended")).toBe("pro");
   });
 
   it("is a no-op for an unrelated event", async () => {

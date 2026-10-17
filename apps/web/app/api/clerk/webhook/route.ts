@@ -7,6 +7,9 @@ import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// The Clerk Billing plan slug for Pro (dashboard, test mode). Other plans' events are ignored.
+const PRO_PLAN_SLUG = "pro";
+
 async function setPlan(clerkUserId: string, plan: Plan): Promise<void> {
   await defaultDb.update(accounts).set({ plan }).where(eq(accounts.clerkUserId, clerkUserId));
 }
@@ -21,10 +24,12 @@ export async function POST(request: NextRequest) {
   }
 
   // The payer on a user-type subscription carries the Clerk user id (project.md §9 Webhook).
-  if (event.type === "subscriptionItem.active") {
+  if (event.type === "subscriptionItem.active" && event.data.plan?.slug === PRO_PLAN_SLUG) {
     const userId = event.data.payer?.user_id;
     if (userId) await setPlan(userId, "pro");
-  } else if (event.type === "subscriptionItem.canceled" || event.type === "subscriptionItem.ended") {
+  } else if (event.type === "subscriptionItem.ended" && event.data.plan?.slug === PRO_PLAN_SLUG) {
+    // Not "canceled": Clerk keeps Pro access through the paid period after a cancellation
+    // request, so only the subscription actually ending should downgrade the account.
     const userId = event.data.payer?.user_id;
     if (userId) await setPlan(userId, "free");
   }
