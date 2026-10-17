@@ -61,8 +61,11 @@ export async function upsertWidgetConfig(
 ): Promise<StoredWidgetConfig> {
   if (Object.keys(changes).length === 0) {
     const [row] = await database.select(STORED_COLUMNS).from(widgetConfigs).where(eq(widgetConfigs.projectId, projectId));
-    if (!row) throw new Error(`No widget_configs row for project ${projectId}`);
-    return row;
+    if (row) return row;
+    // No row yet (shouldn't happen — project creation always inserts one): create the default.
+    const [created] = await database.insert(widgetConfigs).values({ projectId }).returning(STORED_COLUMNS);
+    if (!created) throw new Error(`Widget config upsert for project ${projectId} returned no row`);
+    return created;
   }
 
   const [row] = await database

@@ -71,6 +71,19 @@ describe("upsertWidgetConfig", () => {
     expect(await upsertWidgetConfig(project.id, {}, db)).toEqual(custom);
   });
 
+  it("creates a default row instead of throwing when there are no changes and no row yet", async () => {
+    const project = await seedProject(db, { plan: "pro", publicKey: "pk_patch_empty_insert" });
+    const stored = await upsertWidgetConfig(project.id, {}, db);
+    expect(stored).toEqual({
+      buttonColor: null,
+      position: "bottom-right",
+      label: null,
+      animation: "fade",
+      headerText: null,
+      showBadge: true,
+    });
+  });
+
   it("inserts a row when the project has none yet", async () => {
     const project = await seedProject(db, { plan: "pro", publicKey: "pk_patch_insert" });
     const stored = await upsertWidgetConfig(project.id, { position: "top-right" }, db);
