@@ -56,6 +56,9 @@ vi.mock("@askwell/db/client", () => ({
   },
 }));
 
+const captureServerEvent = vi.hoisted(() => vi.fn());
+vi.mock("../../../../lib/posthog/server", () => ({ captureServerEvent }));
+
 const { POST } = await import("./route");
 
 let db: TestDb;
@@ -74,6 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  captureServerEvent.mockClear();
 });
 
 async function seedAccount(clerkUserId: string, plan: "free" | "pro") {
@@ -149,5 +153,41 @@ describe("POST /api/clerk/webhook", () => {
   it("doesn't throw when the account doesn't exist (unknown user)", async () => {
     const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_unknown")));
     expect(res.status).toBe(200);
+  });
+});
+
+describe("upgraded", () => {
+  it("fires when a Pro subscription becomes active", async () => {
+    await seedAccount("user_upgraded", "free");
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded")));
+    expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("user_upgraded", "upgraded", { plan: "pro" });
+  });
+
+  it.each([
+    ["a downgrade", "subscriptionItem.ended", "pro"],
+    ["a non-Pro plan", "subscriptionItem.active", "starter"],
+  ])("doesn't fire for %s", async (_label, type, planSlug) => {
+    await seedAccount(`user_not_upgraded_${planSlug}`, "pro");
+    await POST(signedRequest(subscriptionItemEvent(type, `user_not_upgraded_${planSlug}`, planSlug)));
+    expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("fires once when the same active event is delivered twice", async () => {
+    await seedAccount("user_redelivered", "free");
+    const event = subscriptionItemEvent("subscriptionItem.active", "user_redelivered");
+    await POST(signedRequest(event));
+    await POST(signedRequest(event));
+    expect(captureServerEvent).toHaveBeenCalledOnce();
+  });
+
+  it("doesn't fire when there is no account row", async () => {
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded_missing")));
+    expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("doesn't fire for a request with a bad signature", async () => {
+    await seedAccount("user_upgraded_badsig", "free");
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded_badsig"), { badSignature: true }));
+    expect(captureServerEvent).not.toHaveBeenCalled();
   });
 });

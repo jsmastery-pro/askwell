@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { useState } from "react";
 import { BUTTON_PRIMARY } from "../ui/styles";
 
@@ -9,6 +10,7 @@ export function CopyButton({ text, label = "Copy snippet" }: { text: string; lab
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
+      posthog.capture("snippet_copied");
       setState("copied");
     } catch {
       setState("failed");
