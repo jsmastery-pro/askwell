@@ -55,9 +55,12 @@ async function setSourceStatus(
   await database.update(knowledgeSources).set({ status }).where(eq(knowledgeSources.id, sourceId));
 }
 
-/** Marks a source `failed` directly, e.g. when the upload itself never reached storage. */
-export async function failKnowledgeSource(sourceId: string, database: Database = defaultDb): Promise<void> {
-  await setSourceStatus(sourceId, "failed", database);
+/**
+ * Removes a source that never reached storage, so it doesn't permanently occupy a file slot
+ * (the plan's file count only reflects files actually stored).
+ */
+export async function deleteKnowledgeSource(sourceId: string, database: Database = defaultDb): Promise<void> {
+  await database.delete(knowledgeSources).where(eq(knowledgeSources.id, sourceId));
 }
 
 /**

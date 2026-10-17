@@ -1,4 +1,4 @@
-import { accounts } from "@askwell/db";
+import { accounts, projects } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import { getOwnedProject } from "@askwell/db/queries";
 import {
@@ -17,7 +17,7 @@ import { runAfterResponse } from "../../../../../lib/knowledge/background";
 import { extractFileText, hasPdfMagicBytes } from "../../../../../lib/knowledge/extract";
 import {
   countProjectKnowledgeFiles,
-  failKnowledgeSource,
+  deleteKnowledgeSource,
   insertKnowledgeSource,
   processKnowledgeSource,
   toKnowledgeSource,
@@ -41,6 +41,10 @@ function created(response: AddKnowledgeResponse) {
 async function handleText(projectId: string, request: Request) {
   const parsed = addTextKnowledgeRequestSchema.safeParse(await readJson(request));
   if (!parsed.success) return invalidInput("A title and content are required.");
+  // Same cap as uploaded files, since both end up chunked and embedded the same way.
+  if (Buffer.byteLength(parsed.data.content, "utf-8") > MAX_KNOWLEDGE_FILE_BYTES) {
+    return invalidInput("The pasted text is too large. Max 10 MB.");
+  }
 
   const source = await insertKnowledgeSource({
     projectId,
@@ -80,25 +84,35 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
 
   const plan = await getOwnerPlan(ownerId);
   const limit = PLAN_LIMITS[plan].knowledgeFilesPerProject;
-  const fileCount = await countProjectKnowledgeFiles(projectId);
-  if (fileCount >= limit) {
+  const title = fieldsParsed.data.title?.trim() || file.name;
+  const sourceId = randomUUID();
+  const storageKey = knowledgeFileKey(projectId, sourceId);
+
+  // Count-then-insert inside one transaction, with the project row locked, so two concurrent
+  // uploads for the same project can't both read a count under the limit and both pass.
+  const reservation = await defaultDb.transaction(async (tx) => {
+    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for("update");
+    const fileCount = await countProjectKnowledgeFiles(projectId, tx);
+    if (fileCount >= limit) return { ok: false as const };
+    const source = await insertKnowledgeSource({ id: sourceId, projectId, title, type, storageKey }, tx);
+    return { ok: true as const, source };
+  });
+
+  if (!reservation.ok) {
     return errorResponse(
       ERROR_CODES.planLimit,
       `Your plan allows ${limit} knowledge file${limit === 1 ? "" : "s"} per project. Upgrade to add more.`,
       403,
     );
   }
-
-  const title = fieldsParsed.data.title?.trim() || file.name;
-  const sourceId = randomUUID();
-  const storageKey = knowledgeFileKey(projectId, sourceId);
-  const source = await insertKnowledgeSource({ id: sourceId, projectId, title, type, storageKey });
+  const { source } = reservation;
 
   try {
     await uploadKnowledgeFile(storageKey, buffer, file.type || "application/octet-stream");
   } catch (error) {
     console.error(`Knowledge file upload failed for source ${source.id}`, error);
-    await failKnowledgeSource(source.id);
+    // Never reached storage: free the file slot rather than leaving a permanent `failed` row.
+    await deleteKnowledgeSource(source.id);
     return errorResponse(ERROR_CODES.internal, "Could not store the file.", 500);
   }
 

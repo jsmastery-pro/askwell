@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
+import { MAX_KNOWLEDGE_FILE_BYTES } from "@askwell/shared";
 import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -115,6 +116,14 @@ describe("pasted text", () => {
     const res = await POST(jsonRequest({ type: "text", title: "t", content: "" }), ctx(projectId));
     expect(res.status).toBe(400);
   });
+
+  it("rejects pasted text over the 10 MB cap with 400", async () => {
+    const projectId = await seedProject("owner_text3", "free", "pk_text3");
+    as("owner_text3");
+    const tooBig = "a".repeat(MAX_KNOWLEDGE_FILE_BYTES + 1);
+    const res = await POST(jsonRequest({ type: "text", title: "t", content: tooBig }), ctx(projectId));
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("file upload", () => {
@@ -156,6 +165,24 @@ describe("file upload", () => {
       const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, body.source.id));
       expect(row?.status).toBe("failed");
     });
+  });
+
+  it("deletes the source and frees its file slot when storage upload fails", async () => {
+    const projectId = await seedProject("owner_uploadfail", "free", "pk_uploadfail");
+    as("owner_uploadfail");
+    uploadKnowledgeFile.mockRejectedValueOnce(new Error("network error"));
+
+    const res = await POST(fileRequest(new Blob([Buffer.from("Doc")]), "doc.txt"), ctx(projectId));
+    expect(res.status).toBe(500);
+
+    const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
+    expect(rows).toHaveLength(0);
+
+    // The freed slot doesn't count against the plan limit: all 3 Free files still fit.
+    for (let i = 0; i < 3; i++) {
+      const retry = await POST(fileRequest(new Blob([Buffer.from(`Doc ${i}`)]), `doc${i}.txt`), ctx(projectId));
+      expect(retry.status).toBe(201);
+    }
   });
 
   it("rejects a renamed .exe with 400", async () => {
@@ -216,6 +243,20 @@ describe("file upload", () => {
     }
     const res = await POST(fileRequest(new Blob([Buffer.from("Doc 4")]), "doc4.txt"), ctx(projectId));
     expect(res.status).toBe(403);
+  });
+
+  it("never lets concurrent uploads exceed the Free plan's 3-file limit", async () => {
+    const projectId = await seedProject("owner_race", "free", "pk_race");
+    as("owner_race");
+
+    const responses = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => POST(fileRequest(new Blob([Buffer.from(`Doc ${i}`)]), `doc${i}.txt`), ctx(projectId))),
+    );
+
+    const succeeded = responses.filter((res) => res.status === 201);
+    expect(succeeded).toHaveLength(3);
+    const stored = await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
+    expect(stored).toHaveLength(3);
   });
 });
 

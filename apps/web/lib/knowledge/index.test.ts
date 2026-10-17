@@ -11,7 +11,7 @@ vi.mock("../ai", () => ({ embedTexts }));
 
 const {
   countProjectKnowledgeFiles,
-  failKnowledgeSource,
+  deleteKnowledgeSource,
   insertKnowledgeSource,
   processKnowledgeSource,
   toKnowledgeSource,
@@ -131,13 +131,16 @@ describe("processKnowledgeSource", () => {
   });
 });
 
-describe("failKnowledgeSource", () => {
-  it("marks a source failed directly", async () => {
+describe("deleteKnowledgeSource", () => {
+  it("removes the row, freeing the file slot it reserved", async () => {
     const source = await insertKnowledgeSource({ projectId, title: "Upload failed", type: "pdf", storageKey: "k" }, db);
+    expect(await countProjectKnowledgeFiles(projectId, db)).toBeGreaterThan(0);
+    const countBefore = await countProjectKnowledgeFiles(projectId, db);
 
-    await failKnowledgeSource(source.id, db);
+    await deleteKnowledgeSource(source.id, db);
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("failed");
+    const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
+    expect(rows).toHaveLength(0);
+    expect(await countProjectKnowledgeFiles(projectId, db)).toBe(countBefore - 1);
   });
 });
