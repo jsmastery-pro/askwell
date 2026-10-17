@@ -1,7 +1,9 @@
 "use client";
 
 import { SignOutButton, useUser } from "@clerk/nextjs";
+import posthog from "posthog-js";
 import { useEffect, useId, useRef, useState } from "react";
+import { posthogReady } from "../../lib/posthog/client";
 import { FOCUS } from "../ui/styles";
 
 /** The navbar's account area: the signed-in email, and Sign out in a small disclosure menu. */
@@ -12,6 +14,20 @@ export function AccountMenu() {
   const root = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+  const userId = user?.id;
+
+  // Ties this browser's PostHog person (incl. anonymous landing visits) to the Clerk user id the
+  // server-side events use, so one funnel spans both. The id only: no email or name in PostHog.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void posthogReady.then(() => {
+      if (!cancelled && posthog.get_distinct_id() !== userId) posthog.identify(userId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!open) return;
@@ -77,6 +93,7 @@ export function AccountMenu() {
         <SignOutButton redirectUrl="/sign-in">
           <button
             type="button"
+            onClick={() => posthog.reset()}
             className={`mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-ink hover:bg-canvas ${FOCUS}`}
           >
             Sign out

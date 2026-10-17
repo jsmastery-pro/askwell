@@ -5,6 +5,7 @@ import { PLAN_LIMITS, type Project } from "@askwell/shared";
 import { and, asc, count, eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { ensureAccount } from "../../app/dashboard/account";
+import { captureServerEvent } from "../posthog/server";
 
 /** `pk_` + 24 random bytes, base64url (URL-safe, 32 chars). */
 export function generatePublicKey(): string {
@@ -43,7 +44,7 @@ export async function createProject(
   // The dashboard creates the account on first visit; an API call may come first.
   await ensureAccount(ownerId, database);
 
-  return database.transaction(async (tx) => {
+  const result = await database.transaction(async (tx): Promise<CreateProjectResult> => {
     const [account] = await tx
       .select({ plan: accounts.plan })
       .from(accounts)
@@ -62,6 +63,9 @@ export async function createProject(
     await tx.insert(widgetConfigs).values({ projectId: project!.id });
     return { ok: true, project: project! };
   });
+  // After commit, so a rolled-back create is never counted.
+  if (result.ok) captureServerEvent(ownerId, "project_created", { project_id: result.project.id });
+  return result;
 }
 
 /** Renames an owned project. Null if it doesn't exist or isn't owned by `ownerId`. */

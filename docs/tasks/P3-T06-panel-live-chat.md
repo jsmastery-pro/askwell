@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice |
+| Owner | Bob (reassigned from Alice 2026-10-17, product owner) |
 | Lane | B |
 | Needs first | P3-T05, P2-T06 |
 | Files allowed | `apps/web/app/embed/**`, `apps/web/components/widget-panel/**` |

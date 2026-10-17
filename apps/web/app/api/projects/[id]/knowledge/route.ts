@@ -21,7 +21,9 @@ import {
   insertKnowledgeSource,
   processKnowledgeSource,
   toKnowledgeSource,
+  type KnowledgeSourceRow,
 } from "../../../../../lib/knowledge";
+import { captureServerEvent } from "../../../../../lib/posthog/server";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../lib/projects/http";
 import { knowledgeFileKey, uploadKnowledgeFile } from "../../../../../lib/storage";
 
@@ -34,11 +36,13 @@ async function getOwnerPlan(ownerId: string): Promise<Plan> {
   return row?.plan ?? "free";
 }
 
-function created(response: AddKnowledgeResponse) {
-  return Response.json(response, { status: 201 });
+// The one success path for both pasted text and files.
+function created(ownerId: string, source: KnowledgeSourceRow) {
+  captureServerEvent(ownerId, "knowledge_added", { project_id: source.projectId, type: source.type });
+  return Response.json({ source: toKnowledgeSource(source) } satisfies AddKnowledgeResponse, { status: 201 });
 }
 
-async function handleText(projectId: string, request: Request) {
+async function handleText(projectId: string, ownerId: string, request: Request) {
   const parsed = addTextKnowledgeRequestSchema.safeParse(await readJson(request));
   if (!parsed.success) return invalidInput("A title and content are required.");
   // Same cap as uploaded files, since both end up chunked and embedded the same way.
@@ -54,7 +58,7 @@ async function handleText(projectId: string, request: Request) {
   });
 
   runAfterResponse(() => processKnowledgeSource(source.id, projectId, () => parsed.data.content));
-  return created({ source: toKnowledgeSource(source) });
+  return created(ownerId, source);
 }
 
 async function handleFile(projectId: string, ownerId: string, request: Request) {
@@ -117,7 +121,7 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
   }
 
   runAfterResponse(() => processKnowledgeSource(source.id, projectId, () => extractFileText(type, buffer)));
-  return created({ source: toKnowledgeSource(source) });
+  return created(ownerId, source);
 }
 
 export async function POST(request: Request, { params }: Context) {
@@ -128,7 +132,7 @@ export async function POST(request: Request, { params }: Context) {
   if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
 
   const contentType = request.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return handleText(projectId, request);
+  if (contentType.includes("application/json")) return handleText(projectId, ownerId, request);
   if (contentType.includes("multipart/form-data")) return handleFile(projectId, ownerId, request);
   return invalidInput("Send JSON for pasted text or multipart form data for a file.");
 }

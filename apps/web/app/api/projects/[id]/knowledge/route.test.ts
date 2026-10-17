@@ -20,6 +20,9 @@ vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.user
 const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/ai", () => ({ embedTexts }));
 
+const captureServerEvent = vi.hoisted(() => vi.fn());
+vi.mock("../../../../../lib/posthog/server", () => ({ captureServerEvent }));
+
 const uploadKnowledgeFile = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/storage", () => ({
   knowledgeFileKey: (projectId: string, sourceId: string) => `projects/${projectId}/${sourceId}`,
@@ -42,6 +45,7 @@ afterAll(() => close());
 
 beforeEach(() => {
   state.userId = null;
+  captureServerEvent.mockClear();
   uploadKnowledgeFile.mockReset();
   uploadKnowledgeFile.mockResolvedValue(undefined);
   embedTexts.mockReset();
@@ -257,6 +261,42 @@ describe("file upload", () => {
     expect(succeeded).toHaveLength(3);
     const stored = await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
     expect(stored).toHaveLength(3);
+  });
+});
+
+describe("knowledge_added", () => {
+  it("fires for pasted text with type text", async () => {
+    const projectId = await seedProject("owner_ev_text", "free", "pk_ev_text");
+    as("owner_ev_text");
+    const res = await POST(jsonRequest({ type: "text", title: "FAQ", content: "Hours: 9-5." }), ctx(projectId));
+    expect(res.status).toBe(201);
+    expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("owner_ev_text", "knowledge_added", {
+      project_id: projectId,
+      type: "text",
+    });
+  });
+
+  it("fires for a file with its file type", async () => {
+    const projectId = await seedProject("owner_ev_file", "free", "pk_ev_file");
+    as("owner_ev_file");
+    const res = await POST(fileRequest(new Blob([samplePdf]), "guide.pdf"), ctx(projectId));
+    expect(res.status).toBe(201);
+    expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("owner_ev_file", "knowledge_added", {
+      project_id: projectId,
+      type: "pdf",
+    });
+  });
+
+  it("doesn't fire when the add fails (rejected type, failed upload)", async () => {
+    const projectId = await seedProject("owner_ev_fail", "free", "pk_ev_fail");
+    as("owner_ev_fail");
+    expect((await POST(fileRequest(new Blob(["x"]), "virus.exe"), ctx(projectId))).status).toBe(400);
+
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    uploadKnowledgeFile.mockRejectedValueOnce(new Error("storage down"));
+    expect((await POST(fileRequest(new Blob(["Doc"]), "doc.txt"), ctx(projectId))).status).toBe(500);
+
+    expect(captureServerEvent).not.toHaveBeenCalled();
   });
 });
 
