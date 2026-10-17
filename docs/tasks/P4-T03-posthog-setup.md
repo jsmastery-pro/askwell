@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | B (normally Alice's — she's on Phase 3 Lane B; product owner approved giving this to Bob, 2026-10-17) |
 | Needs first | — |
-| Files allowed | `apps/web/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/instrumentation*.ts`, `apps/web/app/layout.tsx`, `apps/web/app/dashboard/account.ts`, `apps/web/lib/projects/**`, `apps/web/app/api/projects/[id]/knowledge/route.ts` (knowledge_added, via the shared `created()` helper), `apps/web/components/projects/CopyButton.tsx` (snippet_copied), `apps/web/app/api/clerk/webhook/route.ts` (upgraded, on `setPlan(userId, "pro")`) — plus any other existing file where you add a **single PostHog event call and nothing else**. Ask before touching anything that needs more than that one-line addition. |
+| Files allowed | `apps/web/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/instrumentation*.ts`, `apps/web/app/layout.tsx`, `apps/web/app/dashboard/account.ts`, `apps/web/lib/projects/**`, `apps/web/app/api/projects/[id]/knowledge/route.ts` (knowledge_added, via the shared `created()` helper), `apps/web/components/projects/CopyButton.tsx` (snippet_copied), `apps/web/app/api/clerk/webhook/route.ts` (upgraded, on `setPlan(userId, "pro")`), `apps/web/next.config.ts` (add the `/ingest` reverse-proxy `rewrites()` entry only — never touch `headers()`) — plus any other existing file where you add a **single PostHog event call and nothing else**. Ask before touching anything that needs more than that one-line addition. |
 | project.md | §6.11 Analytics |
 
 ## Background
