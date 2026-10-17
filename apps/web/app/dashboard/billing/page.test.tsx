@@ -6,9 +6,12 @@ import { listProjectUsage, type ProjectUsageRow } from "../../../lib/data/usage"
 import BillingPage from "./page";
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: { protect: vi.fn(async () => ({ userId: "user_owner" })) } }));
+vi.mock("@clerk/nextjs", () => ({
+  useClerk: () => ({ openUserProfile: vi.fn() }),
+  PricingTable: () => <div data-testid="pricing-table" />,
+}));
 vi.mock("../../../lib/data/billing", () => ({ getAccountPlan: vi.fn() }));
 vi.mock("../../../lib/data/usage", () => ({ listProjectUsage: vi.fn() }));
-vi.mock("../../../lib/data/billing-actions", () => ({ startCheckout: vi.fn(), openBillingPortal: vi.fn() }));
 
 const far = new Date(Date.now() + 20 * 86_400_000).toISOString();
 const usage = (name: string, plan: Plan, messagesUsed: number): ProjectUsageRow => ({
@@ -38,7 +41,7 @@ describe("Billing page", () => {
 
     const plan = screen.getByRole("region", { name: "Current plan" });
     expect(within(plan).getByText("Free")).toBeTruthy();
-    expect(within(plan).getByRole("button", { name: "Upgrade to Pro" })).toBeTruthy();
+    expect(within(plan).getByTestId("pricing-table")).toBeTruthy();
     expect(within(plan).queryByRole("button", { name: "Manage subscription" })).toBeNull();
 
     const list = screen.getByRole("region", { name: "Messages this month" });
@@ -57,7 +60,7 @@ describe("Billing page", () => {
     const plan = screen.getByRole("region", { name: "Current plan" });
     expect(within(plan).getByText("Pro")).toBeTruthy();
     expect(within(plan).getByRole("button", { name: "Manage subscription" })).toBeTruthy();
-    expect(within(plan).queryByRole("button", { name: "Upgrade to Pro" })).toBeNull();
+    expect(within(plan).queryByTestId("pricing-table")).toBeNull();
     expect(screen.getAllByRole("meter")).toHaveLength(2);
     expect(screen.getByText("Limit reached.")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: /Pro/ }).textContent).toContain("Your plan");

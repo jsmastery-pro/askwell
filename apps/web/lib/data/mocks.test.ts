@@ -1,7 +1,6 @@
-import { checkoutResponseSchema, portalResponseSchema, updateWidgetConfigResponseSchema, WIDGET_DEFAULTS } from "@askwell/shared";
+import { updateWidgetConfigResponseSchema, WIDGET_DEFAULTS } from "@askwell/shared";
 import { describe, expect, it, vi } from "vitest";
 import { MOCK_THREADS } from "../mock/conversations";
-import { openBillingPortal, startCheckout } from "./billing-actions";
 import { saveWidgetConfig } from "./config-actions";
 
 vi.mock("server-only", () => ({}));
@@ -23,10 +22,5 @@ describe("mock writes match their shared schemas", () => {
     updateWidgetConfigResponseSchema.parse(saved);
     expect(saved.config.label).toBe(WIDGET_DEFAULTS.label);
     expect(saved.config.position).toBe("top-left");
-  });
-
-  it("billing URLs", async () => {
-    checkoutResponseSchema.parse(await startCheckout());
-    portalResponseSchema.parse(await openBillingPortal());
   });
 });
