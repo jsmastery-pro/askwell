@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | B |
 | Needs first | P1-T02, P5-T01 |
-| Files allowed | `apps/web/app/api/projects/[id]/config/**`, `apps/web/lib/widget-config/**`, `apps/web/lib/data/config-actions.ts` |
+| Files allowed | `apps/web/app/api/projects/[id]/config/**`, `apps/web/lib/widget-config/**`, `apps/web/lib/data/config-actions.ts`, `apps/web/lib/data/mocks.test.ts` |
 | project.md | §6.8 Customize, §5 Plans, §9 Security rules (Plan bypass) |
 
 ## Background
