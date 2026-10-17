@@ -251,6 +251,22 @@ describe("monthly quota", () => {
     expect((await usage(shop.id)).messagesUsed).toBe(freeLimit);
   });
 
+  it("doesn't overshoot when a concurrent request takes the last message while the model answers", async () => {
+    await setUsage(shop.id, freeLimit - 1);
+    ai.create.mockImplementationOnce(async () => {
+      // Another request for this project is counted while this one waits on the model.
+      await setUsage(shop.id, freeLimit);
+      return { output_text: "We ship worldwide.", model: "gpt-test", usage: { input_tokens: 1, output_tokens: 1 } };
+    });
+    const conversationsBefore = (await db.select().from(conversations)).length;
+
+    const res = await ask("How fast do you ship?");
+    expect(res.status).toBe(429);
+    expect((await res.json()).error.code).toBe("quota_exceeded");
+    expect((await usage(shop.id)).messagesUsed).toBe(freeLimit);
+    expect((await db.select().from(conversations)).length).toBe(conversationsBefore);
+  });
+
   it("reads the plan on the server: a Pro project is past the Free limit", async () => {
     await setUsage(other.id, freeLimit);
     expect((await chat({ key: "pk_other", visitorId: "v_3", message: "Hi" })).status).toBe(200);

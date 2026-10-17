@@ -2,7 +2,7 @@ import { accounts, conversations, messages, projects } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import { searchChunks, type Database } from "@askwell/db/queries";
 import { ERROR_CODES, PLAN_LIMITS, RETRIEVAL_TOP_K, type WidgetChatRequest } from "@askwell/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { embedQuery } from "../ai";
 import { addOneMonth } from "../data/usage";
 import { answerFromChunks, type AnswerTelemetry } from "./answer";
@@ -14,6 +14,13 @@ export type ChatResult =
   | { ok: false; status: 404 | 429; code: string; message: string };
 
 const notFound = (message: string): ChatResult => ({ ok: false, status: 404, code: ERROR_CODES.notFound, message });
+
+const quotaExceeded: ChatResult = {
+  ok: false,
+  status: 429,
+  code: ERROR_CODES.quotaExceeded,
+  message: "This chat has reached its monthly message limit.",
+};
 
 /**
  * Messages used in the project's current period. Starts a new period (count 0, period_start now)
@@ -80,14 +87,9 @@ export async function handleChat(
   }
 
   // The plan comes from the owner's account, read here on the server (§5, §9 Plan bypass).
-  if ((await usedThisPeriod(project, database, receivedAt)) >= PLAN_LIMITS[project.plan].messagesPerMonth) {
-    return {
-      ok: false,
-      status: 429,
-      code: ERROR_CODES.quotaExceeded,
-      message: "This chat has reached its monthly message limit.",
-    };
-  }
+  const limit = PLAN_LIMITS[project.plan].messagesPerMonth;
+  // Early check, so a project at its limit costs no OpenAI call. The save below re-checks.
+  if ((await usedThisPeriod(project, database, receivedAt)) >= limit) return quotaExceeded;
 
   const chunks = await searchChunks(project.id, await embedQuery(message), RETRIEVAL_TOP_K, database);
   const { reply, telemetry } = await answerFromChunks(
@@ -98,6 +100,15 @@ export async function handleChat(
   const repliedAt = new Date(Math.max(Date.now(), receivedAt.getTime() + 1));
 
   const savedConversationId = await database.transaction(async (tx) => {
+    // Count first, and only while under the limit: requests racing at the boundary can each
+    // pass the early check, but only `limit` of them get counted and saved. The rest save nothing.
+    const [counted] = await tx
+      .update(projects)
+      .set({ messagesUsed: sql`${projects.messagesUsed} + 1` })
+      .where(and(eq(projects.id, project.id), lt(projects.messagesUsed, limit)))
+      .returning({ id: projects.id });
+    if (!counted) return null;
+
     let id = conversationId;
     if (!id) {
       const [created] = await tx
@@ -110,12 +121,9 @@ export async function handleChat(
       { conversationId: id, role: "visitor", body: message, createdAt: receivedAt },
       { conversationId: id, role: "bot", body: reply, createdAt: repliedAt },
     ]);
-    await tx
-      .update(projects)
-      .set({ messagesUsed: sql`${projects.messagesUsed} + 1` })
-      .where(eq(projects.id, project.id));
     return id;
   });
+  if (!savedConversationId) return quotaExceeded;
 
   return { ok: true, conversationId: savedConversationId, reply, telemetry: { ...telemetry, projectId: project.id } };
 }
