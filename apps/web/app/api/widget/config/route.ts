@@ -1,5 +1,5 @@
-import { ERROR_CODES, RATE_LIMITS, widgetConfigQuerySchema, type ApiError, type WidgetConfigResponse } from "@askwell/shared";
-import { checkRateLimit, getClientIp } from "../../../../lib/rate-limit";
+import { ERROR_CODES, widgetConfigQuerySchema, type ApiError, type WidgetConfigResponse } from "@askwell/shared";
+import { checkRateLimit } from "../../../../lib/rate-limit";
 import { getWidgetConfigByKey } from "../../../../lib/widget-config";
 
 export const dynamic = "force-dynamic";
@@ -32,10 +32,7 @@ export async function GET(request: Request) {
   const { key } = parsed.data;
 
   // Before the lookup, so unknown keys can't be probed without limit.
-  const limit = await checkRateLimit(
-    `config:${key}:${getClientIp(request.headers)}`,
-    RATE_LIMITS.widgetConfig,
-  );
+  const limit = await checkRateLimit(request, "widgetConfig", key);
   if (!limit.allowed) {
     return error(ERROR_CODES.rateLimited, "Too many requests. Try again shortly.", 429, {
       "Retry-After": String(limit.retryAfterSeconds),

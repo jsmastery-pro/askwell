@@ -10,11 +10,11 @@ const tables = [
   schema.knowledgeChunks,
   schema.conversations,
   schema.messages,
-  schema.rateLimits,
 ].map((t) => getTableConfig(t));
 
 describe("schema", () => {
-  it("defines exactly the 8 tables from project.md §7", () => {
+  // rate_limits was dropped when Arcjet took over the widget rate limits (P3-T07).
+  it("defines exactly the 7 tables from project.md §7", () => {
     expect(tables.map((t) => t.name).sort()).toEqual(
       [
         "accounts",
@@ -23,7 +23,6 @@ describe("schema", () => {
         "knowledge_sources",
         "messages",
         "projects",
-        "rate_limits",
         "widget_configs",
       ].sort(),
     );

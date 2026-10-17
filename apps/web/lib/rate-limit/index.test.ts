@@ -1,42 +1,103 @@
 // @vitest-environment node
-import { rateLimits } from "@askwell/db";
-import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestDb, type TestDb } from "../widget-config/test-db";
-import { checkRateLimit, getClientIp } from "./index";
+import { RATE_LIMITS } from "@askwell/shared";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const limit = { windowSeconds: 60, max: 3 };
+// Arcjet is mocked: no test calls the real Arcjet API.
+const arcjet = vi.hoisted(() => ({ protect: vi.fn(), created: [] as unknown[] }));
+vi.mock("@arcjet/next", () => ({
+  default: (options: unknown) => {
+    arcjet.created.push(options);
+    return { protect: arcjet.protect };
+  },
+  fixedWindow: (options: unknown) => [{ type: "FIXED_WINDOW", ...(options as object) }],
+}));
 
-let db: TestDb;
-let close: () => Promise<void>;
+const { checkRateLimit, getClientIp } = await import("./index");
 
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
+type Fake = { conclusion: "ALLOW" | "DENY" | "ERROR"; reason?: Record<string, unknown> };
+function decision({ conclusion, reason = {} }: Fake) {
+  return {
+    conclusion,
+    isErrored: () => conclusion === "ERROR",
+    isDenied: () => conclusion === "DENY",
+    reason: { ...reason, isRateLimit: () => reason.type === "RATE_LIMIT" },
+  };
+}
+
+function request(ip = "203.0.113.7") {
+  return new Request("https://app.test/api/widget/config?key=pk_test", { headers: { "cf-connecting-ip": ip } });
+}
+
+beforeEach(() => {
+  vi.stubEnv("ARCJET_KEY", "ajkey_test");
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-afterAll(() => close());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.mocked(console.error).mockRestore();
+  arcjet.protect.mockReset();
+});
 
 describe("checkRateLimit", () => {
-  it("allows up to max calls in a window, then refuses", async () => {
-    const results = [];
-    for (let i = 0; i < limit.max + 1; i++) results.push(await checkRateLimit("k1", limit, db));
-    expect(results.map((r) => r.allowed)).toEqual([true, true, true, false]);
-    expect(results.at(-1)!.retryAfterSeconds).toBeGreaterThan(0);
-    expect(results.at(-1)!.retryAfterSeconds).toBeLessThanOrEqual(60);
+  it("allows an allowed decision", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "ALLOW" }));
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).allowed).toBe(true);
   });
 
-  it("counts keys separately", async () => {
-    expect((await checkRateLimit("k2", limit, db)).allowed).toBe(true);
+  it("counts per route + public key + client IP, using our IP rather than Arcjet's", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "ALLOW" }));
+    const req = request("198.51.100.4");
+    await checkRateLimit(req, "widgetChat", "pk_abc");
+    expect(arcjet.protect).toHaveBeenCalledWith(req, { route: "widgetChat", publicKey: "pk_abc", clientIp: "198.51.100.4" });
   });
 
-  it("resets the window in place once it expires", async () => {
-    await db
-      .update(rateLimits)
-      .set({ windowStart: sql`now() - interval '61 seconds'` })
-      .where(eq(rateLimits.key, "k1"));
-    expect((await checkRateLimit("k1", limit, db)).allowed).toBe(true);
-    const [row] = await db.select().from(rateLimits).where(eq(rateLimits.key, "k1"));
-    expect(row?.count).toBe(1);
+  it("builds each route's fixed window from RATE_LIMITS, tracked by our characteristics", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "ALLOW" }));
+    await checkRateLimit(request(), "widgetConfig", "pk_test");
+    await checkRateLimit(request(), "widgetChat", "pk_test");
+    // One client per route, created on first use (possibly by an earlier test) and then reused.
+    const { created } = arcjet;
+    expect(created).toHaveLength(2);
+    for (const route of ["widgetConfig", "widgetChat"] as const) {
+      expect(created).toContainEqual({
+        key: "ajkey_test",
+        characteristics: ["route", "publicKey", "clientIp"],
+        rules: [[{ type: "FIXED_WINDOW", mode: "LIVE", window: RATE_LIMITS[route].windowSeconds, max: RATE_LIMITS[route].max }]],
+      });
+    }
+  });
+
+  it("refuses a denied decision, with Retry-After from the reset time", async () => {
+    arcjet.protect.mockResolvedValue(
+      decision({ conclusion: "DENY", reason: { type: "RATE_LIMIT", reset: 40, resetTime: new Date(Date.now() + 12_300) } }),
+    );
+    expect(await checkRateLimit(request(), "widgetConfig", "pk_test")).toEqual({ allowed: false, retryAfterSeconds: 13 });
+  });
+
+  it("falls back to the reset seconds, and never says retry in under 1 second", async () => {
+    arcjet.protect.mockResolvedValueOnce(decision({ conclusion: "DENY", reason: { type: "RATE_LIMIT", reset: 7 } }));
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).retryAfterSeconds).toBe(7);
+    arcjet.protect.mockResolvedValueOnce(decision({ conclusion: "DENY", reason: { type: "RATE_LIMIT", reset: 0 } }));
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).retryAfterSeconds).toBe(1);
+  });
+
+  it("fails open on an Arcjet error decision, and logs it", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "ERROR", reason: { type: "ERROR", message: "timeout" } }));
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).allowed).toBe(true);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("fails open when protect throws", async () => {
+    arcjet.protect.mockRejectedValue(new Error("network down"));
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).allowed).toBe(true);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("fails open without ARCJET_KEY, without calling Arcjet", async () => {
+    vi.stubEnv("ARCJET_KEY", "");
+    expect((await checkRateLimit(request(), "widgetConfig", "pk_test")).allowed).toBe(true);
+    expect(arcjet.protect).not.toHaveBeenCalled();
   });
 });
 
