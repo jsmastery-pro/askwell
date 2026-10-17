@@ -1,11 +1,11 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openBillingPortal, startCheckout } from "../../lib/data/billing-actions";
 import { PlanActions } from "./PlanActions";
 
-vi.mock("../../lib/data/billing-actions", () => ({
-  startCheckout: vi.fn(async () => ({ url: "https://checkout.example/session" })),
-  openBillingPortal: vi.fn(async () => ({ url: "https://portal.example/session" })),
+const openUserProfile = vi.hoisted(() => vi.fn());
+vi.mock("@clerk/nextjs", () => ({
+  useClerk: () => ({ openUserProfile }),
+  PricingTable: (props: { for?: string }) => <div data-testid="pricing-table" data-for={props.for} />,
 }));
 
 afterEach(() => {
@@ -14,47 +14,19 @@ afterEach(() => {
 });
 
 describe("PlanActions", () => {
-  it("offers Upgrade on Free, and shows what it will do instead of navigating", async () => {
-    const before = window.location.href;
+  it("shows Clerk's pricing table on Free", () => {
     render(<PlanActions plan="free" />);
-    expect(screen.getByText("Opens Stripe Checkout.")).toBeTruthy();
+    const table = screen.getByTestId("pricing-table");
+    expect(table.dataset.for).toBe("user");
     expect(screen.queryByRole("button", { name: "Manage subscription" })).toBeNull();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Upgrade to Pro" }));
-    });
-
-    expect(startCheckout).toHaveBeenCalledTimes(1);
-    expect(openBillingPortal).not.toHaveBeenCalled();
-    expect(screen.getByRole("status").textContent).toMatch(/opens Stripe Checkout/);
-    expect(window.location.href).toBe(before);
   });
 
-  it("offers Manage subscription on Pro", async () => {
+  it("opens Clerk's account management on Pro", () => {
     render(<PlanActions plan="pro" />);
-    expect(screen.queryByRole("button", { name: "Upgrade to Pro" })).toBeNull();
+    expect(screen.queryByTestId("pricing-table")).toBeNull();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Manage subscription" }));
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Manage subscription" }));
 
-    expect(openBillingPortal).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status").textContent).toMatch(/billing portal isn't connected yet/);
-  });
-
-  it("shows a pending label, and an error if the request fails", async () => {
-    let fail: (e: Error) => void = () => {};
-    vi.mocked(startCheckout).mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
-    render(<PlanActions plan="free" />);
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Upgrade to Pro" }));
-    });
-    const button = screen.getByRole("button", { name: "Opening checkout…" }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-
-    await act(async () => fail(new Error("network")));
-    expect(screen.getByRole("alert").textContent).toMatch(/didn't open/);
-    expect((screen.getByRole("button", { name: "Upgrade to Pro" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(openUserProfile).toHaveBeenCalledTimes(1);
   });
 });

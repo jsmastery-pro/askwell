@@ -27,7 +27,6 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 export const accounts = pgTable("accounts", {
   clerkUserId: text("clerk_user_id").primaryKey(),
   plan: planEnum("plan").notNull().default("free"),
-  stripeCustomerId: text("stripe_customer_id"),
   createdAt: createdAt(),
 });
 
