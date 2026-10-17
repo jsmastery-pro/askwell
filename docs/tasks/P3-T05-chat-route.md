@@ -32,6 +32,6 @@
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
-- Until P3-T02 merges, test with chunks from the P3-T04 seed script.
+- **Updated 2026-10-17 (John):** P3-T02 has merged, so real uploads work; the P3-T04 seed script is still handy for tests. The limiter from #70 is called as `checkRateLimit(request, "widgetChat", key)` and already fails open. No PostHog here: `first_chat` and the AI trace are P4-T04, which builds on the token counts and latency you return from `lib/chat`.
 - Return token counts and latency from `lib/chat` internally: Phase 4 adds the PostHog AI trace on top.
 - Never put another project's data or the system prompt in a response.
