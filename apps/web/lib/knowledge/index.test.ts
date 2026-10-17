@@ -12,7 +12,9 @@ vi.mock("../ai", () => ({ embedTexts }));
 const {
   countProjectKnowledgeFiles,
   deleteKnowledgeSource,
+  getKnowledgeSourceById,
   insertKnowledgeSource,
+  listProjectKnowledgeSources,
   processKnowledgeSource,
   toKnowledgeSource,
 } = await import("./index");
@@ -77,6 +79,39 @@ describe("countProjectKnowledgeFiles", () => {
     await insertKnowledgeSource({ projectId: otherProject.id, title: "f2", type: "md", storageKey: "k2" }, db);
 
     expect(await countProjectKnowledgeFiles(otherProject.id, db)).toBe(2);
+  });
+});
+
+describe("listProjectKnowledgeSources", () => {
+  it("returns a project's sources, newest first", async () => {
+    const otherProject = (
+      await db.insert(projects).values({ ownerId: "owner_1", name: "List", publicKey: "pk_list" }).returning()
+    )[0]!;
+    const first = await insertKnowledgeSource({ projectId: otherProject.id, title: "First", type: "text", storageKey: null }, db);
+    const second = await insertKnowledgeSource({ projectId: otherProject.id, title: "Second", type: "pdf", storageKey: "k" }, db);
+
+    const sources = await listProjectKnowledgeSources(otherProject.id, db);
+
+    expect(sources.map((s) => s.id)).toEqual([second.id, first.id]);
+  });
+
+  it("returns nothing for a project with no sources", async () => {
+    const empty = (
+      await db.insert(projects).values({ ownerId: "owner_1", name: "Empty", publicKey: "pk_empty" }).returning()
+    )[0]!;
+    expect(await listProjectKnowledgeSources(empty.id, db)).toEqual([]);
+  });
+});
+
+describe("getKnowledgeSourceById", () => {
+  it("returns the row for a known id", async () => {
+    const source = await insertKnowledgeSource({ projectId, title: "Findable", type: "text", storageKey: null }, db);
+    expect((await getKnowledgeSourceById(source.id, db))?.id).toBe(source.id);
+  });
+
+  it("returns null for an unknown or malformed id", async () => {
+    expect(await getKnowledgeSourceById("00000000-0000-4000-8000-000000000000", db)).toBeNull();
+    expect(await getKnowledgeSourceById("not-a-uuid", db)).toBeNull();
   });
 });
 

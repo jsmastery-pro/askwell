@@ -1,19 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS, type KnowledgeSource } from "@askwell/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  addFileKnowledge,
-  addTextKnowledge,
-  deleteKnowledgeSource,
-  retryKnowledgeSource,
-} from "../../lib/data/knowledge-actions";
+import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "../../lib/data/knowledge-actions";
 import { KnowledgeManager } from "./KnowledgeManager";
 
 vi.mock("../../lib/data/knowledge-actions", () => ({
   addTextKnowledge: vi.fn(),
   addFileKnowledge: vi.fn(),
   deleteKnowledgeSource: vi.fn(async () => ({ ok: true })),
-  retryKnowledgeSource: vi.fn(async (source: KnowledgeSource) => ({ source: { ...source, status: "processing" } })),
 }));
 
 const PROJECT = "11111111-2222-4333-8444-555555555555";
@@ -157,19 +151,10 @@ describe("KnowledgeManager", () => {
     expect(within(row("Returns policy")).getByText("Processing")).toBeTruthy();
   });
 
-  it("retries a failed source", async () => {
-    vi.useFakeTimers();
+  it("shows a failed source with no retry affordance", () => {
     renderManager([source({ title: "Scan.pdf", status: "failed" })]);
     expect(within(row("Scan.pdf")).getByText(/couldn't read this file/)).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    });
-    expect(retryKnowledgeSource).toHaveBeenCalledOnce();
-    expect(within(row("Scan.pdf")).getByText("Processing")).toBeTruthy();
-
-    act(() => vi.advanceTimersByTime(2500));
-    expect(within(row("Scan.pdf")).getByText("Ready")).toBeTruthy();
+    expect(within(row("Scan.pdf")).queryByRole("button", { name: "Try again" })).toBeNull();
   });
 
   it("deletes after confirming, and keeps the row when cancelled", async () => {
@@ -190,19 +175,6 @@ describe("KnowledgeManager", () => {
     expect(deleteKnowledgeSource).toHaveBeenCalledWith(drop.id);
     expect(screen.queryByText("Delete me")).toBeNull();
     expect(screen.getByText("Keep me")).toBeTruthy();
-  });
-
-  it("shows an error and keeps the source failed when retry fails", async () => {
-    vi.mocked(retryKnowledgeSource).mockRejectedValueOnce(new Error("network"));
-    renderManager([source({ title: "Scan.pdf", status: "failed" })]);
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    });
-
-    expect(within(row("Scan.pdf")).getByText("Couldn't start processing again. Try again in a moment.")).toBeTruthy();
-    expect(within(row("Scan.pdf")).getByText("Failed")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Try again" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows an error and keeps the row when delete fails", async () => {

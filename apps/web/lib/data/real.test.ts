@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { projects } from "@askwell/db";
+import { knowledgeSources, projects } from "@askwell/db";
 import { PLAN_LIMITS, WIDGET_DEFAULTS } from "@askwell/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestDb, seedProject, type TestDb } from "../widget-config/test-db";
 import { getAccountPlan } from "./billing";
 import { getStoredWidgetConfig, getWidgetConfig } from "./config";
+import { countKnowledgeFiles, listKnowledgeSources } from "./knowledge";
 import { addOneMonth, getProjectUsage } from "./usage";
 
 vi.mock("server-only", () => ({}));
@@ -70,6 +71,35 @@ describe("widget config reads", () => {
   });
 });
 
+describe("knowledge reads", () => {
+  let project: { id: string; ownerId: string };
+
+  beforeAll(async () => {
+    project = await seedProject(db, { plan: "free", publicKey: "pk_knowledge" });
+    await db.insert(knowledgeSources).values([
+      { projectId: project.id, title: "Pasted FAQ", type: "text", status: "ready" },
+      { projectId: project.id, title: "Handbook.pdf", type: "pdf", status: "ready", storageKey: "k1" },
+      { projectId: project.id, title: "Notes.md", type: "md", status: "processing", storageKey: "k2" },
+    ]);
+  });
+
+  it("lists a project's sources, newest first", async () => {
+    const sources = await listKnowledgeSources(project.id, db);
+    expect(sources).toHaveLength(3);
+    const times = sources.map((s) => Date.parse(s.createdAt));
+    expect(times).toEqual([...times].sort((a, b) => b - a));
+  });
+
+  it("counts only uploaded files toward the file limit", async () => {
+    expect(await countKnowledgeFiles(project.id, db)).toBe(2);
+  });
+
+  it("returns nothing for another project's sources", async () => {
+    expect(await listKnowledgeSources(freeProject.id, db)).toEqual([]);
+    expect(await countKnowledgeFiles(freeProject.id, db)).toBe(0);
+  });
+});
+
 describe("malformed project IDs", () => {
   it.each(["abc", "1", "not-a-uuid-at-all", "11111111-2222-4333-8444-55555555555z"])(
     "%s returns null instead of a database error",
@@ -77,6 +107,8 @@ describe("malformed project IDs", () => {
       expect(await getProjectUsage(freeProject.ownerId, id, db)).toBeNull();
       expect(await getWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
       expect(await getStoredWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
+      expect(await listKnowledgeSources(id, db)).toEqual([]);
+      expect(await countKnowledgeFiles(id, db)).toBe(0);
     },
   );
 });

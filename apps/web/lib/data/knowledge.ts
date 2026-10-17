@@ -1,18 +1,22 @@
 import "server-only";
+import { db as defaultDb } from "@askwell/db/client";
+import type { Database } from "@askwell/db/queries";
 import type { KnowledgeSource } from "@askwell/shared";
-import { MOCK_KNOWLEDGE_SOURCES } from "../mock/knowledge";
+import { countProjectKnowledgeFiles, listProjectKnowledgeSources, toKnowledgeSource } from "../knowledge";
 import { isUuid } from "./ids";
 
+// Real reads. The caller (a server component) has already checked ownership via
+// getOwnedProject before calling these with the project's id.
+
 // Newest first.
-// MOCK: replace with a knowledge_sources query scoped by project (P3-T03).
-export async function listKnowledgeSources(projectId: string): Promise<KnowledgeSource[]> {
+export async function listKnowledgeSources(projectId: string, database: Database = defaultDb): Promise<KnowledgeSource[]> {
   if (!isUuid(projectId)) return [];
-  return [...MOCK_KNOWLEDGE_SOURCES].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const rows = await listProjectKnowledgeSources(projectId, database);
+  return rows.map(toKnowledgeSource);
 }
 
 // Uploaded files count toward the plan's file limit; pasted text doesn't (project.md §6.4).
-// MOCK: replace with a count of this project's file sources (P3-T03).
-export async function countKnowledgeFiles(projectId: string): Promise<number> {
-  const sources = await listKnowledgeSources(projectId);
-  return sources.filter((source) => source.type !== "text").length;
+export async function countKnowledgeFiles(projectId: string, database: Database = defaultDb): Promise<number> {
+  if (!isUuid(projectId)) return 0;
+  return countProjectKnowledgeFiles(projectId, database);
 }

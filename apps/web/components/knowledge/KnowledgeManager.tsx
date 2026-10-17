@@ -3,12 +3,7 @@
 import { PLAN_LIMITS, type KnowledgeSource, type Plan } from "@askwell/shared";
 import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import {
-  addFileKnowledge,
-  addTextKnowledge,
-  deleteKnowledgeSource,
-  retryKnowledgeSource,
-} from "../../lib/data/knowledge-actions";
+import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "../../lib/data/knowledge-actions";
 import { formatDateTime } from "../project-shell/format";
 import { UsageMeter } from "../project-shell/UsageMeter";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FOCUS, INPUT } from "../ui/styles";
@@ -129,22 +124,6 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
       setTextErrors({ content: "The text didn't save. Try again." });
     } finally {
       setSavingText(false);
-    }
-  }
-
-  async function retry(source: KnowledgeSource) {
-    setBusy(source.id, true);
-    setRowError(source.id, null);
-    try {
-      const { source: updated } = await retryKnowledgeSource(source);
-      setSources((current) => current.map((s) => (s.id === source.id ? updated : s)));
-      setAnnouncement(`Processing ${source.title} again.`);
-      finishProcessingLater(updated);
-    } catch {
-      setRowError(source.id, "Couldn't start processing again. Try again in a moment.");
-      setAnnouncement(`${source.title} wasn't retried. Try again.`);
-    } finally {
-      setBusy(source.id, false);
     }
   }
 
@@ -340,11 +319,6 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={source.status} />
-                    {source.status === "failed" && (
-                      <button type="button" onClick={() => retry(source)} disabled={busy} className={BUTTON_SECONDARY}>
-                        Try again
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setConfirming(source)}
