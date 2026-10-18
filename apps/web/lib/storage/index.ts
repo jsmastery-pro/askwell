@@ -4,28 +4,34 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 
 let client: S3Client | undefined;
 
+// InstaCloud's names for a bound storage service (`insta secrets bind … storage/<name> --to compute/<app>`).
+const ENV = {
+  endpoint: "AWS_ENDPOINT_URL_S3",
+  region: "AWS_REGION",
+  accessKeyId: "AWS_ACCESS_KEY_ID",
+  secretAccessKey: "AWS_SECRET_ACCESS_KEY",
+  bucket: "BUCKET_NAME",
+} as const;
+
 function getClient(): S3Client {
   if (!client) {
-    const endpoint = process.env.STORAGE_ENDPOINT;
-    const region = process.env.STORAGE_REGION;
-    const accessKeyId = process.env.STORAGE_ACCESS_KEY;
-    const secretAccessKey = process.env.STORAGE_SECRET_KEY;
+    const endpoint = process.env[ENV.endpoint];
+    const region = process.env[ENV.region];
+    const accessKeyId = process.env[ENV.accessKeyId];
+    const secretAccessKey = process.env[ENV.secretAccessKey];
     if (!endpoint || !region || !accessKeyId || !secretAccessKey) {
-      throw new Error("Storage is not configured");
+      const missing = Object.values(ENV).filter((name) => name !== ENV.bucket && !process.env[name]);
+      throw new Error(`Storage is not configured (missing ${missing.join(", ")})`);
     }
-    client = new S3Client({
-      endpoint,
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-      forcePathStyle: true,
-    });
+    // The endpoint is required: without it the SDK talks to real AWS.
+    client = new S3Client({ endpoint, region, credentials: { accessKeyId, secretAccessKey } });
   }
   return client;
 }
 
 function bucket(): string {
-  const value = process.env.STORAGE_BUCKET;
-  if (!value) throw new Error("STORAGE_BUCKET is not set");
+  const value = process.env[ENV.bucket];
+  if (!value) throw new Error(`${ENV.bucket} is not set`);
   return value;
 }
 

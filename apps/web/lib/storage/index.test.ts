@@ -11,9 +11,13 @@ class FakeCommand {
 }
 
 const send = vi.hoisted(() => vi.fn());
+const clientConfig = vi.hoisted(() => ({ last: undefined as unknown }));
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     send = send;
+    constructor(config: unknown) {
+      clientConfig.last = config;
+    }
   },
   PutObjectCommand: class extends FakeCommand {},
   GetObjectCommand: class extends FakeCommand {},
@@ -22,13 +26,20 @@ vi.mock("@aws-sdk/client-s3", () => ({
 
 const { deleteKnowledgeFile, knowledgeFileKey, readKnowledgeFile, uploadKnowledgeFile } = await import("./index");
 
-beforeEach(() => {
-  vi.stubEnv("STORAGE_ENDPOINT", "https://storage.test");
-  vi.stubEnv("STORAGE_REGION", "auto");
-  vi.stubEnv("STORAGE_BUCKET", "askwell-test");
-  vi.stubEnv("STORAGE_ACCESS_KEY", "key");
-  vi.stubEnv("STORAGE_SECRET_KEY", "secret");
-});
+// The names InstaCloud injects for a bound storage service.
+const BOUND = {
+  AWS_ENDPOINT_URL_S3: "https://storage.test",
+  AWS_REGION: "auto",
+  BUCKET_NAME: "askwell-test",
+  AWS_ACCESS_KEY_ID: "key",
+  AWS_SECRET_ACCESS_KEY: "secret",
+};
+
+function stubBound(overrides: Partial<Record<keyof typeof BOUND, string>> = {}) {
+  for (const [name, value] of Object.entries({ ...BOUND, ...overrides })) vi.stubEnv(name, value);
+}
+
+beforeEach(() => stubBound());
 
 afterEach(() => {
   send.mockReset();
@@ -69,13 +80,31 @@ describe("deleteKnowledgeFile", () => {
   });
 });
 
-describe("when storage isn't configured", () => {
-  it("throws rather than silently no-op", async () => {
+describe("configuration", () => {
+  async function fresh() {
     vi.resetModules();
-    vi.unstubAllEnvs();
-    const fresh = await import("./index");
-    await expect(fresh.uploadKnowledgeFile("k", Buffer.from("x"), "text/plain")).rejects.toThrow(
-      "Storage is not configured",
+    return import("./index");
+  }
+
+  it("builds the client from InstaCloud's bound names, with the endpoint set explicitly", async () => {
+    send.mockResolvedValue({});
+    await (await fresh()).uploadKnowledgeFile("k", Buffer.from("x"), "text/plain");
+    expect(clientConfig.last).toEqual({
+      endpoint: "https://storage.test",
+      region: "auto",
+      credentials: { accessKeyId: "key", secretAccessKey: "secret" },
+    });
+  });
+
+  it("throws, naming what's missing, rather than silently no-op", async () => {
+    stubBound({ AWS_ENDPOINT_URL_S3: "", AWS_SECRET_ACCESS_KEY: "" });
+    await expect((await fresh()).uploadKnowledgeFile("k", Buffer.from("x"), "text/plain")).rejects.toThrow(
+      "Storage is not configured (missing AWS_ENDPOINT_URL_S3, AWS_SECRET_ACCESS_KEY)",
     );
+  });
+
+  it("throws when BUCKET_NAME is missing", async () => {
+    stubBound({ BUCKET_NAME: "" });
+    await expect((await fresh()).deleteKnowledgeFile("k")).rejects.toThrow("BUCKET_NAME is not set");
   });
 });
