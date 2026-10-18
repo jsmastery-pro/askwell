@@ -7,7 +7,7 @@ import {
   isLoaderToPanelMessage,
   type PanelToLoaderMessage,
 } from "@askwell/shared/widget-messages";
-import { getReply } from "../../app/embed/reply";
+import { getReply, previewReply } from "../../app/embed/reply";
 import { replyFailure } from "../../app/embed/reply-error";
 import { textColorOn } from "./contrast";
 import { getVisitorId } from "./visitor-id";
@@ -30,7 +30,16 @@ const RATE_LIMITED = "You're sending messages too fast. Try again in a minute.";
 const UNAVAILABLE = "This assistant is unavailable right now.";
 const FAILED = "Something went wrong.";
 
-export function Panel({ config, parentOrigin }: { config: WidgetConfig; parentOrigin: string | null }) {
+export function Panel({
+  publicKey,
+  config,
+  parentOrigin,
+}: {
+  /** The project's key. Without one (the dashboard's Customize preview), replies are local previews. */
+  publicKey?: string;
+  config: WidgetConfig;
+  parentOrigin: string | null;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
@@ -38,7 +47,7 @@ export function Panel({ config, parentOrigin }: { config: WidgetConfig; parentOr
   const [unavailable, setUnavailable] = useState(false);
   const nextId = useRef(1);
   const unread = useRef(0);
-  // Sent with each message once replies come from the chat route (Phase 3).
+  // Sent with each message, so the owner sees one visitor across conversations.
   const visitorId = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +95,10 @@ export function Panel({ config, parentOrigin }: { config: WidgetConfig; parentOr
   async function reply(text: string) {
     setTyping(true);
     try {
-      add({ from: "bot", text: await getReply(text) });
+      const answer = publicKey
+        ? await getReply(text, { key: publicKey, visitorId: visitorId.current ?? getVisitorId() })
+        : await previewReply(text);
+      add({ from: "bot", text: answer });
     } catch (error) {
       const failure = replyFailure(error);
       if (failure === "quota_exceeded") setUnavailable(true);
