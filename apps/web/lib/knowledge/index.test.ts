@@ -10,7 +10,7 @@ const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../ai", () => ({ embedTexts }));
 
 const {
-  countProjectKnowledgeFiles,
+  countProjectKnowledgeSources,
   deleteKnowledgeSource,
   getKnowledgeSourceById,
   insertKnowledgeSource,
@@ -69,8 +69,8 @@ describe("insertKnowledgeSource", () => {
   });
 });
 
-describe("countProjectKnowledgeFiles", () => {
-  it("counts file sources but not pasted text", async () => {
+describe("countProjectKnowledgeSources", () => {
+  it("counts every source, pasted text included", async () => {
     const otherProject = (
       await db.insert(projects).values({ ownerId: "owner_1", name: "Other", publicKey: "pk_other" }).returning()
     )[0]!;
@@ -78,7 +78,7 @@ describe("countProjectKnowledgeFiles", () => {
     await insertKnowledgeSource({ projectId: otherProject.id, title: "f1", type: "pdf", storageKey: "k1" }, db);
     await insertKnowledgeSource({ projectId: otherProject.id, title: "f2", type: "md", storageKey: "k2" }, db);
 
-    expect(await countProjectKnowledgeFiles(otherProject.id, db)).toBe(2);
+    expect(await countProjectKnowledgeSources(otherProject.id, db)).toBe(3);
   });
 });
 
@@ -176,13 +176,13 @@ describe("processKnowledgeSource", () => {
 describe("deleteKnowledgeSource", () => {
   it("removes the row, freeing the file slot it reserved", async () => {
     const source = await insertKnowledgeSource({ projectId, title: "Upload failed", type: "pdf", storageKey: "k" }, db);
-    expect(await countProjectKnowledgeFiles(projectId, db)).toBeGreaterThan(0);
-    const countBefore = await countProjectKnowledgeFiles(projectId, db);
+    expect(await countProjectKnowledgeSources(projectId, db)).toBeGreaterThan(0);
+    const countBefore = await countProjectKnowledgeSources(projectId, db);
 
     await deleteKnowledgeSource(source.id, db);
 
     const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
     expect(rows).toHaveLength(0);
-    expect(await countProjectKnowledgeFiles(projectId, db)).toBe(countBefore - 1);
+    expect(await countProjectKnowledgeSources(projectId, db)).toBe(countBefore - 1);
   });
 });

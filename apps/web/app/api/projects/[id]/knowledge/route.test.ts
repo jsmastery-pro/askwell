@@ -235,18 +235,42 @@ describe("file upload", () => {
     }
   });
 
-  it("pasted text doesn't count toward the file limit", async () => {
+  it("counts pasted text toward the same limit: a Free project's 4th source is refused, text or file", async () => {
     const projectId = await seedProject("owner_mixed", "free", "pk_mixed");
     as("owner_mixed");
-    for (let i = 0; i < 5; i++) {
-      await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
-    }
-    for (let i = 0; i < 3; i++) {
-      const res = await POST(fileRequest(new Blob([Buffer.from(`Doc ${i}`)]), `doc${i}.txt`), ctx(projectId));
+    for (let i = 0; i < 2; i++) {
+      const res = await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
       expect(res.status).toBe(201);
     }
-    const res = await POST(fileRequest(new Blob([Buffer.from("Doc 4")]), "doc4.txt"), ctx(projectId));
+    expect((await POST(fileRequest(new Blob([Buffer.from("Doc")]), "doc.txt"), ctx(projectId))).status).toBe(201);
+
+    const text = await POST(jsonRequest({ type: "text", title: "t4", content: "one too many" }), ctx(projectId));
+    expect(text.status).toBe(403);
+    expect((await text.json()).error.code).toBe("plan_limit");
+    const file = await POST(fileRequest(new Blob([Buffer.from("Doc 4")]), "doc4.txt"), ctx(projectId));
+    expect(file.status).toBe(403);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(3);
+  });
+
+  it("keeps an existing project's sources over the new limit, but refuses more", async () => {
+    const projectId = await seedProject("owner_over", "free", "pk_over");
+    as("owner_over");
+    for (let i = 0; i < 5; i++) {
+      await db.insert(knowledgeSources).values({ projectId, title: `old ${i}`, type: "text", status: "ready" });
+    }
+    const res = await POST(jsonRequest({ type: "text", title: "new", content: "more" }), ctx(projectId));
     expect(res.status).toBe(403);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(5);
+  });
+
+  it("never lets concurrent pasted texts exceed the Free plan's 3-source limit", async () => {
+    const projectId = await seedProject("owner_text_race", "free", "pk_text_race");
+    as("owner_text_race");
+    const responses = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => POST(jsonRequest({ type: "text", title: `t${i}`, content: `c ${i}` }), ctx(projectId))),
+    );
+    expect(responses.filter((res) => res.status === 201)).toHaveLength(3);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(3);
   });
 
   it("never lets concurrent uploads exceed the Free plan's 3-file limit", async () => {

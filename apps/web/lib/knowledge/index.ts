@@ -3,7 +3,7 @@ import { knowledgeChunks, knowledgeSources } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import { SOURCE_TYPES, type KnowledgeSource } from "@askwell/shared";
-import { and, count, desc, eq, ne } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { embedTexts } from "../ai";
 import { chunkText } from "./chunk";
@@ -47,16 +47,16 @@ export async function getKnowledgeSourceById(
   return row ?? null;
 }
 
-/** Files count toward the plan limit; pasted text doesn't (project.md §6.4). */
-export async function countProjectKnowledgeFiles(projectId: string, database: Database = defaultDb): Promise<number> {
+/** Every source counts toward the plan limit: uploaded files and pasted text alike (§5, §6.4). */
+export async function countProjectKnowledgeSources(projectId: string, database: Database = defaultDb): Promise<number> {
   const [row] = await database
     .select({ n: count() })
     .from(knowledgeSources)
-    .where(and(eq(knowledgeSources.projectId, projectId), ne(knowledgeSources.type, "text")));
+    .where(eq(knowledgeSources.projectId, projectId));
   return row?.n ?? 0;
 }
 
-type NewSource = { id?: string; projectId: string; title: string; type: SourceType; storageKey: string | null };
+export type NewSource = { id?: string; projectId: string; title: string; type: SourceType; storageKey: string | null };
 
 /**
  * Inserts a `processing` source. Pass `id` when the caller needs the id before inserting

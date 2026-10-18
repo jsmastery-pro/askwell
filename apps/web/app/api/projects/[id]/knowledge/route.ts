@@ -16,12 +16,13 @@ import { randomUUID } from "node:crypto";
 import { runAfterResponse } from "../../../../../lib/knowledge/background";
 import { extractFileText, hasPdfMagicBytes } from "../../../../../lib/knowledge/extract";
 import {
-  countProjectKnowledgeFiles,
+  countProjectKnowledgeSources,
   deleteKnowledgeSource,
   insertKnowledgeSource,
   processKnowledgeSource,
   toKnowledgeSource,
   type KnowledgeSourceRow,
+  type NewSource,
 } from "../../../../../lib/knowledge";
 import { captureServerEvent } from "../../../../../lib/posthog/server";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../lib/projects/http";
@@ -34,6 +35,29 @@ type Context = { params: Promise<{ id: string }> };
 async function getOwnerPlan(ownerId: string): Promise<Plan> {
   const [row] = await defaultDb.select({ plan: accounts.plan }).from(accounts).where(eq(accounts.clerkUserId, ownerId));
   return row?.plan ?? "free";
+}
+
+/**
+ * Inserts a source only while the project is under its plan's source limit, counting pasted
+ * text and files alike (§5). Count-then-insert runs in one transaction with the project row
+ * locked, so concurrent adds for the same project can't both read a count under the limit.
+ */
+async function reserveSource(ownerId: string, source: NewSource) {
+  const limit = PLAN_LIMITS[await getOwnerPlan(ownerId)].knowledgeSourcesPerProject;
+  const reserved = await defaultDb.transaction(async (tx) => {
+    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, source.projectId)).for("update");
+    if ((await countProjectKnowledgeSources(source.projectId, tx)) >= limit) return null;
+    return insertKnowledgeSource(source, tx);
+  });
+  return reserved ? { ok: true as const, source: reserved } : { ok: false as const, limit };
+}
+
+function sourceLimitReached(limit: number) {
+  return errorResponse(
+    ERROR_CODES.planLimit,
+    `Your plan allows ${limit} knowledge source${limit === 1 ? "" : "s"} per project, files and pasted text together. Upgrade to add more.`,
+    403,
+  );
 }
 
 // The one success path for both pasted text and files.
@@ -50,12 +74,9 @@ async function handleText(projectId: string, ownerId: string, request: Request) 
     return invalidInput("The pasted text is too large. Max 10 MB.");
   }
 
-  const source = await insertKnowledgeSource({
-    projectId,
-    title: parsed.data.title,
-    type: "text",
-    storageKey: null,
-  });
+  const reservation = await reserveSource(ownerId, { projectId, title: parsed.data.title, type: "text", storageKey: null });
+  if (!reservation.ok) return sourceLimitReached(reservation.limit);
+  const { source } = reservation;
 
   runAfterResponse(() => processKnowledgeSource(source.id, projectId, () => parsed.data.content));
   return created(ownerId, source);
@@ -86,29 +107,12 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
   const buffer = Buffer.from(await file.arrayBuffer());
   if (type === "pdf" && !hasPdfMagicBytes(buffer)) return invalidInput("The file is not a valid PDF.");
 
-  const plan = await getOwnerPlan(ownerId);
-  const limit = PLAN_LIMITS[plan].knowledgeFilesPerProject;
   const title = fieldsParsed.data.title?.trim() || file.name;
   const sourceId = randomUUID();
   const storageKey = knowledgeFileKey(projectId, sourceId);
 
-  // Count-then-insert inside one transaction, with the project row locked, so two concurrent
-  // uploads for the same project can't both read a count under the limit and both pass.
-  const reservation = await defaultDb.transaction(async (tx) => {
-    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for("update");
-    const fileCount = await countProjectKnowledgeFiles(projectId, tx);
-    if (fileCount >= limit) return { ok: false as const };
-    const source = await insertKnowledgeSource({ id: sourceId, projectId, title, type, storageKey }, tx);
-    return { ok: true as const, source };
-  });
-
-  if (!reservation.ok) {
-    return errorResponse(
-      ERROR_CODES.planLimit,
-      `Your plan allows ${limit} knowledge file${limit === 1 ? "" : "s"} per project. Upgrade to add more.`,
-      403,
-    );
-  }
+  const reservation = await reserveSource(ownerId, { id: sourceId, projectId, title, type, storageKey });
+  if (!reservation.ok) return sourceLimitReached(reservation.limit);
   const { source } = reservation;
 
   try {
