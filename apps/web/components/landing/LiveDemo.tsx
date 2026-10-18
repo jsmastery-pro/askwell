@@ -1,4 +1,4 @@
-import { PLAN_LIMITS } from "@askwell/shared";
+import { APP_NAME, PLAN_LIMITS } from "@askwell/shared";
 import { BrowserFrame } from "./BrowserFrame";
 import { ChatTranscript } from "./ChatTranscript";
 import { FONT_DISPLAY } from "./fonts";
@@ -6,7 +6,8 @@ import { formatLimit } from "./Pricing";
 import { Reveal } from "./Reveal";
 import { Section } from "./Section";
 
-export function LiveDemoPlaceholder() {
+/** `live`: the real widget is on this page, so point visitors to it. */
+export function LiveDemo({ live }: { live: boolean }) {
   return (
     <section className="py-24 sm:py-28">
       <Section className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[1fr_1.05fr]">
@@ -38,6 +39,11 @@ export function LiveDemoPlaceholder() {
             This is the exact widget your visitors will use — opened here so you can see the full exchange, including
             what happens when the answer isn&apos;t in your docs.
           </p>
+          {live && (
+            <p className="mt-4 max-w-md font-medium text-ink">
+              Try it: ask the chat in the corner about {APP_NAME}. It answers from a project about {APP_NAME} itself.
+            </p>
+          )}
           <ul className="mt-8 space-y-4">
             <li className="border-l-2 border-ink pl-4 text-sm text-ink">Scoped to one project&apos;s content only.</li>
             <li className="border-l-2 border-ink pl-4 text-sm text-ink">
