@@ -209,4 +209,14 @@ Lane B (Customize) added once a developer is free for it.
 
 **Done when:** all nine steps of the core flow (§2) pass on the `main` URL.
 
-**Tasks:** _added by John_
+**Tasks:** (product owner approved 2026-10-18)
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| P6-T01 | Security audit (report only) | John | Phases 0–5 | in progress | — |
+| P6-T02 | Security fixes from the report | Bob | P6-T01 | todo | — |
+| P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | in progress | — |
+| P6-T04 | Responsive + empty-state polish | Alice, else Bob | P6-T03 | todo | — |
+| P6-T05 | Launch check: core flow on `main` | Product owner | P6-T02, P6-T03, P6-T04 | todo | — |
+
+> **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
