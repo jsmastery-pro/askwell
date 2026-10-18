@@ -3,7 +3,6 @@ import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { ConversationList } from "../../../../../components/conversations/ConversationList";
 import { RefreshButton } from "../../../../../components/conversations/RefreshButton";
-import { DemoBadge } from "../../../../../components/ui/DemoBadge";
 import { listConversations } from "../../../../../lib/data/conversations";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
 
@@ -22,7 +21,6 @@ export default async function ConversationsPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <SectionHeader
         title="Conversations"
-        badge={<DemoBadge />}
         description="What visitors asked your bot, newest first. Refresh to see new chats."
         actions={<RefreshButton />}
       />

@@ -59,14 +59,14 @@ describe("Dashboard home", () => {
     expect(screen.getByRole("link", { name: "30d" }).getAttribute("aria-current")).toBe("true");
   });
 
-  it("shows the cards with their change, the real project count, the chart and Demo badges on mock parts", async () => {
+  it("shows the cards with their change, the real project count and the chart, with no Demo badges", async () => {
     await renderPage(base, "30d");
     const totals = screen.getByRole("region", { name: "Totals, last 30 days" });
     expect(within(totals).getByText("New")).toBeTruthy(); // messages: previous period was 0
     expect(within(totals).getByText("+10%")).toBeTruthy(); // conversations: 33 vs 30
     expect(within(totals).getByText("2 of 3")).toBeTruthy();
-    expect(within(totals).getAllByText("Demo data")).toHaveLength(3);
     expect(screen.getByRole("img", { name: /100 messages, busiest day Oct 13: 60/ })).toBeTruthy();
+    expect(screen.queryByText("Demo data")).toBeNull();
   });
 
   it("lists usage busiest first, and recent chats linking to their thread", async () => {

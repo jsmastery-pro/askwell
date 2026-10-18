@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { UsageSummary } from "../../../../components/billing/UsageSummary";
 import { BILLING_PATH } from "../../../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../../../components/landing/fonts";
-import { DemoBadge } from "../../../../components/ui/DemoBadge";
 import { formatDateTime } from "../../../../components/project-shell/format";
 import { UsageMeter } from "../../../../components/project-shell/UsageMeter";
 import { FOCUS, TEXT_LINK } from "../../../../components/ui/styles";
@@ -56,7 +55,6 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             <h2 id="conversations-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
               Recent conversations
             </h2>
-            <DemoBadge />
           </div>
           {conversations.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
@@ -93,7 +91,6 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
               <h2 id="knowledge-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
                 Knowledge
               </h2>
-              <DemoBadge />
             </div>
             <p className="mt-4 text-sm text-ink">
               {files} of {filesLimit} files
