@@ -288,6 +288,30 @@ describe("file upload", () => {
   });
 });
 
+describe("upload size (LM4)", () => {
+  it("returns 413 on a Content-Length over the limit, before reading the body or touching storage", async () => {
+    const projectId = await seedProject("owner_lm4_big", "free", "pk_lm4_big");
+    as("owner_lm4_big");
+    const request = fileRequest(new Blob([Buffer.from("small")]), "doc.txt");
+    const formData = vi.spyOn(request, "formData");
+    request.headers.set("content-length", String(11 * 1024 * 1024));
+
+    const res = await POST(request, ctx(projectId));
+    expect(res.status).toBe(413);
+    expect((await res.json()).error.code).toBe("invalid_input");
+    expect(formData).not.toHaveBeenCalled();
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(0);
+  });
+
+  it("allows a 10 MB file plus multipart overhead through to the normal checks", async () => {
+    const projectId = await seedProject("owner_lm4_edge", "free", "pk_lm4_edge");
+    as("owner_lm4_edge");
+    const request = fileRequest(new Blob([Buffer.from("small")]), "doc.txt");
+    request.headers.set("content-length", String(10 * 1024 * 1024 + 1024));
+    expect((await POST(request, ctx(projectId))).status).toBe(201);
+  });
+});
+
 describe("knowledge_added", () => {
   it("fires for pasted text with type text", async () => {
     const projectId = await seedProject("owner_ev_text", "free", "pk_ev_text");

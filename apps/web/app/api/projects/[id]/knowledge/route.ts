@@ -32,6 +32,9 @@ export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ id: string }> };
 
+// The 10 MB content limit plus room for multipart boundaries and the title field.
+const MAX_REQUEST_BYTES = MAX_KNOWLEDGE_FILE_BYTES + 64 * 1024;
+
 async function getOwnerPlan(ownerId: string): Promise<Plan> {
   const [row] = await defaultDb.select({ plan: accounts.plan }).from(accounts).where(eq(accounts.clerkUserId, ownerId));
   return row?.plan ?? "free";
@@ -134,6 +137,13 @@ export async function POST(request: Request, { params }: Context) {
 
   const { id: projectId } = await params;
   if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
+
+  // Before reading anything: a huge body is refused without being buffered in memory (§9 File upload).
+  // Without the header (chunked), the size checks after reading still apply.
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_REQUEST_BYTES) {
+    return errorResponse(ERROR_CODES.invalidInput, "The upload is too large. Max 10 MB.", 413);
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) return handleText(projectId, ownerId, request);
