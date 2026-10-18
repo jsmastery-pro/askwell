@@ -125,7 +125,7 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | P3-T07 | Arcjet rate limit | Bob | P3-T04 | done | #70 |
 | P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | done | #72 |
 | P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | in review | #74 |
-| P3-T08 | Read InstaCloud's storage env vars | Bob | P3-T02 | in review | #75 |
+| P3-T08 | Read InstaCloud's storage env vars | Bob | P3-T02 | in review | #75 (merge-ready, live upload check passed) |
 
 > **Lane B reassigned (2026-10-17, product owner):** Alice's session failed before P3-T07 started (no branch or PR). P3-T07, P3-T05 and P3-T06 move to Bob, in that order. P3-T07 branches after #69 merges, since both add dependencies.
 
