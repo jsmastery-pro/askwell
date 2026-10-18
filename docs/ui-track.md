@@ -34,7 +34,7 @@ Product owner decision, 2026-10-12: build **every remaining screen first**, with
 | UI-T09 | Chat panel states, sign-in redirect, preview focus | Alice | UI-T08 | done | #53 |
 | UI-T10 | Design tokens + landing redesign (dark, glass, motion) | Alice | UI-T09 | done | #54 |
 | UI-T11 | Dashboard redesign (light monochrome, glass) | Alice | UI-T10 + PO approval | done | #56 |
-| UI-T12 | Remove demo leftovers ("Demo data" badges, unused demo helpers) | Alice, or Bob after P3-T06 | P3-T05 | todo | — |
+| UI-T12 | Remove demo leftovers ("Demo data" badges, unused demo helpers) | Bob | — | in progress | — |
 
 Alice does them one at a time, one PR each, in table order. UI-T07 was added on 2026-10-13 (product owner: top navbar instead of the sidebar). It comes before UI-T05, so Billing is built on the final layout. UI-T08 (dashboard home with analytics; it brings back `/dashboard` as a page, partly reversing UI-T07's "merge Overview into Projects") and UI-T09 (the last panel and sign-in pieces) were added the same day, so the UI is complete before Bob resumes. UI-T10 and UI-T11 are a visual redesign (product owner, 2026-10-13): black and white with glass, a dark landing page with simple motion, and a light app. The landing page comes first, and the product owner approves its look before the dashboard follows. The landing look was approved on 2026-10-14; the sign-in/up pages keep Clerk's default look.
 

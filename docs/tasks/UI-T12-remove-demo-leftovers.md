@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice if her session is back, otherwise Bob after P3-T06 |
+| Owner | Bob (Alice's session is still down) |
 | Lane | UI track (cleanup) |
-| Needs first | P3-T05 merged (#72) |
+| Needs first | — (independent of the chat work; no file overlap with P3-T06) |
 | Files allowed | `apps/web/app/dashboard/page.tsx`, `apps/web/app/dashboard/projects/[id]/page.tsx`, `apps/web/app/dashboard/projects/[id]/conversations/page.tsx`, `apps/web/app/dashboard/projects/[id]/conversations/[conversationId]/page.tsx`, `apps/web/app/dashboard/projects/[id]/knowledge/page.tsx`, `apps/web/components/customize/CustomizeForm.tsx`, `apps/web/components/ui/DemoBadge*`, `apps/web/lib/data/demo.ts`, `apps/web/lib/mock/knowledge.ts`, plus the co-located tests of those files |
 | project.md | §6.7 Conversations, §6.4 Knowledge, §6.8 Customize |
 | See | `docs/ui-track.md` |
