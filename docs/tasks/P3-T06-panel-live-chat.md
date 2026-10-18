@@ -29,3 +29,6 @@ The `/embed` panel sends real messages to `POST /api/widget/chat` instead of the
 ## Notes
 - This is the Phase 3 "Done when". Put a short clip in the PR.
 - The end-to-end check needs P3-T02 merged for real uploads. Until then, use seeded chunks.
+- **Updated 2026-10-18 (John), from the merged route (#72):** errors are `{ error: { code, message } }`. `429` comes with `rate_limited` (plus `Retry-After`) or `quota_exceeded`. `404` `not_found` means the key or the stored `conversationId` isn't valid for this project: for a stale `conversationId`, clear it from storage and resend once without it, so the visitor isn't stuck. A `500` is generic, so show the friendly error. Never show `message` text from the server.
+- Test from an `http(s)` host page, not a file opened from disk: `frame-ancestors *` doesn't match `file://`, so the panel won't load there.
+- No PostHog here: `first_chat` is P4-T04.
