@@ -29,6 +29,15 @@ vi.mock("@arcjet/next", () => ({
   fixedWindow: () => [],
 }));
 
+// PostHog is mocked at the SDK boundary; the real helpers in lib/posthog/server run.
+const posthog = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("posthog-node", () => ({
+  PostHog: class {
+    capture = posthog.capture;
+    captureException = vi.fn();
+  },
+}));
+
 const { POST, OPTIONS } = await import("./route");
 
 const unit = (i: number) => Array.from({ length: EMBEDDING_DIMENSIONS }, (_, j) => (j === i ? 1 : 0));
@@ -60,6 +69,7 @@ afterAll(() => close());
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
   arcjet.conclusion = "ALLOW";
   arcjet.protect.mockImplementation(async () => {
     const { conclusion } = arcjet;
@@ -315,5 +325,106 @@ describe("OPTIONS /api/widget/chat", () => {
     expect(res.status).toBe(204);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+  });
+});
+
+describe("PostHog: first_chat and the AI trace", () => {
+  type Captured = { distinctId: string; event: string; properties: Record<string, unknown> };
+  const captured = (event: string) =>
+    posthog.capture.mock.calls.map(([call]) => call as Captured).filter((call) => call.event === event);
+
+  let seq = 0;
+  async function freshProject(withChunk = true) {
+    const publicKey = `pk_fresh${++seq}`;
+    const project = await seedProject(db, { plan: "pro", publicKey });
+    if (withChunk) await seedChunk(project.id, "We ship worldwide within 5 business days.", 0);
+    return { ...project, publicKey, ownerId: `user_${publicKey}` };
+  }
+  const send = (publicKey: string, extra: Record<string, unknown> = {}) =>
+    chat({ key: publicKey, visitorId: "v_ph", message: "How fast do you ship?", ...extra });
+
+  it("sends first_chat once, as the owner, when the project's first conversation is saved", async () => {
+    const project = await freshProject();
+    const first = await (await send(project.publicKey)).json();
+    await send(project.publicKey, { conversationId: first.conversationId }); // same conversation
+    await send(project.publicKey); // a second conversation
+
+    expect(captured("first_chat")).toEqual([
+      { distinctId: project.ownerId, event: "first_chat", properties: { project_id: project.id } },
+    ]);
+  });
+
+  it("sends first_chat once when a project's first chats arrive at the same time", async () => {
+    const project = await freshProject();
+    const results = await Promise.all([1, 2, 3].map((n) => send(project.publicKey, { visitorId: `v_race${n}` })));
+
+    expect(results.map((res) => res.status)).toEqual([200, 200, 200]);
+    expect(await db.select().from(conversations).where(eq(conversations.projectId, project.id))).toHaveLength(3);
+    expect(captured("first_chat")).toHaveLength(1);
+  });
+
+  it("sends one $ai_generation per model reply as the owner, grouped by conversation", async () => {
+    const project = await freshProject();
+    const first = await (await send(project.publicKey)).json();
+    await send(project.publicKey, { conversationId: first.conversationId });
+
+    const generations = captured("$ai_generation");
+    expect(generations).toHaveLength(2);
+    for (const generation of generations) {
+      expect(generation).toEqual({
+        distinctId: project.ownerId,
+        event: "$ai_generation",
+        properties: {
+          $ai_model: "gpt-test",
+          $ai_provider: "openai",
+          $ai_input_tokens: 100,
+          $ai_output_tokens: 10,
+          $ai_latency: expect.any(Number),
+          $ai_trace_id: first.conversationId,
+          project_id: project.id,
+        },
+      });
+    }
+  });
+
+  it("never sends the visitor's message, the chunks or the reply in any event", async () => {
+    const project = await freshProject();
+    await chat({ key: project.publicKey, visitorId: "v_private", message: "My order 4471 for jane@example.com is late" });
+
+    const sent = JSON.stringify(posthog.capture.mock.calls);
+    for (const text of ["4471", "jane@example.com", "is late", "We ship worldwide", "5 business days", "v_private"]) {
+      expect(sent).not.toContain(text);
+    }
+  });
+
+  it("sends no $ai_generation when the model was skipped (no chunks)", async () => {
+    const project = await freshProject(false);
+    const body = await (await send(project.publicKey)).json();
+
+    expect(body.reply).toBe(DONT_KNOW_REPLY);
+    expect(captured("$ai_generation")).toHaveLength(0);
+    expect(captured("first_chat")).toHaveLength(1);
+  });
+
+  it("sends nothing when the request is refused", async () => {
+    const project = await freshProject();
+    await db.update(projects).set({ messagesUsed: PLAN_LIMITS.pro.messagesPerMonth }).where(eq(projects.id, project.id));
+    expect((await send(project.publicKey)).status).toBe(429);
+    expect(posthog.capture).not.toHaveBeenCalled();
+  });
+
+  it("still returns the reply when the PostHog client throws", async () => {
+    const project = await freshProject();
+    posthog.capture.mockImplementation(() => {
+      throw new Error("PostHog down");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await send(project.publicKey);
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe("We ship worldwide within 5 business days.");
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+    posthog.capture.mockReset();
   });
 });

@@ -5,6 +5,7 @@ import { ERROR_CODES, PLAN_LIMITS, RETRIEVAL_TOP_K, type WidgetChatRequest } fro
 import { and, eq, lt, sql } from "drizzle-orm";
 import { embedQuery } from "../ai";
 import { addOneMonth } from "../data/usage";
+import { captureAiGeneration, captureServerEvent } from "../posthog/server";
 import { answerFromChunks, type AnswerTelemetry } from "./answer";
 
 export type ChatTelemetry = AnswerTelemetry & { projectId: string };
@@ -66,6 +67,7 @@ export async function handleChat(
   const [project] = await database
     .select({
       id: projects.id,
+      ownerId: projects.ownerId,
       messagesUsed: projects.messagesUsed,
       periodStart: projects.periodStart,
       plan: accounts.plan,
@@ -99,9 +101,11 @@ export async function handleChat(
   // Threads sort by created_at alone, so the reply must sort strictly after the question.
   const repliedAt = new Date(Math.max(Date.now(), receivedAt.getTime() + 1));
 
-  const savedConversationId = await database.transaction(async (tx) => {
+  const saved = await database.transaction(async (tx) => {
     // Count first, and only while under the limit: requests racing at the boundary can each
     // pass the early check, but only `limit` of them get counted and saved. The rest save nothing.
+    // This update also locks the project row until commit, so concurrent saves for one project
+    // run one at a time from here on.
     const [counted] = await tx
       .update(projects)
       .set({ messagesUsed: sql`${projects.messagesUsed} + 1` })
@@ -110,7 +114,16 @@ export async function handleChat(
     if (!counted) return null;
 
     let id = conversationId;
+    let firstChat = false;
     if (!id) {
+      // Under the row lock, any earlier save has committed, so this sees every conversation:
+      // exactly one request can find none and create the project's first.
+      const [earlier] = await tx
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(eq(conversations.projectId, project.id))
+        .limit(1);
+      firstChat = !earlier;
       const [created] = await tx
         .insert(conversations)
         .values({ projectId: project.id, visitorId })
@@ -121,9 +134,23 @@ export async function handleChat(
       { conversationId: id, role: "visitor", body: message, createdAt: receivedAt },
       { conversationId: id, role: "bot", body: reply, createdAt: repliedAt },
     ]);
-    return id;
+    return { id, firstChat };
   });
-  if (!savedConversationId) return quotaExceeded;
+  if (!saved) return quotaExceeded;
 
-  return { ok: true, conversationId: savedConversationId, reply, telemetry: { ...telemetry, projectId: project.id } };
+  // After the save, as the project owner (never the visitor). The helpers never throw and don't
+  // wait on the network, so PostHog can't change the reply, its status or its timing.
+  if (saved.firstChat) captureServerEvent(project.ownerId, "first_chat", { project_id: project.id });
+  if (telemetry.model) {
+    captureAiGeneration(project.ownerId, {
+      model: telemetry.model,
+      inputTokens: telemetry.inputTokens,
+      outputTokens: telemetry.outputTokens,
+      latencyMs: telemetry.latencyMs,
+      conversationId: saved.id,
+      projectId: project.id,
+    });
+  }
+
+  return { ok: true, conversationId: saved.id, reply, telemetry: { ...telemetry, projectId: project.id } };
 }
