@@ -153,7 +153,7 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 | P4-T01 | Conversations API + wiring | Bob | P1-T02, P2-T02 | done | #64 |
 | P4-T02 | Owner analytics wiring (dashboard home) | Bob | P4-T01 | done | #65 |
 | P4-T03 | PostHog setup: wizard, events, funnel, replay, errors | Bob | — | done | #69 |
-| P4-T04 | `first_chat` event + AI trace | Bob | P4-T03, P3-T05, P3-T06 | in review | #77 |
+| P4-T04 | `first_chat` event + AI trace | Bob | P4-T03, P3-T05, P3-T06 | done | #77 |
 
 Lane B is normally Alice's; product owner approved giving P4-T03 to Bob (2026-10-17) since it's independent of her Phase 3 work, while #68 is in review. Scope cut: `first_chat` event + AI tracing wait for Phase 3 Lane B to merge (a follow-up task, P4-T04).
 
@@ -197,6 +197,8 @@ Lane B (Customize) added once a developer is free for it.
 **Goal:** the core flow works on `main`, with no open security issues.
 
 > **Carried into Lane A (2026-10-17, from #70 review):** a missing `ARCJET_KEY` makes the limiter allow every request, with only one log line. Before launch, confirm `ARCJET_KEY` is set on `main` and decide whether production should refuse to start without it. The monthly quota still caps cost per project. Also: Arcjet logs a WARN about resolving `ip.src` from an unverified forwarding header; our limit uses `getClientIp` instead, so it's noise, but `proxies` for InstaCloud's Cloudflare edge would silence it.
+
+> **Carried into Lane A (2026-10-18, from #77):** CodeRabbit was rate-limited and never reviewed #77 (`first_chat` + `$ai_generation` in `lib/chat`). John reviewed it in full. Include the chat route in the §9 pass.
 
 **Keys before start:** none new
 
