@@ -1,4 +1,4 @@
-import { ERROR_CODES, apiErrorSchema, widgetChatResponseSchema } from "@askwell/shared";
+import { ERROR_CODES, apiErrorSchema, widgetChatResponseSchema, type WidgetChatRequest } from "@askwell/shared";
 import {
   clearConversationId,
   getConversationId,
@@ -8,7 +8,7 @@ import { ReplyError } from "./reply-error";
 
 export type ReplyContext = { key: string; visitorId: string };
 
-async function postChat(body: { key: string; visitorId: string; message: string; conversationId?: string }) {
+async function postChat(body: WidgetChatRequest) {
   const response = await fetch("/api/widget/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

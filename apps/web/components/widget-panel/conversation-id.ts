@@ -3,33 +3,35 @@
 // conversation must never be sent to another site's project.
 const storageKey = (publicKey: string) => `askwell:conversation:${publicKey}`;
 
-const memory = new Map<string, string>();
+// Keys whose last write or removal failed, with the value that should have been stored (null
+// after a failed removal). They override storage, which may still hold an older value.
+const unsaved = new Map<string, string | null>();
 
-// Storage can throw in third-party iframes (blocked cookies, private mode),
+// Storage can throw in third-party iframes (blocked cookies, private mode, full quota),
 // so fall back to memory for this page load, like the visitor ID.
 export function getConversationId(publicKey: string): string | null {
+  if (unsaved.has(publicKey)) return unsaved.get(publicKey) ?? null;
   try {
-    // Readable storage is the source of truth; memory is only for when it throws.
     return window.localStorage.getItem(storageKey(publicKey));
   } catch {
-    return memory.get(publicKey) ?? null;
+    return null;
   }
 }
 
 export function setConversationId(publicKey: string, conversationId: string): void {
-  memory.set(publicKey, conversationId);
   try {
     window.localStorage.setItem(storageKey(publicKey), conversationId);
+    unsaved.delete(publicKey);
   } catch {
-    // Memory only.
+    unsaved.set(publicKey, conversationId);
   }
 }
 
 export function clearConversationId(publicKey: string): void {
-  memory.delete(publicKey);
   try {
     window.localStorage.removeItem(storageKey(publicKey));
+    unsaved.delete(publicKey);
   } catch {
-    // Memory only.
+    unsaved.set(publicKey, null);
   }
 }
