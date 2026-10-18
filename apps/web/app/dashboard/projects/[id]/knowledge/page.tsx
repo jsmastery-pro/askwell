@@ -3,7 +3,6 @@ import { PLAN_LIMITS } from "@askwell/shared";
 import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { KnowledgeManager } from "../../../../../components/knowledge/KnowledgeManager";
-import { DemoBadge } from "../../../../../components/ui/DemoBadge";
 import { getAccountPlan } from "../../../../../lib/data/billing";
 import { listKnowledgeSources } from "../../../../../lib/data/knowledge";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
@@ -23,7 +22,6 @@ export default async function KnowledgePage({ params }: { params: Promise<{ id: 
     <div className="space-y-8">
       <SectionHeader
         title="Knowledge"
-        badge={<DemoBadge />}
         description="The bot answers only from these sources. If something isn't here, it says it doesn't know."
       />
       <KnowledgeManager

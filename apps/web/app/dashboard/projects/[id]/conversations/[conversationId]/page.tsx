@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { visitorLabel } from "../../../../../../components/conversations/format";
 import { RefreshButton } from "../../../../../../components/conversations/RefreshButton";
 import { Thread } from "../../../../../../components/conversations/Thread";
-import { DemoBadge } from "../../../../../../components/ui/DemoBadge";
 import { formatDateTime } from "../../../../../../components/project-shell/format";
 import { FOCUS } from "../../../../../../components/ui/styles";
 import { getConversation } from "../../../../../../lib/data/conversations";
@@ -37,7 +36,6 @@ export default async function ConversationPage({
       </Link>
       <SectionHeader
         title={visitorLabel(conversation.visitorId)}
-        badge={<DemoBadge />}
         description={`Started ${formatDateTime(conversation.createdAt)}, ${conversation.messages.length} ${
           conversation.messages.length === 1 ? "message" : "messages"
         }`}

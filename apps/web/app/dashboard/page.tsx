@@ -9,7 +9,6 @@ import { RecentChats } from "../../components/dashboard-home/RecentChats";
 import { StatCard } from "../../components/dashboard-home/StatCard";
 import { PROJECTS_PATH } from "../../components/dashboard-nav/routes";
 import { FONT_DISPLAY } from "../../components/landing/fonts";
-import { DemoBadge } from "../../components/ui/DemoBadge";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { CARD, FOCUS, GLASS_CARD, TEXT_LINK } from "../../components/ui/styles";
 import { getDashboard, parseRange, RANGE_DAYS } from "../../lib/data/analytics";
@@ -18,13 +17,12 @@ export const dynamic = "force-dynamic";
 
 const PLAN_NAME = { free: "Free", pro: "Pro" } as const;
 
-function SectionTitle({ id, children, badge }: { id: string; children: string; badge?: boolean }) {
+function SectionTitle({ id, children }: { id: string; children: string }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <h2 id={id} className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
         {children}
       </h2>
-      {badge && <DemoBadge />}
     </div>
   );
 }
@@ -63,19 +61,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           label="Messages"
           value={data.current.messages}
           change={{ current: data.current.messages, previous: data.previous.messages, period }}
-          badge={<DemoBadge />}
         />
         <StatCard
           label="Conversations"
           value={data.current.conversations}
           change={{ current: data.current.conversations, previous: data.previous.conversations, period }}
-          badge={<DemoBadge />}
         />
         <StatCard
           label="Visitors"
           value={data.current.visitors}
           change={{ current: data.current.visitors, previous: data.previous.visitors, period }}
-          badge={<DemoBadge />}
         />
         <StatCard
           label="Projects"
@@ -85,7 +80,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </section>
 
       <section aria-labelledby="chart-heading" className={`${GLASS_CARD} p-4 sm:p-6`}>
-        <SectionTitle id="chart-heading" badge>
+        <SectionTitle id="chart-heading">
           Messages per day, all projects
         </SectionTitle>
         <div className="mt-5">
@@ -134,7 +129,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
 
         <section aria-labelledby="recent-heading" className={`${CARD} p-4 sm:p-6`}>
-          <SectionTitle id="recent-heading" badge>
+          <SectionTitle id="recent-heading">
             Recent chats
           </SectionTitle>
           <div className="mt-3">
