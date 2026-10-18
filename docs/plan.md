@@ -124,8 +124,8 @@ Lane B tests retrieval with seeded chunks until Lane A is merged.
 | P3-T04 | Chunk search + seed script | Alice | P3-T01 | done | #62 |
 | P3-T07 | Arcjet rate limit | Bob | P3-T04 | done | #70 |
 | P3-T05 | Chat route | Bob | P3-T04, P3-T07, P2-T03 | done | #72 |
-| P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | in review | #74 (merge-ready) |
-| P3-T08 | Read InstaCloud's storage env vars | Bob | P3-T02 | in review | #75 (merge-ready, live upload check passed) |
+| P3-T06 | Connect the panel to chat | Bob | P3-T05, P2-T06 | done | #74 |
+| P3-T08 | Read InstaCloud's storage env vars | Bob | P3-T02 | done | #75 |
 
 > **Lane B reassigned (2026-10-17, product owner):** Alice's session failed before P3-T07 started (no branch or PR). P3-T07, P3-T05 and P3-T06 move to Bob, in that order. P3-T07 branches after #69 merges, since both add dependencies.
 
@@ -153,6 +153,7 @@ PostHog AI trace (§6.6 step 6) deferred to Phase 4 — product owner, 2026-10-0
 | P4-T01 | Conversations API + wiring | Bob | P1-T02, P2-T02 | done | #64 |
 | P4-T02 | Owner analytics wiring (dashboard home) | Bob | P4-T01 | done | #65 |
 | P4-T03 | PostHog setup: wizard, events, funnel, replay, errors | Bob | — | done | #69 |
+| P4-T04 | `first_chat` event + AI trace | Bob | P4-T03, P3-T05, P3-T06 | in progress | — |
 
 Lane B is normally Alice's; product owner approved giving P4-T03 to Bob (2026-10-17) since it's independent of her Phase 3 work, while #68 is in review. Scope cut: `first_chat` event + AI tracing wait for Phase 3 Lane B to merge (a follow-up task, P4-T04).
 
