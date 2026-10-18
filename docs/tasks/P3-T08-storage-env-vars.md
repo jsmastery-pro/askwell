@@ -23,5 +23,6 @@
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
-- Put the exact variable names in the PR body. John updates `project.md` §11 from it.
+- **Updated 2026-10-18 (John):** the bucket's variables aren't bound to the web service by default. Bob found only `DATABASE_URL` bound to `compute/web` on `bob`. The storage service offers `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION` and `BUCKET_NAME`. Each environment needs them bound: `insta secrets bind <NAME> storage/storage --source-name <NAME> --to compute/web --branch <branch>`. Bob binds on `bob` (approved). The product owner binds on `main`. A binding doesn't expose values.
+- Put the exact variable names and the bind command in the PR body. John updates `project.md` §11 from it.
 - CodeRabbit is required: this touches file upload, which §9 covers.
