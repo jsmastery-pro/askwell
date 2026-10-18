@@ -14,7 +14,7 @@ export function getPostHogConfig(): PostHogConfigResponse {
 }
 
 /** The server-side product events from project.md §6.11. */
-export type ServerEvent = "signed_up" | "project_created" | "knowledge_added" | "upgraded";
+export type ServerEvent = "signed_up" | "project_created" | "knowledge_added" | "upgraded" | "first_chat";
 
 let client: PostHog | null | undefined;
 
@@ -46,5 +46,40 @@ export function captureServerException(error: unknown): void {
     getClient()?.captureException(error);
   } catch (captureError) {
     console.error("PostHog exception capture failed", captureError);
+  }
+}
+
+/**
+ * One model call, for PostHog's LLM analytics (§6.6 step 6). Counts and timings only: there is
+ * deliberately no field for the visitor's message, the chunks or the reply (§9, visitor data).
+ */
+export type AiGeneration = {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  /** Groups a conversation's replies into one trace. */
+  conversationId: string;
+  projectId: string;
+};
+
+/** Records an `$ai_generation` event as the project owner. A no-op without a key, and never throws. */
+export function captureAiGeneration(distinctId: string, generation: AiGeneration): void {
+  try {
+    getClient()?.capture({
+      distinctId,
+      event: "$ai_generation",
+      properties: {
+        $ai_model: generation.model,
+        $ai_provider: "openai",
+        $ai_input_tokens: generation.inputTokens,
+        $ai_output_tokens: generation.outputTokens,
+        $ai_latency: generation.latencyMs / 1000,
+        $ai_trace_id: generation.conversationId,
+        project_id: generation.projectId,
+      },
+    });
+  } catch (error) {
+    console.error("PostHog capture failed for $ai_generation", error);
   }
 }

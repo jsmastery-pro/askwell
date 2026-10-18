@@ -86,3 +86,55 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
     expect(() => captureServerEvent("user_1", "upgraded", { plan: "pro" })).not.toThrow();
   });
 });
+
+describe("captureAiGeneration", () => {
+  const generation = {
+    model: "gpt-5.4-mini-2026-03-01",
+    inputTokens: 812,
+    outputTokens: 64,
+    latencyMs: 1830,
+    conversationId: "c-1",
+    projectId: "p-1",
+  };
+
+  it("sends one $ai_generation as the owner, with counts and timings only", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+    const { captureAiGeneration } = await load();
+
+    captureAiGeneration("user_owner", generation);
+
+    expect(capture).toHaveBeenCalledExactlyOnceWith({
+      distinctId: "user_owner",
+      event: "$ai_generation",
+      properties: {
+        $ai_model: "gpt-5.4-mini-2026-03-01",
+        $ai_provider: "openai",
+        $ai_input_tokens: 812,
+        $ai_output_tokens: 64,
+        $ai_latency: 1.83,
+        $ai_trace_id: "c-1",
+        project_id: "p-1",
+      },
+    });
+  });
+
+  it("is a no-op without a key", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+    const { captureAiGeneration } = await load();
+    captureAiGeneration("user_owner", generation);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("never throws when the client does", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+    capture.mockImplementationOnce(() => {
+      throw new Error("PostHog down");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { captureAiGeneration } = await load();
+
+    expect(() => captureAiGeneration("user_owner", generation)).not.toThrow();
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+});
