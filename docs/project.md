@@ -324,7 +324,7 @@ docs/
 | Variable                                                                         | Used by         | Public? |
 | -------------------------------------------------------------------------------- | --------------- | ------- |
 | `DATABASE_URL`                                                                   | Server          | No      |
-| `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Server          | No      |
+| `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (bound from the InstaCloud storage service) | Server | No |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                              | Client          | Yes     |
 | `CLERK_SECRET_KEY`                                                               | Server          | No      |
 | `OPENAI_API_KEY`                                                                 | Server          | No      |
@@ -334,6 +334,8 @@ docs/
 | `NEXT_PUBLIC_APP_URL`                                                            | Client + server | Yes     |
 
 `.env.example` lists every variable with no values. `.env` is never committed.
+
+Storage variables come from binding the storage service to the web app on each environment: `insta secrets bind <NAME> storage/storage --source-name <NAME> --to compute/web --branch <branch>`.
 
 ---
 
