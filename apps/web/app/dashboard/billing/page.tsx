@@ -17,11 +17,11 @@ export const dynamic = "force-dynamic";
 
 const PLAN_NAME = { free: "Free", pro: "Pro" } as const;
 
-// "1 project with 100 messages a month and 3 knowledge files"
+// "1 project with 100 messages a month and 3 knowledge sources"
 function planSummary(plan: Plan) {
   const limits = PLAN_LIMITS[plan];
   const projects = limits.projects === 1 ? "1 project with" : `${limits.projects} projects, each with`;
-  return `${projects} ${formatCount(limits.messagesPerMonth)} messages a month and ${limits.knowledgeFilesPerProject} knowledge files`;
+  return `${projects} ${formatCount(limits.messagesPerMonth)} messages a month and ${limits.knowledgeSourcesPerProject} knowledge sources`;
 }
 
 export default async function BillingPage() {

@@ -14,9 +14,9 @@ describe("PRICING_ROWS", () => {
       free: PLAN_LIMITS.free.messagesPerMonth.toLocaleString("en-US"),
       pro: PLAN_LIMITS.pro.messagesPerMonth.toLocaleString("en-US"),
     });
-    expect(row("Knowledge files (per project)")).toMatchObject({
-      free: String(PLAN_LIMITS.free.knowledgeFilesPerProject),
-      pro: String(PLAN_LIMITS.pro.knowledgeFilesPerProject),
+    expect(row("Knowledge sources (per project)")).toMatchObject({
+      free: String(PLAN_LIMITS.free.knowledgeSourcesPerProject),
+      pro: String(PLAN_LIMITS.pro.knowledgeSourcesPerProject),
     });
   });
 

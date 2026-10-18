@@ -20,12 +20,12 @@ If your documents don't contain the answer, Askwell says it doesn't know instead
 |---|---|---|
 | Projects | 1 | 5 |
 | Messages per month, per project | 100 | 2,000 |
-| Knowledge files per project | 3 | 25 |
+| Knowledge sources per project (files and pasted text) | 3 | 25 |
 | Customize the widget | No | Yes |
 | "Powered by Askwell" badge | Shown | Can be hidden |
 
 - **Messages:** the monthly count resets each month. When a project reaches its limit, the widget tells visitors the assistant is unavailable until the next month.
-- **Pasted text:** doesn't count toward the file limit.
+- **Sources:** every uploaded file and every pasted text counts as one source toward the limit. Delete a source to add another.
 - **Customization (Pro):** button color, button position (any corner), button label, open animation (fade, slide or scale) and header text. Pro can also hide the "Powered by Askwell" badge. On Free, the widget uses the defaults: the default color, bottom-right, fade, and the badge is shown.
 - **Upgrading:** upgrade to Pro from the Billing page in the dashboard. The current price is shown there. Manage or cancel your subscription from "Manage subscription" on the same page. After a cancellation, Pro stays active until the end of the paid period.
 

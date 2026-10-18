@@ -4,7 +4,8 @@ export type Plan = (typeof PLANS)[number];
 export type PlanLimits = {
   projects: number;
   messagesPerMonth: number;
-  knowledgeFilesPerProject: number;
+  /** Knowledge sources per project: uploaded files and pasted text together. */
+  knowledgeSourcesPerProject: number;
   customizeWidget: boolean;
 };
 
@@ -13,13 +14,13 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
     projects: 1,
     messagesPerMonth: 100,
-    knowledgeFilesPerProject: 3,
+    knowledgeSourcesPerProject: 3,
     customizeWidget: false,
   },
   pro: {
     projects: 5,
     messagesPerMonth: 2000,
-    knowledgeFilesPerProject: 25,
+    knowledgeSourcesPerProject: 25,
     customizeWidget: true,
   },
 };

@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 function renderManager(sources: KnowledgeSource[], { limit = 3, plan = "free" as const } = {}) {
-  return render(<KnowledgeManager projectId={PROJECT} initialSources={sources} filesLimit={limit} plan={plan} />);
+  return render(<KnowledgeManager projectId={PROJECT} initialSources={sources} sourcesLimit={limit} plan={plan} />);
 }
 
 const fileInput = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -83,19 +83,21 @@ describe("KnowledgeManager", () => {
     expect(addFileKnowledge).not.toHaveBeenCalled();
   });
 
-  it("disables upload at the Free file limit and links to Billing", () => {
+  it("disables upload and paste at the Free source limit and links to Billing", () => {
     const { container } = renderManager([source(), source({ type: "md" }), source({ type: "txt" })]);
 
-    expect(screen.getByText("3 of 3 files")).toBeTruthy();
+    expect(screen.getByText("3 of 3 sources")).toBeTruthy();
     expect(fileInput(container).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Paste text" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("link", { name: "Upgrade to Pro" }).getAttribute("href")).toBe("/dashboard/billing");
   });
 
-  it("doesn't count pasted text toward the limit, and Pro at its limit gets no upgrade link", () => {
-    const { container } = renderManager([source({ type: "text" }), source()], { limit: 1, plan: "pro" as never });
+  it("counts pasted text toward the limit, and Pro at its limit gets no upgrade link", () => {
+    const { container } = renderManager([source({ type: "text" }), source()], { limit: 2, plan: "pro" as never });
 
-    expect(screen.getByText("1 of 1 files")).toBeTruthy();
+    expect(screen.getByText("2 of 2 sources")).toBeTruthy();
     expect(fileInput(container).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Paste text" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("link", { name: "Upgrade to Pro" })).toBeNull();
   });
 
@@ -106,7 +108,7 @@ describe("KnowledgeManager", () => {
 
     expect(addFileKnowledge).toHaveBeenCalledOnce();
     expect(within(row("Handbook.pdf")).getByText("Processing")).toBeTruthy();
-    expect(screen.getByText("1 of 3 files")).toBeTruthy();
+    expect(screen.getByText("1 of 3 sources")).toBeTruthy();
   });
 
   it("accepts a dropped file", async () => {
@@ -185,10 +187,10 @@ describe("KnowledgeManager", () => {
     expect(within(row("Keep me")).getByText("Couldn't delete this. Try again in a moment.")).toBeTruthy();
   });
 
-  it("reads the Pro file limit in the upgrade message from PLAN_LIMITS", () => {
+  it("reads the Pro source limit in the upgrade message from PLAN_LIMITS", () => {
     renderManager([source(), source({ type: "md" }), source({ type: "txt" })]);
     const message = screen.getByRole("link", { name: "Upgrade to Pro" }).closest("p")!.textContent;
-    expect(message).toContain(`for up to ${PLAN_LIMITS.pro.knowledgeFilesPerProject}.`);
+    expect(message).toContain(`for up to ${PLAN_LIMITS.pro.knowledgeSourcesPerProject}.`);
   });
 
   it("explains what Knowledge is for when there are no sources", () => {

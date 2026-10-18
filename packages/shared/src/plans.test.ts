@@ -6,7 +6,7 @@ describe("PLAN_LIMITS", () => {
     expect(PLAN_LIMITS.free).toEqual({
       projects: 1,
       messagesPerMonth: 100,
-      knowledgeFilesPerProject: 3,
+      knowledgeSourcesPerProject: 3,
       customizeWidget: false,
     });
   });
@@ -15,7 +15,7 @@ describe("PLAN_LIMITS", () => {
     expect(PLAN_LIMITS.pro).toEqual({
       projects: 5,
       messagesPerMonth: 2000,
-      knowledgeFilesPerProject: 25,
+      knowledgeSourcesPerProject: 25,
       customizeWidget: true,
     });
   });
