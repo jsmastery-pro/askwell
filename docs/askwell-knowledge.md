@@ -52,7 +52,7 @@ Each file can be up to 10 MB. You can also paste text directly.
 ## Limits that protect your quota
 
 - A visitor's message can be up to 1,000 characters.
-- Each visitor can send up to 20 messages a minute to a project. Past that, the widget asks them to wait a minute.
+- Each IP address can send up to 20 messages a minute to a project. Visitors who share a network, such as an office, share that limit. Past it, the widget asks them to wait a minute.
 
 ## Privacy and security
 
