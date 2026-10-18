@@ -1,5 +1,5 @@
 import { RATE_LIMITS } from "@askwell/shared";
-import arcjet, { fixedWindow, type ArcjetDecision } from "@arcjet/next";
+import arcjet, { cloudflare, fixedWindow, type ArcjetDecision } from "@arcjet/next";
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
 
@@ -14,6 +14,9 @@ function createClient(key: string, route: RateLimitedRoute) {
   const { windowSeconds, max } = RATE_LIMITS[route];
   return arcjet({
     key,
+    // InstaCloud's edge is Cloudflare: lets Arcjet's own IP analysis trust cf-connecting-ip from
+    // Cloudflare's ranges. Our limit doesn't depend on it (it counts by clientIp above).
+    proxies: [cloudflare()],
     characteristics: CHARACTERISTICS,
     rules: [fixedWindow({ mode: "LIVE", window: windowSeconds, max })],
   });

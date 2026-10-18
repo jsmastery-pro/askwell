@@ -27,6 +27,7 @@ const arcjet = vi.hoisted(() => ({ conclusion: "ALLOW" as Conclusion, protect: v
 vi.mock("@arcjet/next", () => ({
   default: () => ({ protect: arcjet.protect }),
   fixedWindow: () => [],
+  cloudflare: () => ({}),
 }));
 
 // PostHog is mocked at the SDK boundary; the real helpers in lib/posthog/server run.

@@ -10,6 +10,7 @@ vi.mock("@arcjet/next", () => ({
     return { protect: arcjet.protect };
   },
   fixedWindow: (options: unknown) => [{ type: "FIXED_WINDOW", ...(options as object) }],
+  cloudflare: () => "CLOUDFLARE_PROXY",
 }));
 
 const { checkRateLimit, getClientIp } = await import("./index");
@@ -62,6 +63,7 @@ describe("checkRateLimit", () => {
     for (const route of ["widgetConfig", "widgetChat"] as const) {
       expect(created).toContainEqual({
         key: "ajkey_test",
+        proxies: ["CLOUDFLARE_PROXY"],
         characteristics: ["route", "publicKey", "clientIp"],
         rules: [[{ type: "FIXED_WINDOW", mode: "LIVE", window: RATE_LIMITS[route].windowSeconds, max: RATE_LIMITS[route].max }]],
       });

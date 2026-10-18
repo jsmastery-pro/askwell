@@ -16,6 +16,7 @@ const arcjet = vi.hoisted(() => ({ conclusion: "ALLOW" as Conclusion, protect: v
 vi.mock("@arcjet/next", () => ({
   default: () => ({ protect: arcjet.protect }),
   fixedWindow: () => [],
+  cloudflare: () => ({}),
 }));
 arcjet.protect.mockImplementation(async () => {
   const { conclusion } = arcjet;
