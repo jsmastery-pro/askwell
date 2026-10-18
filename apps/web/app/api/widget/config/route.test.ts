@@ -16,7 +16,6 @@ const arcjet = vi.hoisted(() => ({ conclusion: "ALLOW" as Conclusion, protect: v
 vi.mock("@arcjet/next", () => ({
   default: () => ({ protect: arcjet.protect }),
   fixedWindow: () => [],
-  cloudflare: () => ({}),
 }));
 arcjet.protect.mockImplementation(async () => {
   const { conclusion } = arcjet;
@@ -105,6 +104,7 @@ describe("GET /api/widget/config", () => {
       route: "widgetConfig",
       publicKey: "pk_pro",
       clientIp: "10.7.7.7",
+      ipSrc: "10.7.7.7",
     });
   });
 

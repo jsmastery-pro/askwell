@@ -27,7 +27,6 @@ const arcjet = vi.hoisted(() => ({ conclusion: "ALLOW" as Conclusion, protect: v
 vi.mock("@arcjet/next", () => ({
   default: () => ({ protect: arcjet.protect }),
   fixedWindow: () => [],
-  cloudflare: () => ({}),
 }));
 
 // PostHog is mocked at the SDK boundary; the real helpers in lib/posthog/server run.
@@ -299,6 +298,7 @@ describe("rate limit", () => {
       route: "widgetChat",
       publicKey: "pk_shop",
       clientIp: "203.0.113.9",
+      ipSrc: "203.0.113.9",
     });
   });
 

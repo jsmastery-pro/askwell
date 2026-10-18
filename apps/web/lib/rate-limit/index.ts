@@ -1,5 +1,6 @@
 import { RATE_LIMITS } from "@askwell/shared";
-import arcjet, { cloudflare, fixedWindow, type ArcjetDecision } from "@arcjet/next";
+import arcjet, { fixedWindow, type ArcjetDecision } from "@arcjet/next";
+import { isIP } from "node:net";
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
 
@@ -14,9 +15,6 @@ function createClient(key: string, route: RateLimitedRoute) {
   const { windowSeconds, max } = RATE_LIMITS[route];
   return arcjet({
     key,
-    // InstaCloud's edge is Cloudflare: lets Arcjet's own IP analysis trust cf-connecting-ip from
-    // Cloudflare's ranges. Our limit doesn't depend on it (it counts by clientIp above).
-    proxies: [cloudflare()],
     characteristics: CHARACTERISTICS,
     rules: [fixedWindow({ mode: "LIVE", window: windowSeconds, max })],
   });
@@ -63,10 +61,15 @@ export async function checkRateLimit(
       warnedNoKey = true;
       return ALLOW;
     }
+    const clientIp = getClientIp(request.headers);
     const decision = await client.protect(request, {
       route,
       publicKey,
-      clientIp: getClientIp(request.headers),
+      clientIp,
+      // Hands Arcjet's own IP analysis the IP we trust (cf-connecting-ip first) instead of its
+      // guess from x-forwarded-for. Only a real address: Arcjet throws on anything else, and a
+      // throw here would fail open.
+      ...(isIP(clientIp) ? { ipSrc: clientIp } : {}),
     });
     if (decision.isErrored()) {
       console.error("Arcjet rate limit check failed, allowing the request", decision.reason.message);
