@@ -59,6 +59,13 @@ vi.mock("@askwell/db/client", () => ({
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../../../../lib/posthog/server", () => ({ captureServerEvent }));
 
+// Clerk's backend billing API, asked on subscriptionItem.active (L5). Pro is active by default.
+const getUserBillingSubscription = vi.hoisted(() => vi.fn());
+vi.mock("@clerk/nextjs/server", () => ({
+  clerkClient: async () => ({ billing: { getUserBillingSubscription } }),
+}));
+const subscription = (status: string, slug = "pro") => ({ subscriptionItems: [{ status, plan: { slug } }] });
+
 const { POST } = await import("./route");
 
 let db: TestDb;
@@ -73,6 +80,7 @@ afterAll(() => close());
 
 beforeEach(() => {
   vi.stubEnv("CLERK_WEBHOOK_SIGNING_SECRET", SIGNING_SECRET);
+  getUserBillingSubscription.mockResolvedValue(subscription("active"));
 });
 
 afterEach(() => {
@@ -189,5 +197,56 @@ describe("upgraded", () => {
     await seedAccount("user_upgraded_badsig", "free");
     await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_upgraded_badsig"), { badSignature: true }));
     expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("confirming with Clerk before granting Pro (L5)", () => {
+  it("doesn't re-grant Pro for a late active event after the subscription ended", async () => {
+    await seedAccount("user_late_active", "free");
+    getUserBillingSubscription.mockResolvedValueOnce(subscription("ended"));
+
+    const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_late_active")));
+    expect(res.status).toBe(200);
+    expect(await planOf("user_late_active")).toBe("free");
+    expect(getUserBillingSubscription).toHaveBeenCalledWith("user_late_active");
+    expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("doesn't grant Pro when only another plan is active", async () => {
+    await seedAccount("user_other_plan_active", "free");
+    getUserBillingSubscription.mockResolvedValueOnce(subscription("active", "starter"));
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_other_plan_active")));
+    expect(await planOf("user_other_plan_active")).toBe("free");
+  });
+
+  it("returns 500 and changes nothing when Clerk can't be reached, so the delivery is retried", async () => {
+    await seedAccount("user_clerk_down", "free");
+    getUserBillingSubscription.mockRejectedValueOnce(new Error("Clerk API down"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_clerk_down")));
+    expect(res.status).toBe(500);
+    expect(await planOf("user_clerk_down")).toBe("free");
+    logged.mockRestore();
+  });
+
+  it("doesn't ask Clerk for an ended event or a bad signature", async () => {
+    await seedAccount("user_no_check", "pro");
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.ended", "user_no_check")));
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_no_check"), { badSignature: true }));
+    expect(getUserBillingSubscription).not.toHaveBeenCalled();
+  });
+});
+
+describe("without CLERK_WEBHOOK_SIGNING_SECRET", () => {
+  it("rejects even a correctly signed request, and changes nothing", async () => {
+    await seedAccount("user_no_secret", "free");
+    vi.stubEnv("CLERK_WEBHOOK_SIGNING_SECRET", "");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_no_secret")));
+    expect(res.status).toBe(400);
+    expect(await planOf("user_no_secret")).toBe("free");
+    logged.mockRestore();
   });
 });
