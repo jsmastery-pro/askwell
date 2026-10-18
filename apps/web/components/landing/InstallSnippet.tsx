@@ -1,3 +1,4 @@
+import { buildInstallSnippet } from "../projects/snippet";
 import { BrowserFrame } from "./BrowserFrame";
 import { FONT_DISPLAY, FONT_MONO } from "./fonts";
 import { Reveal } from "./Reveal";
@@ -9,7 +10,8 @@ const STEPS = [
   "Refresh your site — the button appears.",
 ];
 
-export function InstallSnippet() {
+/** `appUrl`: this app's public URL, resolved per request (see resolveAppUrl). */
+export function InstallSnippet({ appUrl }: { appUrl: string }) {
   return (
     <section className="py-24 sm:py-28">
       <Section className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[1fr_1.1fr]">
@@ -31,7 +33,7 @@ export function InstallSnippet() {
         <Reveal delay={120}>
           <BrowserFrame url="yoursite.com/index.html">
             <pre className="overflow-x-auto rounded-lg bg-surface p-4 text-sm text-ink" style={FONT_MONO}>
-              <code>{'<script src="https://askwell.app/widget.js" data-key="pk_..."></script>'}</code>
+              <code>{buildInstallSnippet(appUrl, "pk_...")}</code>
             </pre>
           </BrowserFrame>
         </Reveal>
