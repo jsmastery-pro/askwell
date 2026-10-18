@@ -21,9 +21,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      // Clickjacking (project.md §9): only the widget panel may be framed by other sites.
+      // Clickjacking (project.md §9): only the widget panel, exactly /embed, may be framed by other sites.
+      // Everything else, /embed/… included, is same-origin only.
       {
-        source: "/:path((?!embed(?:/|$)).*)",
+        source: "/:path((?!embed$).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
