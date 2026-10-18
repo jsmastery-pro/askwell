@@ -10,11 +10,9 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 type SearchParams = Promise<{ key?: string | string[]; origin?: string | string[] }>;
 
-async function configFor(key: unknown): Promise<WidgetConfig | null> {
-  const parsed = publicKeySchema.safeParse(key);
-  if (!parsed.success) return null;
+async function configFor(key: string): Promise<WidgetConfig | null> {
   try {
-    return await getWidgetConfigByKey(parsed.data);
+    return await getWidgetConfigByKey(key);
   } catch {
     return null;
   }
@@ -22,7 +20,8 @@ async function configFor(key: unknown): Promise<WidgetConfig | null> {
 
 export default async function EmbedPage({ searchParams }: { searchParams: SearchParams }) {
   const { key, origin } = await searchParams;
-  const config = await configFor(key);
-  if (!config) return <Unavailable />;
-  return <Panel config={config} parentOrigin={parentOriginFrom(origin)} />;
+  const parsed = publicKeySchema.safeParse(key);
+  const config = parsed.success ? await configFor(parsed.data) : null;
+  if (!parsed.success || !config) return <Unavailable />;
+  return <Panel publicKey={parsed.data} config={config} parentOrigin={parentOriginFrom(origin)} />;
 }

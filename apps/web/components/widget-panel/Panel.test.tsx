@@ -2,12 +2,13 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { DEFAULT_WIDGET_CONFIG, MAX_CHAT_MESSAGE_LENGTH } from "@askwell/shared";
 import { WIDGET_MESSAGE_SOURCE } from "@askwell/shared/widget-messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getReply } from "../../app/embed/reply";
+import { getReply, previewReply } from "../../app/embed/reply";
 import { ReplyError } from "../../app/embed/reply-error";
 import { Panel } from "./Panel";
 
 vi.mock("../../app/embed/reply", () => ({
   getReply: vi.fn(async (message: string) => `Echo: ${message}`),
+  previewReply: vi.fn(async (message: string) => `Preview: ${message}`),
 }));
 
 const HOST = "https://customer.example";
@@ -32,8 +33,10 @@ afterEach(() => {
   vi.mocked(getReply).mockImplementation(async (message: string) => `Echo: ${message}`);
 });
 
+const KEY = "pk_acme";
+
 function renderPanel(overrides: Partial<typeof DEFAULT_WIDGET_CONFIG> = {}, parentOrigin: string | null = HOST) {
-  return render(<Panel config={{ ...DEFAULT_WIDGET_CONFIG, ...overrides }} parentOrigin={parentOrigin} />);
+  return render(<Panel publicKey={KEY} config={{ ...DEFAULT_WIDGET_CONFIG, ...overrides }} parentOrigin={parentOrigin} />);
 }
 
 async function sendMessage(text: string) {
@@ -44,6 +47,23 @@ async function sendMessage(text: string) {
 }
 
 describe("Panel", () => {
+  it("asks the chat route with the project's key and the visitor's ID, and shows the reply", async () => {
+    renderPanel();
+    await sendMessage("Do you ship to Canada?");
+
+    expect(getReply).toHaveBeenCalledWith("Do you ship to Canada?", { key: KEY, visitorId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    expect(screen.getByText("Echo: Do you ship to Canada?")).toBeTruthy();
+    expect(previewReply).not.toHaveBeenCalled();
+  });
+
+  it("uses local preview replies without a key (the Customize preview), never the chat route", async () => {
+    render(<Panel config={DEFAULT_WIDGET_CONFIG} parentOrigin={null} />);
+    await sendMessage("Hello");
+
+    expect(getReply).not.toHaveBeenCalled();
+    expect(screen.getByText("Preview: Hello")).toBeTruthy();
+  });
+
   it("renders HTML in messages as literal text", async () => {
     const attack = "<img src=x onerror=alert(1)>";
     const { container } = renderPanel();
