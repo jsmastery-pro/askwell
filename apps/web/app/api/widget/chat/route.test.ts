@@ -157,12 +157,27 @@ describe("POST /api/widget/chat", () => {
     expect(body.reply).toBe(DONT_KNOW_REPLY);
   });
 
-  it("returns DONT_KNOW_REPLY without calling the model when the project has no chunks, and still counts it", async () => {
+  it("returns DONT_KNOW_REPLY without embedding or calling the model when the project has no chunks, and still counts it", async () => {
     const res = await chat({ key: "pk_empty", visitorId: "v_2", message: "Hello?" });
     const body = await res.json();
     expect(body.reply).toBe(DONT_KNOW_REPLY);
+    expect(ai.embedQuery).not.toHaveBeenCalled();
     expect(ai.create).not.toHaveBeenCalled();
     expect(await thread(body.conversationId)).toHaveLength(2);
+  });
+
+  it("skips the embedding and the model when the only chunks belong to a source that isn't ready (L8)", async () => {
+    const project = await seedProject(db, { plan: "free", publicKey: "pk_processing" });
+    const [source] = await db
+      .insert(knowledgeSources)
+      .values({ projectId: project.id, title: "Half done", type: "text", status: "processing" })
+      .returning();
+    await db.insert(knowledgeChunks).values({ projectId: project.id, sourceId: source!.id, content: "partial", embedding: unit(0) });
+
+    const body = await (await chat({ key: "pk_processing", visitorId: "v_8", message: "Anything?" })).json();
+    expect(body.reply).toBe(DONT_KNOW_REPLY);
+    expect(ai.embedQuery).not.toHaveBeenCalled();
+    expect(ai.create).not.toHaveBeenCalled();
   });
 
   it("continues the visitor's own conversation", async () => {
