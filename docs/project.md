@@ -74,7 +74,7 @@ The whole product in one flow. When this works end to end, the product is done.
 | ------------------------------ | ------------ | -------------------- |
 | Projects                       | 1            | 5                    |
 | Messages / month (per project) | 100          | 2,000                |
-| Knowledge files (per project)  | 3            | 25                   |
+| Knowledge sources (per project, files + pasted text) | 3 | 25 |
 | Button color                   | Default      | Any                  |
 | Button position                | Bottom right | Any corner           |
 | Button label                   | Default      | Custom               |
@@ -128,7 +128,7 @@ The whole product in one flow. When this works end to end, the product is done.
 | Upload     | File goes to InstaCloud storage; row in `knowledge_sources`                             |
 | Processing | Extract text (PDF: `unpdf`) → split into chunks → OpenAI embeddings → store in pgvector |
 | Actions    | List sources with status, delete a source (deletes its file and chunks)                 |
-| Limit      | Free: 3 files per project. Pro: 25.                                                     |
+| Limit      | Free: 3 sources per project. Pro: 25. Files and pasted texts count toward the same limit. |
 | Done when  | Uploading a PDF creates chunks; a related question retrieves them                       |
 
 ### 6.5 Widget
@@ -332,6 +332,7 @@ docs/
 | `ARCJET_KEY`                                                                     | Server          | No      |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`                            | Client + server | Yes     |
 | `NEXT_PUBLIC_APP_URL`                                                            | Client + server | Yes     |
+| `LANDING_WIDGET_KEY`                                                             | Server (read at request time) | No (it is a public key, but per-environment config) |
 
 `.env.example` lists every variable with no values. `.env` is never committed.
 
