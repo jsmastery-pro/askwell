@@ -214,7 +214,7 @@ Lane B (Customize) added once a developer is free for it.
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | P6-T01 | Security audit (report only) | John | Phases 0–5 | done | `docs/security-review.md` |
-| P6-T02 | Security fixes from the report | Bob | P6-T01, P6-T03 | todo | — |
+| P6-T02 | Security fixes from the report | Bob | P6-T01, P6-T03 | in progress | — |
 | P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | in review | #79 (merge-ready) |
 | P6-T04 | Responsive + empty-state polish | Alice, else Bob | P6-T03 | todo | — |
 | P6-T05 | Launch check: core flow on `main` | Product owner | P6-T02, P6-T03, P6-T04 | todo | — |
