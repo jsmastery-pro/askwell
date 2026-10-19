@@ -171,6 +171,35 @@ describe("file upload", () => {
     });
   });
 
+  it("still answers 500 when freeing the slot after a failed upload fails too", async () => {
+    const projectId = await seedProject("owner_cleanupfail", "free", "pk_cleanupfail");
+    as("owner_cleanupfail");
+    const realDb = state.db as TestDb;
+    uploadKnowledgeFile.mockImplementationOnce(async () => {
+      // The database goes away between the reservation and the cleanup.
+      state.db = new Proxy(realDb, {
+        get: (target, prop) =>
+          prop === "delete"
+            ? () => {
+                throw new Error("database down");
+              }
+            : Reflect.get(target, prop),
+      });
+      throw new Error("storage down");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const res = await POST(fileRequest(new Blob([Buffer.from("Doc")]), "doc.txt"), ctx(projectId));
+      expect(res.status).toBe(500);
+      expect((await res.json()).error.code).toBe("internal");
+      expect(logged.mock.calls.some(([message]) => String(message).includes("Couldn't free the slot"))).toBe(true);
+    } finally {
+      state.db = realDb;
+      logged.mockRestore();
+    }
+  });
+
   it("deletes the source and frees its file slot when storage upload fails", async () => {
     const projectId = await seedProject("owner_uploadfail", "free", "pk_uploadfail");
     as("owner_uploadfail");

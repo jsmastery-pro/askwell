@@ -122,8 +122,13 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
     await uploadKnowledgeFile(storageKey, buffer, file.type || "application/octet-stream");
   } catch (error) {
     console.error(`Knowledge file upload failed for source ${source.id}`, error);
-    // Never reached storage: free the file slot rather than leaving a permanent `failed` row.
-    await deleteKnowledgeSource(source.id);
+    // Never reached storage: free the source slot rather than leaving a row with no file. If that
+    // fails too, the row stays and the owner can delete it from the Knowledge page to free it.
+    try {
+      await deleteKnowledgeSource(source.id);
+    } catch (cleanupError) {
+      console.error(`Couldn't free the slot of failed upload ${source.id}`, cleanupError);
+    }
     return errorResponse(ERROR_CODES.internal, "Could not store the file.", 500);
   }
 
