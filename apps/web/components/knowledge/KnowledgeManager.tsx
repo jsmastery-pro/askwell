@@ -142,7 +142,7 @@ export function KnowledgeManager({ projectId, initialSources, sourcesLimit, plan
         <p className="mt-2 text-xs text-muted">Uploaded files and pasted text both count as sources.</p>
       </div>
 
-      <section aria-label="Add knowledge" className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
+      <section aria-label="Add knowledge" className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div>
           <label
             onDragOver={(event) => {

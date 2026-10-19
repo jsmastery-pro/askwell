@@ -97,7 +97,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <section aria-labelledby="usage-heading" className={`${CARD} p-4 sm:p-6`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionTitle id="usage-heading">Projects: usage this month</SectionTitle>

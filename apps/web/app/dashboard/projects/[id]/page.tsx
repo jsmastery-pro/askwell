@@ -49,7 +49,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
         />
       </section>
 
-      <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section aria-labelledby="conversations-heading">
           <div className="flex items-center gap-3">
             <h2 id="conversations-heading" className="text-lg font-semibold text-ink" style={FONT_DISPLAY}>
