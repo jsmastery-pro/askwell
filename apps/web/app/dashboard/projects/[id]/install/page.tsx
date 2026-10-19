@@ -42,8 +42,9 @@ export default async function InstallPage({ params }: { params: Promise<{ id: st
         ))}
       </ol>
       <div className="mt-8 rounded-xl bg-ink p-5">
-        {/* A scrollable pre is keyboard-focusable: on the black panel it needs the white ring. */}
-        <pre className={`overflow-x-auto rounded-sm text-sm text-inverse/85 ${FOCUS_ON_INK}`} style={FONT_MONO}>
+        {/* Focusable so keyboard users can scroll a long snippet in every browser; on the black panel
+            it needs the white ring. */}
+        <pre tabIndex={0} className={`overflow-x-auto rounded-sm text-sm text-inverse/85 ${FOCUS_ON_INK}`} style={FONT_MONO}>
           <code>{snippet}</code>
         </pre>
       </div>
