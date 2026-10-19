@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { ErrorState } from "../components/ui/ErrorState";
+import { useCaptureException } from "../components/ui/useCaptureException";
 import { TEXT_LINK } from "../components/ui/styles";
 
 // Shown if the landing or sign-in pages fail to render. The dashboard and /embed have their own.
-export default function RootError({ reset }: { error: Error; reset: () => void }) {
+export default function RootError({ error, reset }: { error: Error; reset: () => void }) {
+  useCaptureException(error);
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-16">
       <div className="w-full max-w-md space-y-4 text-center">
