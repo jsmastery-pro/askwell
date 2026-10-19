@@ -216,8 +216,8 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T01 | Security audit (report only) | John | Phases 0–5 | done | `docs/security-review.md` |
 | P6-T02 | Security fixes from the report | Bob | P6-T01, P6-T03 | done | #80 |
 | P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | done | #79 |
-| P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | in review | #81 (merge-ready) |
-| P6-T05 | Launch check: core flow on `main` | Product owner | P6-T02, P6-T03, P6-T04 | todo | — |
+| P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
+| P6-T05 | Launch check: core flow on `main` | Product owner | P6-T02, P6-T03, P6-T04 | in progress | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
 
