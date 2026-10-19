@@ -22,17 +22,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       // Clickjacking (project.md §9): only the widget panel, exactly /embed, may be framed by other sites.
-      // Everything else, /embed/… included, is same-origin only.
+      // Everything else, /embed/ and /embed/… included, is same-origin only. Next makes a trailing
+      // slash optional on both sources, so /embed/ matches both: the same-origin rule comes last,
+      // so its CSP is the one /embed/ ends up with.
+      {
+        source: "/embed",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
+      },
       {
         source: "/:path((?!embed$).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],
-      },
-      {
-        source: "/embed",
-        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
       },
       // Short cache so loader updates reach customer sites within minutes.
       {

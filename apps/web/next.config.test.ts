@@ -19,7 +19,7 @@ describe("frame headers (§9 Clickjacking)", () => {
     expect(await headersFor("/embed")).toEqual({ "Content-Security-Policy": "frame-ancestors *" });
   });
 
-  it.each(["/embed/anything", "/embed/a/b", "/embedded", "/", "/dashboard", "/sign-in", "/api/widget/config"])(
+  it.each(["/embed/", "/embed/anything", "/embed/a/b", "/embedded", "/", "/dashboard", "/sign-in", "/api/widget/config"])(
     "keeps %s same-origin only",
     async (path) => {
       expect(await headersFor(path)).toMatchObject({
