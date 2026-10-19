@@ -36,7 +36,7 @@ Run from a normal browser. For step 4, serve the HTML page over `http`, e.g. `py
 | 5 | Ask a question on that page | The answer comes from the PDF; an unrelated question gets "I don't know" |
 | 6 | Open Conversations | The chat is there |
 | 7 | Open Customize | The paywall shows; saving is refused |
-| 8 | Upgrade to Pro with a Clerk Billing test card | Customize unlocks |
+| 8 | Upgrade to Pro with a Clerk Billing test card | Customize unlocks. If it doesn't, check the logs for "Couldn't confirm the Pro subscription with Clerk": the webhook's Clerk check (P6-T02, L5) wasn't testable before `main`. |
 | 9 | Change the button color, reload the HTML page | The new color shows |
 
 Afterwards, in PostHog:
