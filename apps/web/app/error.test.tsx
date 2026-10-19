@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import posthog from "posthog-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DashboardError from "./dashboard/error";
@@ -7,6 +7,15 @@ import RootError from "./error";
 import NotFound from "./not-found";
 
 vi.mock("posthog-js", () => ({ default: { captureException: vi.fn() } }));
+
+// PostHog's "ready" signal, resolved by each test when it wants PostHog to have started.
+const ready = vi.hoisted(() => {
+  let resolve: () => void = () => {};
+  const promise = new Promise<void>((r) => (resolve = r));
+  return { promise, resolve: () => resolve() };
+});
+vi.mock("../lib/posthog/client", () => ({ posthogReady: ready.promise }));
+const startPostHog = () => act(async () => ready.resolve());
 
 afterEach(() => {
   cleanup();
@@ -24,17 +33,24 @@ describe("RootError", () => {
     expect(screen.getByRole("link", { name: "Back to the home page" }).getAttribute("href")).toBe("/");
   });
 
-  it("sends the error to PostHog, since the boundary keeps it from exception autocapture", () => {
+  it("waits for PostHog to start, then sends the error (the boundary keeps it from autocapture)", async () => {
     const error = new Error("landing render failed");
     render(<RootError error={error} reset={() => {}} />);
-    expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error);
+    await act(async () => {});
+    expect(posthog.captureException).not.toHaveBeenCalled();
+
+    await startPostHog();
+    // An earlier test's error was waiting on the same start, so it's sent now too.
+    expect(posthog.captureException).toHaveBeenCalledWith(error);
   });
 });
 
 describe("DashboardError", () => {
-  it("sends the error to PostHog too", () => {
+  it("sends the error to PostHog too, right away once PostHog is running", async () => {
+    await startPostHog();
     const error = new Error("dashboard render failed");
     render(<DashboardError error={error} reset={() => {}} />);
+    await act(async () => {});
     expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error);
   });
 });
@@ -45,8 +61,10 @@ describe("EmbedError", () => {
     expect(container.textContent).toBe("Chat is unavailable right now.");
   });
 
-  it("sends nothing to PostHog (it never loads in the panel)", () => {
+  it("sends nothing to PostHog (it never loads in the panel)", async () => {
+    await startPostHog();
     render(<EmbedError />);
+    await act(async () => {});
     expect(posthog.captureException).not.toHaveBeenCalled();
   });
 });
