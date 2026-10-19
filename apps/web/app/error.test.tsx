@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import DashboardError from "./dashboard/error";
 import EmbedError from "./embed/error";
 import RootError from "./error";
+import GlobalError from "./global-error";
 import NotFound from "./not-found";
 
 vi.mock("posthog-js", () => ({ default: { captureException: vi.fn() } }));
@@ -52,6 +53,19 @@ describe("DashboardError", () => {
     render(<DashboardError error={error} reset={() => {}} />);
     await act(async () => {});
     expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error);
+  });
+});
+
+describe("GlobalError", () => {
+  it("sends the error through the same wait for PostHog", async () => {
+    // It renders its own <html>; inside the test's <div> React warns about nesting.
+    const nesting = vi.spyOn(console, "error").mockImplementation(() => {});
+    await startPostHog();
+    const error = new Error("root layout failed");
+    render(<GlobalError error={error} />);
+    await act(async () => {});
+    expect(posthog.captureException).toHaveBeenCalledExactlyOnceWith(error);
+    nesting.mockRestore();
   });
 });
 
