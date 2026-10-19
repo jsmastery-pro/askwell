@@ -6,6 +6,7 @@ import { FONT_DISPLAY, FONT_MONO } from "../../../../../components/landing/fonts
 import { CopyButton } from "../../../../../components/projects/CopyButton";
 import { buildInstallSnippet, resolveAppUrl } from "../../../../../components/projects/snippet";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
+import { FOCUS_ON_INK } from "../../../../../components/ui/styles";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,8 @@ export default async function InstallPage({ params }: { params: Promise<{ id: st
         ))}
       </ol>
       <div className="mt-8 rounded-xl bg-ink p-5">
-        <pre className="overflow-x-auto text-sm text-inverse/85" style={FONT_MONO}>
+        {/* A scrollable pre is keyboard-focusable: on the black panel it needs the white ring. */}
+        <pre className={`overflow-x-auto rounded-sm text-sm text-inverse/85 ${FOCUS_ON_INK}`} style={FONT_MONO}>
           <code>{snippet}</code>
         </pre>
       </div>
