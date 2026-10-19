@@ -157,12 +157,27 @@ describe("POST /api/widget/chat", () => {
     expect(body.reply).toBe(DONT_KNOW_REPLY);
   });
 
-  it("returns DONT_KNOW_REPLY without calling the model when the project has no chunks, and still counts it", async () => {
+  it("returns DONT_KNOW_REPLY without embedding or calling the model when the project has no chunks, and still counts it", async () => {
     const res = await chat({ key: "pk_empty", visitorId: "v_2", message: "Hello?" });
     const body = await res.json();
     expect(body.reply).toBe(DONT_KNOW_REPLY);
+    expect(ai.embedQuery).not.toHaveBeenCalled();
     expect(ai.create).not.toHaveBeenCalled();
     expect(await thread(body.conversationId)).toHaveLength(2);
+  });
+
+  it("skips the embedding and the model when the only chunks belong to a source that isn't ready (L8)", async () => {
+    const project = await seedProject(db, { plan: "free", publicKey: "pk_processing" });
+    const [source] = await db
+      .insert(knowledgeSources)
+      .values({ projectId: project.id, title: "Half done", type: "text", status: "processing" })
+      .returning();
+    await db.insert(knowledgeChunks).values({ projectId: project.id, sourceId: source!.id, content: "partial", embedding: unit(0) });
+
+    const body = await (await chat({ key: "pk_processing", visitorId: "v_8", message: "Anything?" })).json();
+    expect(body.reply).toBe(DONT_KNOW_REPLY);
+    expect(ai.embedQuery).not.toHaveBeenCalled();
+    expect(ai.create).not.toHaveBeenCalled();
   });
 
   it("continues the visitor's own conversation", async () => {
@@ -212,6 +227,57 @@ describe("POST /api/widget/chat", () => {
   });
 });
 
+describe("request size (M1)", () => {
+  it("returns 413 for a body over 16 KB, with CORS, before any lookup or model call", async () => {
+    const res = await ask("x".repeat(20 * 1024));
+    expect(res.status).toBe(413);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect((await res.json()).error.code).toBe("invalid_input");
+    expect(arcjet.protect).not.toHaveBeenCalled();
+    expect(ai.embedQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 on an oversized Content-Length without reading the body", async () => {
+    const res = await POST(
+      new Request("https://app.test/api/widget/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": String(50 * 1024 * 1024) },
+        body: JSON.stringify({ key: "pk_shop", visitorId: "v_1", message: "hi" }),
+      }),
+    );
+    expect(res.status).toBe(413);
+  });
+});
+
+describe("production without ARCJET_KEY (M3)", () => {
+  it("returns 503 service_unavailable with CORS, before the limiter, the lookup or the model", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ARCJET_KEY", "");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await ask("How fast do you ship?");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(await res.json()).toEqual({ error: { code: "service_unavailable", message: "Chat is unavailable right now." } });
+    expect(arcjet.protect).not.toHaveBeenCalled();
+    expect(ai.embedQuery).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it("serves chat in production when the key is set", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await ask("How fast do you ship?")).status).toBe(200);
+  });
+
+  it("still fails open outside production (local dev without a key)", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ARCJET_KEY", "");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await ask("How fast do you ship?")).status).toBe(200);
+    logged.mockRestore();
+  });
+});
+
 describe("rate limit", () => {
   it("returns 429 rate_limited with Retry-After on a denied decision, before any lookup or model call", async () => {
     arcjet.conclusion = "DENY";
@@ -232,6 +298,7 @@ describe("rate limit", () => {
       route: "widgetChat",
       publicKey: "pk_shop",
       clientIp: "203.0.113.9",
+      ipSrc: "203.0.113.9",
     });
   });
 

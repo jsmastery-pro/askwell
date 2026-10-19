@@ -1,5 +1,6 @@
 import { RATE_LIMITS } from "@askwell/shared";
 import arcjet, { fixedWindow, type ArcjetDecision } from "@arcjet/next";
+import { isIP } from "node:net";
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
 
@@ -60,10 +61,15 @@ export async function checkRateLimit(
       warnedNoKey = true;
       return ALLOW;
     }
+    const clientIp = getClientIp(request.headers);
     const decision = await client.protect(request, {
       route,
       publicKey,
-      clientIp: getClientIp(request.headers),
+      clientIp,
+      // Hands Arcjet's own IP analysis the IP we trust (cf-connecting-ip first) instead of its
+      // guess from x-forwarded-for. Only a real address: Arcjet throws on anything else, and a
+      // throw here would fail open.
+      ...(isIP(clientIp) ? { ipSrc: clientIp } : {}),
     });
     if (decision.isErrored()) {
       console.error("Arcjet rate limit check failed, allowing the request", decision.reason.message);

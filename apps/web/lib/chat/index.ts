@@ -1,4 +1,4 @@
-import { accounts, conversations, messages, projects } from "@askwell/db";
+import { accounts, conversations, knowledgeChunks, knowledgeSources, messages, projects } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import { searchChunks, type Database } from "@askwell/db/queries";
 import { ERROR_CODES, PLAN_LIMITS, RETRIEVAL_TOP_K, type WidgetChatRequest } from "@askwell/shared";
@@ -54,6 +54,17 @@ async function usedThisPeriod(
   return current?.messagesUsed ?? 0;
 }
 
+/** Whether the project has anything to answer from: a chunk of a `ready` source. */
+async function hasReadyChunks(projectId: string, database: Database): Promise<boolean> {
+  const [row] = await database
+    .select({ id: knowledgeChunks.id })
+    .from(knowledgeChunks)
+    .innerJoin(knowledgeSources, eq(knowledgeSources.id, knowledgeChunks.sourceId))
+    .where(and(eq(knowledgeChunks.projectId, projectId), eq(knowledgeSources.status, "ready")))
+    .limit(1);
+  return Boolean(row);
+}
+
 /**
  * One visitor message → one bot reply (project.md §6.6, after the route's rate limit).
  * Resolves the project by public key only, and only ever reads that project's chunks and
@@ -93,7 +104,10 @@ export async function handleChat(
   // Early check, so a project at its limit costs no OpenAI call. The save below re-checks.
   if ((await usedThisPeriod(project, database, receivedAt)) >= limit) return quotaExceeded;
 
-  const chunks = await searchChunks(project.id, await embedQuery(message), RETRIEVAL_TOP_K, database);
+  // Nothing ready to answer from: skip the embedding and the model, and say "I don't know" (§9 Cost abuse).
+  const chunks = (await hasReadyChunks(project.id, database))
+    ? await searchChunks(project.id, await embedQuery(message), RETRIEVAL_TOP_K, database)
+    : [];
   const { reply, telemetry } = await answerFromChunks(
     message,
     chunks.map((chunk) => chunk.content),

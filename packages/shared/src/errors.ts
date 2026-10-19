@@ -9,6 +9,8 @@ export const ERROR_CODES = {
   paymentRequired: "payment_required",
   rateLimited: "rate_limited",
   quotaExceeded: "quota_exceeded",
+  // A required service is missing, e.g. chat in production without its rate limiter (§9).
+  serviceUnavailable: "service_unavailable",
   internal: "internal",
 } as const;
 

@@ -27,7 +27,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ id: 
       <KnowledgeManager
         projectId={project.id}
         initialSources={sources}
-        filesLimit={PLAN_LIMITS[plan].knowledgeFilesPerProject}
+        sourcesLimit={PLAN_LIMITS[plan].knowledgeSourcesPerProject}
         plan={plan}
       />
     </div>

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestDb, seedProject, type TestDb } from "../widget-config/test-db";
 import { getAccountPlan } from "./billing";
 import { getStoredWidgetConfig, getWidgetConfig } from "./config";
-import { countKnowledgeFiles, listKnowledgeSources } from "./knowledge";
+import { countKnowledgeSources, listKnowledgeSources } from "./knowledge";
 import { addOneMonth, getProjectUsage } from "./usage";
 
 vi.mock("server-only", () => ({}));
@@ -90,13 +90,13 @@ describe("knowledge reads", () => {
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 
-  it("counts only uploaded files toward the file limit", async () => {
-    expect(await countKnowledgeFiles(project.id, db)).toBe(2);
+  it("counts every source toward the limit, pasted text included", async () => {
+    expect(await countKnowledgeSources(project.id, db)).toBe(3);
   });
 
   it("returns nothing for another project's sources", async () => {
     expect(await listKnowledgeSources(freeProject.id, db)).toEqual([]);
-    expect(await countKnowledgeFiles(freeProject.id, db)).toBe(0);
+    expect(await countKnowledgeSources(freeProject.id, db)).toBe(0);
   });
 });
 
@@ -108,7 +108,7 @@ describe("malformed project IDs", () => {
       expect(await getWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
       expect(await getStoredWidgetConfig(freeProject.ownerId, id, db)).toBeNull();
       expect(await listKnowledgeSources(id, db)).toEqual([]);
-      expect(await countKnowledgeFiles(id, db)).toBe(0);
+      expect(await countKnowledgeSources(id, db)).toBe(0);
     },
   );
 });

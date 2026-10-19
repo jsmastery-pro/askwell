@@ -49,7 +49,20 @@ describe("checkRateLimit", () => {
     arcjet.protect.mockResolvedValue(decision({ conclusion: "ALLOW" }));
     const req = request("198.51.100.4");
     await checkRateLimit(req, "widgetChat", "pk_abc");
-    expect(arcjet.protect).toHaveBeenCalledWith(req, { route: "widgetChat", publicKey: "pk_abc", clientIp: "198.51.100.4" });
+    expect(arcjet.protect).toHaveBeenCalledWith(req, {
+      route: "widgetChat",
+      publicKey: "pk_abc",
+      clientIp: "198.51.100.4",
+      ipSrc: "198.51.100.4",
+    });
+  });
+
+  it("gives Arcjet no ipSrc when the IP isn't a real address, and still checks the limit", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "DENY", reason: { type: "RATE_LIMIT", reset: 5 } }));
+    const req = new Request("https://app.test/api/widget/chat");
+
+    expect((await checkRateLimit(req, "widgetChat", "pk_abc")).allowed).toBe(false);
+    expect(arcjet.protect).toHaveBeenCalledWith(req, { route: "widgetChat", publicKey: "pk_abc", clientIp: "unknown" });
   });
 
   it("builds each route's fixed window from RATE_LIMITS, tracked by our characteristics", async () => {

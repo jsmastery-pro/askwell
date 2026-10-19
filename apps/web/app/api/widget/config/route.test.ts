@@ -104,6 +104,7 @@ describe("GET /api/widget/config", () => {
       route: "widgetConfig",
       publicKey: "pk_pro",
       clientIp: "10.7.7.7",
+      ipSrc: "10.7.7.7",
     });
   });
 
@@ -113,6 +114,25 @@ describe("GET /api/widget/config", () => {
     expect((await get("pk_pro")).status).toBe(200);
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
+  });
+
+  it("returns a JSON 500 with CORS when the lookup fails (L6)", async () => {
+    const realDb = state.db;
+    state.db = {
+      select: () => {
+        throw new Error("database down");
+      },
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await get("pk_pro");
+      expect(res.status).toBe(500);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(await res.json()).toEqual({ error: { code: "internal", message: "Something went wrong." } });
+    } finally {
+      state.db = realDb;
+      logged.mockRestore();
+    }
   });
 
   it("answers the CORS preflight", () => {

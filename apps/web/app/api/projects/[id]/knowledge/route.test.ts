@@ -171,6 +171,35 @@ describe("file upload", () => {
     });
   });
 
+  it("still answers 500 when freeing the slot after a failed upload fails too", async () => {
+    const projectId = await seedProject("owner_cleanupfail", "free", "pk_cleanupfail");
+    as("owner_cleanupfail");
+    const realDb = state.db as TestDb;
+    uploadKnowledgeFile.mockImplementationOnce(async () => {
+      // The database goes away between the reservation and the cleanup.
+      state.db = new Proxy(realDb, {
+        get: (target, prop) =>
+          prop === "delete"
+            ? () => {
+                throw new Error("database down");
+              }
+            : Reflect.get(target, prop),
+      });
+      throw new Error("storage down");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const res = await POST(fileRequest(new Blob([Buffer.from("Doc")]), "doc.txt"), ctx(projectId));
+      expect(res.status).toBe(500);
+      expect((await res.json()).error.code).toBe("internal");
+      expect(logged.mock.calls.some(([message]) => String(message).includes("Couldn't free the slot"))).toBe(true);
+    } finally {
+      state.db = realDb;
+      logged.mockRestore();
+    }
+  });
+
   it("deletes the source and frees its file slot when storage upload fails", async () => {
     const projectId = await seedProject("owner_uploadfail", "free", "pk_uploadfail");
     as("owner_uploadfail");
@@ -235,18 +264,42 @@ describe("file upload", () => {
     }
   });
 
-  it("pasted text doesn't count toward the file limit", async () => {
+  it("counts pasted text toward the same limit: a Free project's 4th source is refused, text or file", async () => {
     const projectId = await seedProject("owner_mixed", "free", "pk_mixed");
     as("owner_mixed");
-    for (let i = 0; i < 5; i++) {
-      await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
-    }
-    for (let i = 0; i < 3; i++) {
-      const res = await POST(fileRequest(new Blob([Buffer.from(`Doc ${i}`)]), `doc${i}.txt`), ctx(projectId));
+    for (let i = 0; i < 2; i++) {
+      const res = await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
       expect(res.status).toBe(201);
     }
-    const res = await POST(fileRequest(new Blob([Buffer.from("Doc 4")]), "doc4.txt"), ctx(projectId));
+    expect((await POST(fileRequest(new Blob([Buffer.from("Doc")]), "doc.txt"), ctx(projectId))).status).toBe(201);
+
+    const text = await POST(jsonRequest({ type: "text", title: "t4", content: "one too many" }), ctx(projectId));
+    expect(text.status).toBe(403);
+    expect((await text.json()).error.code).toBe("plan_limit");
+    const file = await POST(fileRequest(new Blob([Buffer.from("Doc 4")]), "doc4.txt"), ctx(projectId));
+    expect(file.status).toBe(403);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(3);
+  });
+
+  it("keeps an existing project's sources over the new limit, but refuses more", async () => {
+    const projectId = await seedProject("owner_over", "free", "pk_over");
+    as("owner_over");
+    for (let i = 0; i < 5; i++) {
+      await db.insert(knowledgeSources).values({ projectId, title: `old ${i}`, type: "text", status: "ready" });
+    }
+    const res = await POST(jsonRequest({ type: "text", title: "new", content: "more" }), ctx(projectId));
     expect(res.status).toBe(403);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(5);
+  });
+
+  it("never lets concurrent pasted texts exceed the Free plan's 3-source limit", async () => {
+    const projectId = await seedProject("owner_text_race", "free", "pk_text_race");
+    as("owner_text_race");
+    const responses = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => POST(jsonRequest({ type: "text", title: `t${i}`, content: `c ${i}` }), ctx(projectId))),
+    );
+    expect(responses.filter((res) => res.status === 201)).toHaveLength(3);
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(3);
   });
 
   it("never lets concurrent uploads exceed the Free plan's 3-file limit", async () => {
@@ -261,6 +314,30 @@ describe("file upload", () => {
     expect(succeeded).toHaveLength(3);
     const stored = await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
     expect(stored).toHaveLength(3);
+  });
+});
+
+describe("upload size (LM4)", () => {
+  it("returns 413 on a Content-Length over the limit, before reading the body or touching storage", async () => {
+    const projectId = await seedProject("owner_lm4_big", "free", "pk_lm4_big");
+    as("owner_lm4_big");
+    const request = fileRequest(new Blob([Buffer.from("small")]), "doc.txt");
+    const formData = vi.spyOn(request, "formData");
+    request.headers.set("content-length", String(11 * 1024 * 1024));
+
+    const res = await POST(request, ctx(projectId));
+    expect(res.status).toBe(413);
+    expect((await res.json()).error.code).toBe("invalid_input");
+    expect(formData).not.toHaveBeenCalled();
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(0);
+  });
+
+  it("allows a 10 MB file plus multipart overhead through to the normal checks", async () => {
+    const projectId = await seedProject("owner_lm4_edge", "free", "pk_lm4_edge");
+    as("owner_lm4_edge");
+    const request = fileRequest(new Blob([Buffer.from("small")]), "doc.txt");
+    request.headers.set("content-length", String(10 * 1024 * 1024 + 1024));
+    expect((await POST(request, ctx(projectId))).status).toBe(201);
   });
 });
 

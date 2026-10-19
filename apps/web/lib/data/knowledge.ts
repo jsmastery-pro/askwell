@@ -2,7 +2,7 @@ import "server-only";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
 import type { KnowledgeSource } from "@askwell/shared";
-import { countProjectKnowledgeFiles, listProjectKnowledgeSources, toKnowledgeSource } from "../knowledge";
+import { countProjectKnowledgeSources, listProjectKnowledgeSources, toKnowledgeSource } from "../knowledge";
 import { isUuid } from "./ids";
 
 // Real reads. The caller (a server component) has already checked ownership via
@@ -15,8 +15,8 @@ export async function listKnowledgeSources(projectId: string, database: Database
   return rows.map(toKnowledgeSource);
 }
 
-// Uploaded files count toward the plan's file limit; pasted text doesn't (project.md §6.4).
-export async function countKnowledgeFiles(projectId: string, database: Database = defaultDb): Promise<number> {
+// Every source counts toward the plan's source limit, pasted text included (project.md §5, §6.4).
+export async function countKnowledgeSources(projectId: string, database: Database = defaultDb): Promise<number> {
   if (!isUuid(projectId)) return 0;
-  return countProjectKnowledgeFiles(projectId, database);
+  return countProjectKnowledgeSources(projectId, database);
 }

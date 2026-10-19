@@ -39,11 +39,17 @@ export async function GET(request: Request) {
     });
   }
 
-  const config = await getWidgetConfigByKey(key);
-  if (!config) {
-    return error(ERROR_CODES.notFound, "Widget not found.", 404);
+  try {
+    const config = await getWidgetConfigByKey(key);
+    if (!config) {
+      return error(ERROR_CODES.notFound, "Widget not found.", 404);
+    }
+    return json({ config }, 200);
+  } catch (cause) {
+    // Same shape and CORS headers as every other answer, so the loader fails cleanly.
+    console.error("Widget config lookup failed", cause);
+    return error(ERROR_CODES.internal, "Something went wrong.", 500);
   }
-  return json({ config }, 200);
 }
 
 export function OPTIONS() {

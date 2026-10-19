@@ -20,9 +20,9 @@ const TYPE_LABEL: Record<KnowledgeSource["type"], string> = {
 
 const isFile = (source: KnowledgeSource) => source.type !== "text";
 
-type Props = { projectId: string; initialSources: KnowledgeSource[]; filesLimit: number; plan: Plan };
+type Props = { projectId: string; initialSources: KnowledgeSource[]; sourcesLimit: number; plan: Plan };
 
-export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }: Props) {
+export function KnowledgeManager({ projectId, initialSources, sourcesLimit, plan }: Props) {
   const [sources, setSources] = useState(initialSources);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
@@ -39,8 +39,8 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const files = sources.filter(isFile).length;
-  const atLimit = files >= filesLimit;
+  // Files and pasted text count toward one limit (§5).
+  const atLimit = sources.length >= sourcesLimit;
 
   const setRowError = (id: string, message: string | null) =>
     setRowErrors((current) => {
@@ -134,12 +134,12 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
 
       <div className="max-w-md">
         <p className="text-sm text-ink">
-          {files} of {filesLimit} files
+          {sources.length} of {sourcesLimit} sources
         </p>
         <div className="mt-2">
-          <UsageMeter used={files} limit={filesLimit} label="Knowledge files used" />
+          <UsageMeter used={sources.length} limit={sourcesLimit} label="Knowledge sources used" />
         </div>
-        <p className="mt-2 text-xs text-muted">Pasted text doesn&apos;t count toward the file limit.</p>
+        <p className="mt-2 text-xs text-muted">Uploaded files and pasted text both count as sources.</p>
       </div>
 
       <section aria-label="Add knowledge" className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
@@ -172,19 +172,19 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
               }}
             />
             <span className="font-medium text-ink">
-              {uploading ? "Uploading…" : atLimit ? "File limit reached" : "Upload a file"}
+              {uploading ? "Uploading…" : atLimit ? "Source limit reached" : "Upload a file"}
             </span>
             <span id="upload-help" className="mt-1 text-sm text-muted">
-              {atLimit ? "Delete a file to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 10 MB."}
+              {atLimit ? "Delete a source to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 10 MB."}
             </span>
           </label>
           {atLimit && plan === "free" && (
             <p className="mt-3 text-sm text-muted">
-              The Free plan includes {filesLimit} files per project.{" "}
+              The Free plan includes {sourcesLimit} sources per project.{" "}
               <Link href="/dashboard/billing" className={`font-medium text-ink underline underline-offset-4 ${FOCUS}`}>
                 Upgrade to Pro
               </Link>{" "}
-              for up to {PLAN_LIMITS.pro.knowledgeFilesPerProject}.
+              for up to {PLAN_LIMITS.pro.knowledgeSourcesPerProject}.
             </p>
           )}
           <p id="upload-error" role="alert" className="mt-3 text-sm text-danger empty:hidden">
@@ -255,9 +255,14 @@ export function KnowledgeManager({ projectId, initialSources, filesLimit, plan }
             <div>
               <p className="font-medium text-ink">Paste text</p>
               <p className="mt-1 text-sm text-muted">
-                For FAQs, policies or anything not in a file. Doesn&apos;t count toward the file limit.
+                For FAQs, policies or anything not in a file. Counts as one source.
               </p>
-              <button type="button" onClick={() => setTextOpen(true)} className={`mt-4 ${BUTTON_SECONDARY}`}>
+              <button
+                type="button"
+                onClick={() => setTextOpen(true)}
+                disabled={atLimit}
+                className={`mt-4 ${BUTTON_SECONDARY}`}
+              >
                 Paste text
               </button>
             </div>

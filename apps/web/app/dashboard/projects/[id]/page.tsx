@@ -9,7 +9,7 @@ import { formatDateTime } from "../../../../components/project-shell/format";
 import { UsageMeter } from "../../../../components/project-shell/UsageMeter";
 import { FOCUS, TEXT_LINK } from "../../../../components/ui/styles";
 import { listConversations } from "../../../../lib/data/conversations";
-import { countKnowledgeFiles, listKnowledgeSources } from "../../../../lib/data/knowledge";
+import { countKnowledgeSources, listKnowledgeSources } from "../../../../lib/data/knowledge";
 import { getProjectUsage } from "../../../../lib/data/usage";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +22,12 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   const usage = await getProjectUsage(userId, id);
   if (!usage) notFound();
 
-  const [files, sources, conversations] = await Promise.all([
-    countKnowledgeFiles(id),
+  const [sourceCount, sources, conversations] = await Promise.all([
+    countKnowledgeSources(id),
     listKnowledgeSources(id),
     listConversations(id),
   ]);
-  const filesLimit = PLAN_LIMITS[usage.plan].knowledgeFilesPerProject;
+  const sourcesLimit = PLAN_LIMITS[usage.plan].knowledgeSourcesPerProject;
   const processing = sources.filter((s) => s.status === "processing").length;
   const failed = sources.filter((s) => s.status === "failed").length;
   const base = `/dashboard/projects/${id}`;
@@ -93,10 +93,10 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
               </h2>
             </div>
             <p className="mt-4 text-sm text-ink">
-              {files} of {filesLimit} files
+              {sourceCount} of {sourcesLimit} sources
             </p>
             <div className="mt-2">
-              <UsageMeter used={files} limit={filesLimit} label="Knowledge files used" />
+              <UsageMeter used={sourceCount} limit={sourcesLimit} label="Knowledge sources used" />
             </div>
             {(processing > 0 || failed > 0) && (
               <p className="mt-3 text-sm text-muted">

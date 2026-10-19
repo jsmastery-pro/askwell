@@ -6,6 +6,7 @@ import {
   type WidgetChatResponse,
 } from "@askwell/shared";
 import { handleChat } from "../../../../lib/chat";
+import { readCappedJson } from "../../../../lib/chat/body";
 import { checkRateLimit } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +29,25 @@ function error(code: string, message: string, status: number, headers?: Record<s
   return json({ error: { code, message } }, status, headers);
 }
 
+let warnedNoLimiter = false;
+
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return error(ERROR_CODES.invalidInput, "Send a JSON body.", 400);
+  // Every reply costs an OpenAI call, so production never serves chat without its per-minute
+  // limit (§9 Cost abuse). Local dev without a key, and Arcjet outages, still fail open.
+  if (process.env.NODE_ENV === "production" && !process.env.ARCJET_KEY) {
+    if (!warnedNoLimiter) console.error("ARCJET_KEY is not set: refusing widget chat in production");
+    warnedNoLimiter = true;
+    return error(ERROR_CODES.serviceUnavailable, "Chat is unavailable right now.", 503);
   }
-  const parsed = widgetChatRequestSchema.safeParse(body);
+
+  // Capped before parsing: a multi-megabyte body never gets read into memory (§9 Cost abuse).
+  const body = await readCappedJson(request);
+  if (!body.ok) {
+    return body.reason === "too_large"
+      ? error(ERROR_CODES.invalidInput, "The request is too large.", 413)
+      : error(ERROR_CODES.invalidInput, "Send a JSON body.", 400);
+  }
+  const parsed = widgetChatRequestSchema.safeParse(body.json);
   if (!parsed.success) {
     return error(
       ERROR_CODES.invalidInput,

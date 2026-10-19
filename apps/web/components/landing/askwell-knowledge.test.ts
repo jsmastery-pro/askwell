@@ -13,7 +13,7 @@ describe("docs/askwell-knowledge.md", () => {
   it.each([
     ["Projects", "projects"],
     ["Messages per month, per project", "messagesPerMonth"],
-    ["Knowledge files per project", "knowledgeFilesPerProject"],
+    ["Knowledge sources per project (files and pasted text)", "knowledgeSourcesPerProject"],
   ] as const)("lists %s as in PLAN_LIMITS", (label, limit) => {
     expect(row(label)).toBe(`| ${label} | ${n(PLAN_LIMITS.free[limit])} | ${n(PLAN_LIMITS.pro[limit])} |`);
   });

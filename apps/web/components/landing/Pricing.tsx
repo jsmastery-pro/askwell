@@ -7,7 +7,7 @@ import { BUTTON_GLASS, BUTTON_PRIMARY, CARD } from "./styles";
 
 export const formatLimit = (n: number) => n.toLocaleString("en-US");
 
-type NumericLimit = "projects" | "messagesPerMonth" | "knowledgeFilesPerProject";
+type NumericLimit = "projects" | "messagesPerMonth" | "knowledgeSourcesPerProject";
 
 const limitRow = (feature: string, key: NumericLimit) => {
   const value = (plan: Plan) => formatLimit(PLAN_LIMITS[plan][key]);
@@ -17,7 +17,7 @@ const limitRow = (feature: string, key: NumericLimit) => {
 export const PRICING_ROWS = [
   limitRow("Projects", "projects"),
   limitRow("Messages / month (per project)", "messagesPerMonth"),
-  limitRow("Knowledge files (per project)", "knowledgeFilesPerProject"),
+  limitRow("Knowledge sources (per project)", "knowledgeSourcesPerProject"),
   { group: "Customization", feature: "Button color", free: "Default", pro: "Any" },
   { group: "Customization", feature: "Button position", free: "Bottom right", pro: "Any corner" },
   { group: "Customization", feature: "Button label", free: "Default", pro: "Custom" },
