@@ -11,7 +11,9 @@ export function PlanActions({ plan }: { plan: Plan }) {
   if (plan === "free") {
     return (
       <div className="w-full sm:max-w-sm">
-        <PricingTable for="user" />
+        {/* Clerk's default ring is its neutral color at 15% opacity, too faint on its white cards. The
+            value is the app's --color-focus, as a literal: Clerk derives shades from it in JavaScript. */}
+        <PricingTable for="user" appearance={{ variables: { colorRing: "#09090b" } }} />
       </div>
     );
   }
