@@ -5,7 +5,7 @@
 | Owner | Bob (Alice's session is down) |
 | Lane | B |
 | Needs first | P6-T03 |
-| Files allowed | UI only: `apps/web/app/**/page.tsx`, `apps/web/app/**/loading.tsx`, `apps/web/app/**/error.tsx`, `apps/web/components/**`. No API routes, `lib/**`, or `packages/**`. |
+| Files allowed | UI only: `apps/web/app/**/page.tsx`, `apps/web/app/**/loading.tsx`, `apps/web/app/**/error.tsx`, `apps/web/app/not-found.tsx` (added in review), `apps/web/components/**`. No API routes, `lib/**`, or `packages/**`. |
 | project.md | §2, §6.1, §6.3–§6.12 |
 
 ## Goal
@@ -33,3 +33,4 @@ Every screen works at 375 px and on desktop, with real empty, loading and error 
 
 ## Notes
 - UI-only: CodeRabbit isn't required.
+- **From review (2026-10-19):** every `error.tsx` except `/embed` reports the error with `posthog.captureException`, since an error boundary keeps PostHog's automatic capture from seeing it. `notFound()` returning HTTP 200 on streamed, sign-in-only pages is accepted.
