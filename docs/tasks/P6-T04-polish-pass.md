@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice if her session is back, otherwise Bob |
+| Owner | Bob (Alice's session is down) |
 | Lane | B |
 | Needs first | P6-T03 |
 | Files allowed | UI only: `apps/web/app/**/page.tsx`, `apps/web/app/**/loading.tsx`, `apps/web/app/**/error.tsx`, `apps/web/components/**`. No API routes, `lib/**`, or `packages/**`. |
@@ -23,7 +23,8 @@ Every screen works at 375 px and on desktop, with real empty, loading and error 
    - the empty state makes sense with real data (a new account, a project with no knowledge or chats)
    - a loading state exists
    - an error state exists
-3. Fix UI-only issues. List anything that needs non-UI changes in the PR body for John.
+3. Check focus rings: visible, and in contrast with their neighboring colors, on both the dark landing and the light app. Carried over from an unresolved #49 review thread, see `docs/security-review.md`.
+4. Fix UI-only issues. List anything that needs non-UI changes in the PR body for John.
 
 ## Done when
 - [ ] The PR body has a checklist of every screen × 375 px / desktop, with what was fixed
