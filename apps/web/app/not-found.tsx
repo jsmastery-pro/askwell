@@ -11,10 +11,11 @@ export const metadata: Metadata = { title: `Page not found · ${APP_NAME}` };
 export default function NotFound() {
   return (
     <main
-      className="theme-dark relative isolate flex min-h-dvh items-center justify-center overflow-x-clip bg-canvas px-6 text-center text-ink"
+      className="theme-dark relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-canvas px-6 text-center text-ink"
       style={FONT_BODY}
     >
       <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
+      {/* Sized for the long landing page: overflow-hidden keeps it inside this one screen. */}
       <Backdrop />
       <div className="max-w-md">
         <p className="text-sm font-medium text-muted">404</p>
