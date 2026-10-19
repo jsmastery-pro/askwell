@@ -5,7 +5,7 @@
 | Owner | Bob (Alice's session is down) |
 | Lane | B |
 | Needs first | P6-T03 |
-| Files allowed | UI only: `apps/web/app/**/page.tsx`, `apps/web/app/**/loading.tsx`, `apps/web/app/**/error.tsx`, `apps/web/app/not-found.tsx` (added in review), `apps/web/components/**`. No API routes, `lib/**`, or `packages/**`. |
+| Files allowed | UI only: `apps/web/app/**/page.tsx`, `apps/web/app/**/loading.tsx`, `apps/web/app/**/error.tsx`, `apps/web/app/not-found.tsx` and `apps/web/app/global-error.tsx` (added in review), `apps/web/components/**`. No API routes, `lib/**`, or `packages/**`. |
 | project.md | §2, §6.1, §6.3–§6.12 |
 
 ## Goal
