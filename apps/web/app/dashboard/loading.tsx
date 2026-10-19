@@ -14,7 +14,7 @@ export default function DashboardLoading() {
         ))}
       </div>
       <Bone className="h-64" />
-      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <Bone className="h-56" />
         <Bone className="h-56" />
       </div>

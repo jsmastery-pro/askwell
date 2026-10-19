@@ -9,7 +9,7 @@ export default function KnowledgeLoading() {
         <Bone className="h-4 w-80 max-w-full" />
       </div>
       <Bone className="h-2 w-full max-w-md" />
-      <div className="grid gap-4 md:grid-cols-[1.3fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Bone className="h-36" />
         <Bone className="h-36" />
       </div>
