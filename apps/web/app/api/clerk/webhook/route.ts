@@ -22,13 +22,26 @@ async function setPlan(clerkUserId: string, plan: Plan): Promise<boolean> {
   return changed.length > 0;
 }
 
+type SubscriptionItem = { status: string; periodEnd: number | null; endedAt: number | null; plan: { slug: string } | null };
+
 /**
- * Asks Clerk whether the user's Pro subscription item is active right now. Webhooks can arrive
- * late or be retried, so a stale `subscriptionItem.active` must not re-grant Pro after it ended.
+ * Whether a Pro item entitles the user to Pro right now: active, or canceled but still inside
+ * the period it was paid for (a cancellation keeps Pro until then, project.md §6.10).
+ */
+function entitlesToPro(item: SubscriptionItem, now: number): boolean {
+  if (item.plan?.slug !== PRO_PLAN_SLUG) return false;
+  if (item.status === "active") return true;
+  return item.status === "canceled" && item.endedAt === null && item.periodEnd !== null && item.periodEnd > now;
+}
+
+/**
+ * Asks Clerk whether the user is entitled to Pro right now. Webhooks can arrive late or be
+ * retried, so a stale `subscriptionItem.active` must not re-grant Pro after it ended.
  */
 async function proIsActiveNow(userId: string): Promise<boolean> {
   const subscription = await (await clerkClient()).billing.getUserBillingSubscription(userId);
-  return subscription.subscriptionItems.some((item) => item.plan?.slug === PRO_PLAN_SLUG && item.status === "active");
+  const now = Date.now();
+  return subscription.subscriptionItems.some((item) => entitlesToPro(item, now));
 }
 
 export async function POST(request: NextRequest) {

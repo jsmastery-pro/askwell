@@ -64,7 +64,10 @@ const getUserBillingSubscription = vi.hoisted(() => vi.fn());
 vi.mock("@clerk/nextjs/server", () => ({
   clerkClient: async () => ({ billing: { getUserBillingSubscription } }),
 }));
-const subscription = (status: string, slug = "pro") => ({ subscriptionItems: [{ status, plan: { slug } }] });
+const DAY = 24 * 60 * 60 * 1000;
+const subscription = (status: string, slug = "pro", item: { periodEnd?: number | null; endedAt?: number | null } = {}) => ({
+  subscriptionItems: [{ status, plan: { slug }, periodEnd: Date.now() + 20 * DAY, endedAt: null, ...item }],
+});
 
 const { POST } = await import("./route");
 
@@ -210,6 +213,25 @@ describe("confirming with Clerk before granting Pro (L5)", () => {
     expect(await planOf("user_late_active")).toBe("free");
     expect(getUserBillingSubscription).toHaveBeenCalledWith("user_late_active");
     expect(captureServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("grants Pro for a canceled subscription still inside its paid period", async () => {
+    await seedAccount("user_canceled_paid", "free");
+    getUserBillingSubscription.mockResolvedValueOnce(subscription("canceled"));
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", "user_canceled_paid")));
+    expect(await planOf("user_canceled_paid")).toBe("pro");
+  });
+
+  it.each([
+    ["its paid period is over", { periodEnd: Date.now() - DAY }],
+    ["it has ended", { endedAt: Date.now() - DAY }],
+    ["it has no period end", { periodEnd: null }],
+  ])("doesn't grant Pro for a canceled subscription when %s", async (_label, item) => {
+    const user = `user_canceled_${Object.keys(item)[0]}_${String(Object.values(item)[0])}`;
+    await seedAccount(user, "free");
+    getUserBillingSubscription.mockResolvedValueOnce(subscription("canceled", "pro", item));
+    await POST(signedRequest(subscriptionItemEvent("subscriptionItem.active", user)));
+    expect(await planOf(user)).toBe("free");
   });
 
   it("doesn't grant Pro when only another plan is active", async () => {
