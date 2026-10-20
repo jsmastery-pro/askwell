@@ -14,7 +14,8 @@ const STEPS = [
 export function InstallSnippet({ appUrl }: { appUrl: string }) {
   return (
     <section className="py-24 sm:py-28">
-      <Section className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[1fr_1.1fr]">
+      {/* minmax(0, …): the snippet's long URL can't widen its column past its share of the row. */}
+      <Section className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <Reveal>
           <h2 className="text-3xl font-semibold tracking-[-0.02em] text-ink sm:text-4xl" style={FONT_DISPLAY}>
             Install in one line.
@@ -32,7 +33,8 @@ export function InstallSnippet({ appUrl }: { appUrl: string }) {
         </Reveal>
         <Reveal delay={120}>
           <BrowserFrame url="yoursite.com/index.html">
-            <pre className="overflow-x-auto rounded-lg bg-surface p-4 text-sm text-ink" style={FONT_MONO}>
+            {/* Wraps anywhere so the whole tag shows at any width. Visual only: the text is still the one-line tag. */}
+            <pre className="rounded-lg bg-surface p-4 text-sm break-all whitespace-pre-wrap text-ink" style={FONT_MONO}>
               <code>{buildInstallSnippet(appUrl, "pk_...")}</code>
             </pre>
           </BrowserFrame>
