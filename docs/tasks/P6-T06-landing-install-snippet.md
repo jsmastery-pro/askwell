@@ -18,7 +18,7 @@ Likely cause, from the code: the section is a CSS grid (`grid-cols-1`, `lg:grid-
 2. Let the grid children shrink (`min-w-0` on both items, or `minmax(0, …)` tracks).
 3. Make the whole tag readable without sideways scrolling: wrap the code (`whitespace-pre-wrap` with `break-all`, or break the line at attribute boundaries). It's a marketing snippet, and people should see all of it.
 4. Check that the copy-paste text is still the exact one-line tag. Wrapping is visual only.
-5. Keep the focus ring and `tabIndex` from #81.
+5. ~~Keep the focus ring and `tabIndex` from #81.~~ Correction (Bob, #83): those were on the dashboard Install page, not this landing snippet. With wrapping, nothing scrolls here, so no tab stop is needed.
 
 ## Done when
 - [ ] At 375 px and desktop: no horizontal page scroll, and the full tag is visible
