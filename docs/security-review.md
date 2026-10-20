@@ -46,9 +46,12 @@ Audit of every project.md §9 rule against `main` at `7383d7e`, 2026-10-18, by J
 
 ## Open review threads on merged PRs
 
-- **Fixed later without a reply in the thread:** #66 (webhook downgrade and slug gating, fixed in #67), #63 (demo timer, fixed in `761a53b`), #59 (spec alignment, fixed in #71). John replies on each.
-- **Minor docs threads still open:** #44 (CLAUDE.md doesn't mention the 2026-10-13 CodeRabbit-optional rule; UI-T05 prerequisite), #46 (UI-T06 usage-API pointer; tracker vs checklists), #57 (hex examples in ui-track). John handles these in a docs PR.
-- **#49 focus-ring contrast:** moved into P6-T04's polish pass.
+All closed on 2026-10-20 (John):
+
+- **Fixed later, now answered in the thread:** #66 (plan-slug gating, downgrade on `ended`: fixed in #67), #63 (demo timer: fixed in `761a53b`), #59 (spec alignment: fixed in #71).
+- **Fixed in #82:** #44 (`CLAUDE.md` now matches plan.md's review rule; UI-T05's prerequisite).
+- **Answered, no change:** #46 (task-file checkboxes vs the tracker; the usage follow-up was superseded by UI-T08 and P3-T05), #57 (the `#4f46e5` example is data, not a styling color).
+- **#49 focus-ring contrast:** checked in P6-T04 (#81), all rings at 3:1 or better.
 
 ## Unverified
 
