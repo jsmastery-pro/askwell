@@ -23,7 +23,7 @@ Read only the `project.md` sections your task lists. Don't load the whole file.
 | Product owner (human) | Approves plans, answers questions, merges PRs, deploys `main` |
 | John | Lead engineer. Breaks phases into tasks, assigns them, reviews PRs. Writes no app code. |
 | Bob, Alice | Developers. Build the tasks assigned to them. |
-| CodeRabbit | Reviews every PR, ranks the PR queue |
+| CodeRabbit | Reviews PRs and ranks the PR queue. Required on any PR that touches a required area in `docs/plan.md`'s review rule: API routes, auth, the database/migrations, `packages/shared`, the widget bundle, billing, chat/RAG. That includes UI PRs touching one of these, e.g. billing components. Optional only on PRs that touch none of them (UI-only, docs-only). If it comments, answer every thread. |
 
 You can't reach the other agents. Sandboxes are isolated. If you need something from another agent, tell the product owner.
 

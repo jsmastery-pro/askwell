@@ -4,7 +4,7 @@
 |---|---|
 | Owner | Alice |
 | Lane | UI track |
-| Needs first | UI-T01 |
+| Needs first | UI-T07 |
 | Files allowed | `apps/web/app/dashboard/billing/**`, `apps/web/components/billing/**`, `apps/web/lib/data/billing.ts`, `apps/web/lib/data/usage.ts`, `apps/web/app/dashboard/projects/[id]/page.tsx` |
 | project.md | §6.10 Billing, §6.12 Usage, §5 Plans |
 | See | `docs/ui-track.md` (rules) |
