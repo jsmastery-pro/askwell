@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { poolConfig, tlsOptions, withoutSslParams } from "./client";
+import { poolConfig, tlsFor, tlsOptions, withoutSslParams } from "./client";
 
 // pg's own parsing of a client config, to check what a connection would really use.
 const ConnectionParameters = createRequire(import.meta.url)("pg/lib/connection-parameters") as new (config: object) => {
@@ -24,6 +24,21 @@ describe("tlsOptions", () => {
   it("without a CA, still requires TLS (encrypted, server unverified), never plain text", () => {
     for (const env of [{}, { DATABASE_CA_CERT: "" }, { DATABASE_CA_CERT: "  " }]) {
       expect(tlsOptions(env)).toEqual({ rejectUnauthorized: false });
+    }
+  });
+});
+
+describe("tlsFor", () => {
+  it("allows a plain connection only to a Postgres on this machine", () => {
+    for (const host of ["localhost", "LOCALHOST", "127.0.0.1", "::1", "[::1]"]) {
+      expect(tlsFor(host, { DATABASE_CA_CERT: PEM })).toBe(false);
+    }
+  });
+
+  it("requires TLS for every other host, including ones that only look local", () => {
+    for (const host of ["aws-0-eu-central-1.pooler.supabase.com", "db.abcdef.supabase.co", "localhost.evil.com", "127.0.0.2", "10.0.0.5"]) {
+      expect(tlsFor(host, {})).toEqual({ rejectUnauthorized: false });
+      expect(tlsFor(host, { DATABASE_CA_CERT: PEM })).toEqual({ ca: PEM, rejectUnauthorized: true });
     }
   });
 });
@@ -55,6 +70,12 @@ describe("poolConfig", () => {
     expect(params.ssl).toEqual({ ca: PEM, rejectUnauthorized: true });
     expect(params.host).toBe("aws-0-eu-central-1.pooler.supabase.com");
     expect(params.port).toBe(6543);
+  });
+
+  it("connects to a local Postgres without SSL, e.g. to test a migration", () => {
+    for (const url of ["postgresql://postgres:pw@localhost:5432/askwell", "postgresql://postgres:pw@[::1]:5432/askwell"]) {
+      expect(new ConnectionParameters(poolConfig({ DATABASE_URL: url })).ssl).toBe(false);
+    }
   });
 
   it("never connects in plain text, even from a URL with no sslmode or with sslmode=disable", () => {

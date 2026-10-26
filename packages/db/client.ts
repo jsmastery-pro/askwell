@@ -10,7 +10,7 @@ type Env = Record<string, string | undefined>;
 const URL_SSL_PARAMS = ["sslmode", "sslrootcert", "sslcert", "sslkey", "sslpassword", "uselibpqcompat"];
 
 /**
- * TLS for every database connection, never plain text. With DATABASE_CA_CERT (the PEM root
+ * TLS for a remote database connection, never plain text. With DATABASE_CA_CERT (the PEM root
  * certificate from Supabase's Database settings) the server is fully verified; without it the
  * connection is still encrypted, but the server isn't verified (Supabase's `require`).
  */
@@ -18,6 +18,19 @@ export function tlsOptions(env: Env = process.env): ConnectionOptions {
   // Env editors often store a PEM on one line with literal "\n".
   const ca = env["DATABASE_CA_CERT"]?.trim().replace(/\\n/g, "\n");
   return ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false };
+}
+
+// A Postgres on this machine (e.g. testing a migration locally) usually runs without SSL.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+export const isLocalHost = (host: string) => LOCAL_HOSTS.has(host.toLowerCase());
+
+/**
+ * TLS for a connection to `host`: none for a local Postgres, `tlsOptions` for anything else, so a
+ * remote database is never reached in plain text.
+ */
+export function tlsFor(host: string, env: Env = process.env): ConnectionOptions | false {
+  return isLocalHost(host) ? false : tlsOptions(env);
 }
 
 /** A connection string without its SSL parameters, so they can't override `tlsOptions`. */
@@ -39,7 +52,8 @@ export function poolConfig(env: Env = process.env): PoolConfig {
   const url = env["DATABASE_URL"];
   return {
     connectionString: url ? withoutSslParams(url) : undefined,
-    ssl: tlsOptions(env),
+    // No URL yet (e.g. at build) counts as remote: TLS, never plain text.
+    ssl: url ? tlsFor(new URL(url).hostname, env) : tlsOptions(env),
     max: 1,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
@@ -47,8 +61,9 @@ export function poolConfig(env: Env = process.env): PoolConfig {
 }
 
 // Pool connects lazily, so importing this without DATABASE_URL (e.g. at build) is safe.
-const pool = new Pool(poolConfig());
-if (!process.env["DATABASE_CA_CERT"]?.trim()) {
+const config = poolConfig();
+const pool = new Pool(config);
+if (config.ssl && !process.env["DATABASE_CA_CERT"]?.trim()) {
   pool.once("connect", () => {
     console.warn("DATABASE_CA_CERT is not set: the database connection is encrypted, but the server isn't verified");
   });
