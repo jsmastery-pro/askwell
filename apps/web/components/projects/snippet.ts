@@ -6,7 +6,7 @@ export function buildInstallSnippet(appUrl: string, publicKey: string): string {
 
 /**
  * The app's public URL. Read at request time (bracket access) because Next.js inlines literal
- * `process.env.NEXT_PUBLIC_*` reads at build, and InstaCloud injects env only at runtime.
+ * `process.env.NEXT_PUBLIC_*` reads at build; this stays a runtime read instead.
  * Falls back to the request's own origin.
  */
 export function resolveAppUrl(headers: Headers, env: Record<string, string | undefined> = process.env): string {

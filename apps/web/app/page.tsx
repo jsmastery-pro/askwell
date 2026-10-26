@@ -12,7 +12,7 @@ import { Pricing } from "../components/landing/Pricing";
 import { landingWidgetKey } from "../components/landing/widget-key";
 import { resolveAppUrl } from "../components/projects/snippet";
 
-// Rendered per request: the widget key and the app URL are runtime env (InstaCloud has no build-time env).
+// Rendered per request: the widget key and the app URL are read from the environment at runtime, not inlined at build.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {

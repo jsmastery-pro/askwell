@@ -1,15 +1,36 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const after = vi.hoisted(() => vi.fn());
+vi.mock("next/server", () => ({ after }));
+
 const capture = vi.hoisted(() => vi.fn());
 const captureException = vi.hoisted(() => vi.fn());
 const constructed = vi.hoisted(() => vi.fn());
 vi.mock("posthog-node", () => ({
+  // Mirrors posthog-node's real flushAt: 1 behavior enough to test it: a capture call also
+  // invokes the client's own `waitUntil` option with the (fake) flush promise, wrapped in its
+  // own try/catch — exactly as the real client does (waitUntil may throw outside a request scope).
   PostHog: class {
-    capture = capture;
-    captureException = captureException;
-    constructor(key: string, options: unknown) {
+    #waitUntil: ((promise: Promise<unknown>) => void) | undefined;
+    constructor(key: string, options: { waitUntil?: (promise: Promise<unknown>) => void }) {
       constructed(key, options);
+      this.#waitUntil = options.waitUntil;
+    }
+    #callWaitUntil() {
+      try {
+        this.#waitUntil?.(Promise.resolve());
+      } catch {
+        // Same as posthog-node's own client: waitUntil may throw outside a request scope.
+      }
+    }
+    capture(...args: unknown[]) {
+      capture(...args);
+      this.#callWaitUntil();
+    }
+    captureException(...args: unknown[]) {
+      captureException(...args);
+      this.#callWaitUntil();
     }
   },
 }));
@@ -70,10 +91,45 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
     });
   });
 
+  // So the event's flush survives a serverless function freezing right after the response, without
+  // making the caller wait on it (project.md §3 Hosting).
+  it("wires the client's flush to Next's after(), so events survive a serverless freeze", async () => {
+    const { captureServerEvent } = await load();
+    captureServerEvent("user_1", "signed_up");
+    expect(after).toHaveBeenCalledOnce();
+  });
+
+  // after() throws outside a request scope — e.g. instrumentation.ts's onRequestError. Our hook
+  // must let that throw reach posthog-node (not swallow it), which is what actually keeps the
+  // capture itself unaffected.
+  it("still captures the event when after() throws (no request scope)", async () => {
+    after.mockImplementationOnce(() => {
+      throw new Error("`after` was called outside a request scope");
+    });
+    const { captureServerEvent } = await load();
+
+    expect(() => captureServerEvent("user_1", "signed_up")).not.toThrow();
+    expect(capture).toHaveBeenCalledWith({ distinctId: "user_1", event: "signed_up", properties: undefined });
+  });
+
   it("forwards exceptions", async () => {
     const { captureServerException } = await load();
     const error = new Error("boom");
     captureServerException(error);
+    expect(captureException).toHaveBeenCalledWith(error);
+  });
+
+  // instrumentation.ts's onRequestError calls captureServerException and isn't guaranteed to run
+  // inside a request scope, so after() can throw here too. Same guarantee as captureServerEvent:
+  // the exception still reaches PostHog, and nothing throws into onRequestError's caller.
+  it("still captures the exception when after() throws (no request scope)", async () => {
+    after.mockImplementationOnce(() => {
+      throw new Error("`after` was called outside a request scope");
+    });
+    const { captureServerException } = await load();
+    const error = new Error("boom");
+
+    expect(() => captureServerException(error)).not.toThrow();
     expect(captureException).toHaveBeenCalledWith(error);
   });
 

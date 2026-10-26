@@ -1,12 +1,11 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
-// Rewrites are fixed at build time, when InstaCloud provides no env: default to the project's US region.
+// Rewrites are fixed at build time: default to the project's US region if the env var isn't set yet.
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
 const posthogAssetsHost = posthogHost.replace(/^https:\/\/(\w+)\.i\.posthog\.com$/, "https://$1-assets.i.posthog.com");
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@askwell/shared", "@askwell/db"],
   agentRules: false,
