@@ -8,7 +8,7 @@ import { BUTTON_GLASS, BUTTON_PRIMARY } from "./styles";
 
 const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 
-export function Hero() {
+export function Hero({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <Section className="grid grid-cols-1 items-center gap-14 pt-16 pb-24 sm:pt-24 lg:grid-cols-[1.05fr_1fr] lg:pt-28 lg:pb-32">
       <div>
@@ -23,8 +23,8 @@ export function Hero() {
           night — no hallucinated features, no guessing.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Link href="/sign-up" className={BUTTON_PRIMARY}>
-            Start free
+          <Link href={signedIn ? "/dashboard" : "/sign-up"} className={BUTTON_PRIMARY}>
+            {signedIn ? "Go to dashboard" : "Start free"}
           </Link>
           <a href="#how-it-works" className={BUTTON_GLASS}>
             See how it works

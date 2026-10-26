@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { Backdrop } from "../components/landing/Backdrop";
 import { Footer } from "../components/landing/Footer";
@@ -12,21 +13,23 @@ import { Pricing } from "../components/landing/Pricing";
 import { landingWidgetKey } from "../components/landing/widget-key";
 import { resolveAppUrl } from "../components/projects/snippet";
 
-// Rendered per request: the widget key and the app URL are read from the environment at runtime, not inlined at build.
+// Rendered per request: the widget key and the app URL are read from the environment at runtime, not inlined at build,
+// and the nav depends on who's signed in (read on the server, so the right buttons render with no flash).
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const widgetKey = landingWidgetKey();
   const appUrl = resolveAppUrl(await headers());
+  const signedIn = Boolean((await auth()).userId);
   return (
     <main className="theme-dark relative isolate min-h-screen overflow-x-clip bg-canvas text-ink" style={FONT_BODY}>
       <link rel="stylesheet" href={GOOGLE_FONTS_HREF} />
       <Backdrop />
-      <Nav />
-      <Hero />
+      <Nav signedIn={signedIn} />
+      <Hero signedIn={signedIn} />
       <HowItWorks />
       <LiveDemo live={widgetKey !== null} />
-      <Pricing />
+      <Pricing signedIn={signedIn} />
       <InstallSnippet appUrl={appUrl} />
       <Footer />
       <LandingWidget publicKey={widgetKey} />

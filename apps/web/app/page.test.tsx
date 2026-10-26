@@ -5,6 +5,9 @@ import Home from "./page";
 
 const request = vi.hoisted(() => ({ headers: new Headers({ host: "askwell.test", "x-forwarded-proto": "https" }) }));
 vi.mock("next/headers", () => ({ headers: async () => request.headers }));
+// Clerk's server-side auth: signed out unless a test signs in.
+const session = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: session.userId }) }));
 // Stands in for next/script, which only injects the tag in a browser after hydration.
 vi.mock("../components/landing/LandingWidget", () => ({
   LandingWidget: ({ publicKey }: { publicKey: string | null }) =>
@@ -14,6 +17,7 @@ vi.mock("../components/landing/LandingWidget", () => ({
 const renderHome = async () => render(await Home());
 
 beforeEach(() => {
+  session.userId = null;
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
   vi.stubEnv("LANDING_WIDGET_KEY", "");
 });
@@ -73,5 +77,60 @@ describe("Home", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.com/");
     const { container } = await renderHome();
     expect(container.textContent).toContain('<script src="https://app.example.com/widget.js"');
+  });
+});
+
+describe("Home: sign-in state", () => {
+  const nav = (container: HTMLElement) => container.querySelector('nav[aria-label="Main"]') as HTMLElement;
+  const link = (scope: HTMLElement, name: string) =>
+    [...scope.querySelectorAll("a")].find((a) => a.textContent === name) ?? null;
+
+  it("signed out: the nav offers Sign in and Start free, and the hero says Start free", async () => {
+    const { container } = await renderHome();
+    expect(link(nav(container), "Sign in")?.getAttribute("href")).toBe("/sign-in");
+    expect(link(nav(container), "Start free")?.getAttribute("href")).toBe("/sign-up");
+    expect(link(nav(container), "Dashboard")).toBeNull();
+    expect(link(container.querySelector("h1")!.parentElement!, "Start free")?.getAttribute("href")).toBe("/sign-up");
+  });
+
+  it("signed in: the nav offers Dashboard instead, and the hero goes to the dashboard", async () => {
+    session.userId = "user_123";
+    const { container } = await renderHome();
+    expect(link(nav(container), "Dashboard")?.getAttribute("href")).toBe("/dashboard");
+    expect(link(nav(container), "Sign in")).toBeNull();
+    expect(link(nav(container), "Start free")).toBeNull();
+    const hero = container.querySelector("h1")!.parentElement!;
+    expect(link(hero, "Go to dashboard")?.getAttribute("href")).toBe("/dashboard");
+    expect(link(hero, "Start free")).toBeNull();
+  });
+
+  it("signed out: both pricing cards say Start free, with the Pro hint", async () => {
+    const { container } = await renderHome();
+    const pricing = container.querySelector("#pricing") as HTMLElement;
+    const ctas = [...pricing.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(ctas).toEqual([
+      ["Start free", "/sign-up"],
+      ["Start free", "/sign-up"],
+    ]);
+    expect(pricing.textContent).toContain("Upgrade to Pro from your dashboard once you're signed in.");
+  });
+
+  it("signed in: Free goes to the dashboard and Pro to billing, without the sign-in hint", async () => {
+    session.userId = "user_123";
+    const { container } = await renderHome();
+    const pricing = container.querySelector("#pricing") as HTMLElement;
+    const ctas = [...pricing.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(ctas).toEqual([
+      ["Go to dashboard", "/dashboard"],
+      ["Upgrade to Pro", "/dashboard/billing"],
+    ]);
+    expect(pricing.textContent).not.toContain("once you're signed in");
+  });
+
+  it("renders the signed-in nav on the server, so there's no flash of Sign in", async () => {
+    session.userId = "user_123";
+    const html = renderToString(await Home());
+    expect(html).toContain(">Dashboard<");
+    expect(html).not.toContain(">Sign in<");
   });
 });
