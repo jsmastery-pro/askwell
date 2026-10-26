@@ -218,7 +218,7 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | done | #79 |
 | P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
 | P6-T06 | Fix the landing "Install in one line" section | Bob | P6-T03, P6-T04 | done | #83 |
-| P6-T07 | Landing nav knows you're signed in | Bob | — | in progress | — |
+| P6-T07 | Landing nav knows you're signed in | Bob | — | in review | #90 |
 | P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05 | todo | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.

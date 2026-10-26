@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Lane | B |
 | Needs first | — |
-| Files allowed | `apps/web/components/landing/Nav.tsx`, `apps/web/components/landing/Hero.tsx` (CTA only), `apps/web/app/page.tsx` (to pass sign-in state, if needed), plus co-located tests |
+| Files allowed | `apps/web/components/landing/Nav.tsx`, `apps/web/components/landing/Hero.tsx` (CTA only), `apps/web/app/page.tsx` (to pass sign-in state, if needed), `apps/web/components/landing/Pricing.tsx` (CTAs only: signed in → Free "Go to dashboard", Pro "Upgrade to Pro" → `/dashboard/billing`; added in review), plus co-located tests |
 | project.md | §6.1 Landing page, §6.2 Auth |
 
 ## Why
