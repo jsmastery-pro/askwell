@@ -235,7 +235,7 @@ Lane B (Customize) added once a developer is free for it.
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | todo | — |
-| MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | in review | #85 (merge-ready; live check after MV-T01) |
+| MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | done | #85 (live 429 check on the first Vercel preview) |
 | MV-T02 | Build and run on Vercel; remove InstaCloud | Alice | — | in review | #86 (merge-ready; preview check after MV-T01) |
 | MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | in review | #87 (merge-ready; migrations run by the product owner, app check on the first Vercel preview) |
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | in review | #88 (merge-ready; storage verified live on dev, upload → ready on the first Vercel preview) |
