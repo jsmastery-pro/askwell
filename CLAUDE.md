@@ -46,7 +46,7 @@ You can't reach the other agents. Sandboxes are isolated. If you need something 
 6. Run all checks (see Commands). All must pass.
 7. Commit in small steps. Message: `P3-T02: add rate limit check`
 8. Push and open one PR for the task: `gh pr create --title "[P3-T02] Chat route"`. Body: what changed, how you tested, the "Done when" list with each box checked or explained.
-9. Deploy to your own InstaCloud environment (see `ROLE.md`). Put the URL in the PR.
+9. Vercel deploys a preview of every PR. Check your change on it, and put the preview URL in the PR.
 10. Tell the product owner the PR is ready.
 
 Task status lives only in `docs/plan.md`. Only John edits it.
@@ -72,8 +72,8 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 - Schema and migrations live in `packages/db` (Drizzle).
 - Every schema change is a migration in the same PR (`pnpm db:generate`). Never edit a merged migration.
 - Add a new table or column only if your task says so.
-- Your branch database is yours to test with. Its data is throwaway.
-- Never touch the `main` database. The product owner runs migrations on `main`.
+- The Supabase dev project is shared by everyone and every preview. Its data is throwaway, but never apply an unmerged migration to it: test new migrations on pglite or local Postgres.
+- Never touch the production database. Migrations reach dev, then production, only after their PR merges; the product owner runs them on production.
 
 ## Security rules
 
@@ -103,4 +103,4 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 | `pnpm dev` | Run the app locally |
 | `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` | Checks. All must pass before a PR. |
 | `pnpm db:generate` | Create a migration from schema changes |
-| `pnpm db:migrate` | Apply migrations to the database in `DATABASE_URL` |
+| `pnpm db:migrate` | Apply migrations to the database in `DIRECT_URL` |
