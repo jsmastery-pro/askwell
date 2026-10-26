@@ -6,6 +6,13 @@ import OpenAI from "openai";
 /** Inputs per embeddings request. 100 × 800-token chunks stays well under OpenAI's per-request token cap. */
 export const EMBED_BATCH_SIZE = 100;
 
+// Embeddings are small, fast calls — this budget applies to every embeddings request (the chat
+// route's single query and the knowledge route's per-batch ingest alike). Worst case with one
+// retry: 2 × 5s + ~0.5s backoff ≈ 10.5s. The chat route (lib/chat/answer.ts) tightens its own
+// completion call further on top of this, since it has the smaller maxDuration budget of the two.
+const EMBED_TIMEOUT_MS = 5_000;
+const EMBED_MAX_RETRIES = 1;
+
 let client: OpenAI | undefined;
 
 /** The shared OpenAI client. Throws on first use, not at import, if the key is missing. */
@@ -13,7 +20,7 @@ export function getOpenAI(): OpenAI {
   if (!client) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-    client = new OpenAI({ apiKey });
+    client = new OpenAI({ apiKey, timeout: EMBED_TIMEOUT_MS, maxRetries: EMBED_MAX_RETRIES });
   }
   return client;
 }

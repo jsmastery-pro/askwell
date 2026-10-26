@@ -79,8 +79,17 @@ describe("answerFromChunks", () => {
         instructions: SYSTEM_PROMPT,
         input: buildInput(["Ships in 5 business days."], "How fast is shipping?"),
       }),
+      expect.anything(),
     );
     expect(answer.reply).toBe("We ship within 5 business days.");
+  });
+
+  // The route's maxDuration (30s) is much tighter than ingest's (300s): a hung completion must
+  // fail fast rather than retry into the route's own timeout (project.md §6.6, §3 Hosting).
+  it("sets a tight timeout and no retries on the completion call", async () => {
+    modelReply("Yes.");
+    await answerFromChunks("q", ["a"]);
+    expect(create).toHaveBeenCalledWith(expect.anything(), { timeout: 8_000, maxRetries: 0 });
   });
 
   it("returns token counts and latency for the Phase 4 AI trace", async () => {
