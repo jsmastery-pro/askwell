@@ -20,7 +20,12 @@ Agents never create accounts or handle raw keys, so these steps are yours.
    - Connect → copy two connection strings:
      - the **transaction pooler** (port 6543), which becomes `DATABASE_URL`
      - the **direct / session** connection (port 5432), which becomes `DIRECT_URL`, for migrations only
-2. **Vercel.** Import the GitHub repo. Use the root directory and build command from MV-T02's PR. Set env vars per environment:
+2. **Vercel.** Import the GitHub repo with these settings (from #86):
+   - Root Directory: `apps/web`. If Vercel doesn't turn on "Include files outside the Root Directory" by itself, turn it on.
+   - Build Command (override): `cd ../.. && pnpm exec turbo run build --filter=@askwell/web`
+   - Install Command, Output Directory, framework: leave the defaults (Next.js, `pnpm install`, `.next`).
+   - Node.js: 22.x.
+   - Then set env vars per environment:
    - **Production** → `askwell-prod` values. **Preview and Development** → `askwell-dev` values.
    - Database: `DATABASE_URL`, `DIRECT_URL`, `DATABASE_CA_CERT`.
    - Storage: `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BUCKET_NAME=knowledge`. These names stay as they were; only the values come from Supabase's S3 settings.
