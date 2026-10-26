@@ -231,7 +231,7 @@ Lane B (Customize) added once a developer is free for it.
 
 > **Decision (2026-10-26, product owner):** Askwell leaves InstaCloud. Database and file storage move to **Supabase**: one project for dev (shared by Bob, Alice and every Vercel preview), one for production. Hosting moves to **Vercel**: previews per PR, production from `main`. We start fresh (nothing is copied from InstaCloud), and the upload limit drops from 10 MB to **4 MB** (Vercel's 4.5 MB request body limit). The P6-T05 launch check runs on Vercel production once this track is done.
 
-**Shared dev database:** never apply an unmerged migration to the dev project. Migrations reach dev, then prod, only after their PR merges.
+**Shared dev database:** never apply an unmerged migration to the dev project. Migrations never run on Vercel deploys: previews would apply unmerged migrations to the shared dev database, and production is promoted by hand after its migration (product owner, 2026-10-26). Migrations reach dev, then prod, only after their PR merges.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
@@ -241,3 +241,4 @@ Lane B (Customize) added once a developer is free for it.
 | MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (verified live 2026-10-26: chat flow + RLS holds on all 7 tables) |
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | done | #88 (verified live 2026-10-26: upload → ready, delete, 4.2 MB → 413) |
 | MV-T06 | `vercel.json` for Vercel's import (one service, `web`) | Alice | MV-T02 | done | #89 |
+| MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | in progress | — |
