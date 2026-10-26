@@ -218,8 +218,24 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | done | #79 |
 | P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
 | P6-T06 | Fix the landing "Install in one line" section | Bob | P6-T03, P6-T04 | done | #83 |
-| P6-T05 | Launch check: core flow on `main` | Product owner | P6-T02, P6-T03, P6-T04, P6-T06 | in progress | — |
+| P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05 | todo | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
 
 > **Pasted text limit (2026-10-18, product owner):** pasted text counts toward the same per-project limit as files: Free 3, Pro 25 knowledge sources in total (audit finding M2). Built in P6-T02.
+
+---
+
+## Platform move — Supabase + Vercel
+
+> **Decision (2026-10-26, product owner):** Askwell leaves InstaCloud. Database and file storage move to **Supabase**: one project for dev (shared by Bob, Alice and every Vercel preview), one for production. Hosting moves to **Vercel**: previews per PR, production from `main`. We start fresh (nothing is copied from InstaCloud), and the upload limit drops from 10 MB to **4 MB** (Vercel's 4.5 MB request body limit). The P6-T05 launch check runs on Vercel production once this track is done.
+
+**Shared dev database:** never apply an unmerged migration to the dev project. Migrations reach dev, then prod, only after their PR merges.
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | todo | — |
+| MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | in progress | — |
+| MV-T02 | Build and run on Vercel; remove InstaCloud | Bob | MV-T05 | todo | — |
+| MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | todo | — |
+| MV-T04 | Storage on Supabase; 4 MB uploads | Bob | MV-T01 | todo | — |
