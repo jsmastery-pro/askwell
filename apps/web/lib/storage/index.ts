@@ -4,7 +4,8 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 
 let client: S3Client | undefined;
 
-// InstaCloud's names for a bound storage service (`insta secrets bind … storage/<name> --to compute/<app>`).
+// Supabase Storage speaks the S3 protocol; these are the standard AWS SDK env names, with
+// values from the project's Storage → S3 access keys settings.
 const ENV = {
   endpoint: "AWS_ENDPOINT_URL_S3",
   region: "AWS_REGION",
@@ -23,8 +24,9 @@ function getClient(): S3Client {
       const missing = Object.values(ENV).filter((name) => name !== ENV.bucket && !process.env[name]);
       throw new Error(`Storage is not configured (missing ${missing.join(", ")})`);
     }
-    // The endpoint is required: without it the SDK talks to real AWS.
-    client = new S3Client({ endpoint, region, credentials: { accessKeyId, secretAccessKey } });
+    // The endpoint is required: without it the SDK talks to real AWS. forcePathStyle: Supabase's
+    // S3-compatible endpoint requires path-style requests (bucket in the path, not a subdomain).
+    client = new S3Client({ endpoint, region, credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true });
   }
   return client;
 }
