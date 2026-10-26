@@ -74,5 +74,13 @@ describe("embedQuery", () => {
     expect(vector).toHaveLength(EMBEDDING_DIMENSIONS);
     expect(vector[0]).toBe(7);
   });
+
+  // Unlike the client's shared default (one retry): a retry here can honor the server's
+  // Retry-After header, up to 60s, which alone could exceed the chat route's 30s maxDuration.
+  it("disables retries for this call, overriding the client's shared default", async () => {
+    respondInShuffledOrder();
+    await embedQuery("t7");
+    expect(create).toHaveBeenCalledWith(expect.anything(), { maxRetries: 0 });
+  });
 });
 
