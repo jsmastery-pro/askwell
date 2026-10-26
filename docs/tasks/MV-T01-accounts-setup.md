@@ -24,8 +24,9 @@ Agents never create accounts or handle raw keys, so these steps are yours.
    - Storage: `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BUCKET_NAME=knowledge`. These names stay as they were; only the values come from Supabase's S3 settings.
    - In every environment: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `OPENAI_API_KEY`, `ARCJET_KEY` (never `ARCJET_ENV=development`), `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`.
    - **Production only:** `NEXT_PUBLIC_APP_URL` (the production URL) and `LANDING_WIDGET_KEY` (set after step 6). Leave both unset on previews.
+   - **Turn off automatic production promotion**, so you can run a merged PR's migration on prod before its build goes live. Merging still builds production; you promote it by hand. This is in project.md §4, from CodeRabbit on #84.
 3. **Clerk.** Point the billing webhook at `https://<production URL>/api/clerk/webhook`, with the same subscription events as before.
-4. **Migrations.** After MV-T03 merges, run them once on each project: `DIRECT_URL=<project's direct URL> pnpm db:migrate`. After that, every migration runs here once its PR merges: on dev first, then on prod.
+4. **Migrations.** After MV-T03 merges, run them once on each project: `DIRECT_URL=<project's direct URL> pnpm db:migrate`. After that, for every PR with a migration: merge it, run the migration on dev and then prod, and only then promote the production build.
 5. **Developers.** Put the `askwell-dev` values into Bob's and Alice's `.env.local`. Update their `ROLE.md`: their "deploy" is now the Vercel preview URL on each PR, not an InstaCloud branch.
 6. **Askwell project.** On production, once the app is up: create the "Askwell" project on a **Pro** account, upload `docs/askwell-knowledge.md`, set `LANDING_WIDGET_KEY` to its public key, and redeploy.
 7. **Shut down InstaCloud** once the P6-T05 launch check passes on Vercel.
