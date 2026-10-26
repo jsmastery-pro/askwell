@@ -119,6 +119,20 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
     expect(captureException).toHaveBeenCalledWith(error);
   });
 
+  // instrumentation.ts's onRequestError calls captureServerException and isn't guaranteed to run
+  // inside a request scope, so after() can throw here too. Same guarantee as captureServerEvent:
+  // the exception still reaches PostHog, and nothing throws into onRequestError's caller.
+  it("still captures the exception when after() throws (no request scope)", async () => {
+    after.mockImplementationOnce(() => {
+      throw new Error("`after` was called outside a request scope");
+    });
+    const { captureServerException } = await load();
+    const error = new Error("boom");
+
+    expect(() => captureServerException(error)).not.toThrow();
+    expect(captureException).toHaveBeenCalledWith(error);
+  });
+
   it("never throws into the caller when PostHog itself fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     capture.mockImplementation(() => {
