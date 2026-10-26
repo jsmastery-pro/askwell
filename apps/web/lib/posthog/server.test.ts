@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const capture = vi.hoisted(() => vi.fn());
@@ -68,6 +69,14 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
       event: "project_created",
       properties: { project_id: "p1" },
     });
+  });
+
+  // So the event's flush survives a serverless function freezing right after the response, without
+  // making the caller wait on it (project.md §3 Hosting).
+  it("wires the client's flush to Next's after(), so events survive a serverless freeze", async () => {
+    const { captureServerEvent } = await load();
+    captureServerEvent("user_1", "signed_up");
+    expect(constructed).toHaveBeenCalledWith("phc_test", expect.objectContaining({ waitUntil: after }));
   });
 
   it("forwards exceptions", async () => {

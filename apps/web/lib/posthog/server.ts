@@ -1,7 +1,8 @@
+import { after } from "next/server";
 import { PostHog } from "posthog-node";
 import { DEFAULT_POSTHOG_HOST, type PostHogConfigResponse } from "./config";
 
-// A computed key, so Next can't inline it at build time: InstaCloud only injects env at runtime.
+// A computed key, so Next can't inline it at build time; read fresh from the environment on every call.
 function runtimeEnv(name: "NEXT_PUBLIC_POSTHOG_KEY" | "NEXT_PUBLIC_POSTHOG_HOST"): string | undefined {
   return process.env[name] || undefined;
 }
@@ -21,8 +22,10 @@ let client: PostHog | null | undefined;
 function getClient(): PostHog | null {
   if (client === undefined) {
     const { key, host } = getPostHogConfig();
-    // flushAt 1: send each event right away rather than batching in a process that may scale to zero.
-    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0 }) : null;
+    // flushAt 1: send each event right away rather than batching in a process that may scale to
+    // zero. waitUntil: after() keeps a serverless function alive long enough for that flush's
+    // request to land, without making the caller (e.g. the chat reply) wait on it.
+    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0, waitUntil: after }) : null;
   }
   return client;
 }
