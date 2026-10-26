@@ -8,9 +8,9 @@ export const EMBED_BATCH_SIZE = 100;
 
 // Embeddings are small, fast calls — this budget applies to every embeddings request (the chat
 // route's single query and the knowledge route's per-batch ingest alike). Worst case with one
-// retry: 2 × 5s + ~0.5s backoff ≈ 10.5s. The chat route (lib/chat/answer.ts) tightens its own
-// completion call further on top of this, since it has the smaller maxDuration budget of the two.
-const EMBED_TIMEOUT_MS = 5_000;
+// retry: 2 × 4s + ~0.5s backoff ≈ 8.5s. The chat route (lib/chat/answer.ts) budgets its own
+// completion call on top of this, since it has the smaller maxDuration budget of the two.
+const EMBED_TIMEOUT_MS = 4_000;
 const EMBED_MAX_RETRIES = 1;
 
 let client: OpenAI | undefined;

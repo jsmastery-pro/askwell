@@ -89,7 +89,7 @@ describe("answerFromChunks", () => {
   it("sets a tight timeout and no retries on the completion call", async () => {
     modelReply("Yes.");
     await answerFromChunks("q", ["a"]);
-    expect(create).toHaveBeenCalledWith(expect.anything(), { timeout: 8_000, maxRetries: 0 });
+    expect(create).toHaveBeenCalledWith(expect.anything(), { timeout: 15_000, maxRetries: 0 });
   });
 
   it("returns token counts and latency for the Phase 4 AI trace", async () => {

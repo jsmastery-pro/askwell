@@ -48,7 +48,7 @@ describe("embedTexts", () => {
     expect(vectors.map((v) => v[0])).toEqual(texts.map((_, i) => i));
     // The shared client (constructed once, on this first use): a bounded worst case for the
     // route's maxDuration, not left to OpenAI's 10-minute default / unlimited retries.
-    expect(constructed).toHaveBeenCalledWith(expect.objectContaining({ timeout: 5_000, maxRetries: 1 }));
+    expect(constructed).toHaveBeenCalledWith(expect.objectContaining({ timeout: 4_000, maxRetries: 1 }));
   });
 
   it("makes no request for an empty list", async () => {

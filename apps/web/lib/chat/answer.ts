@@ -48,11 +48,14 @@ export type AnswerTelemetry = {
 export type Answer = { reply: string; telemetry: AnswerTelemetry };
 
 // The chat route's maxDuration (30s) is much tighter than ingest's (300s), so this call gets its
-// own per-request budget instead of the client's default: a single attempt, no retry — a retried
-// completion would re-run the model (cost) and risks the route's own timeout more than it helps.
-// Combined with the embedding call's worst case (lib/ai/index.ts, ~10.5s), worst case here is
-// ~18.5s, leaving margin under 30s for the route's database work and response.
-const COMPLETION_TIMEOUT_MS = 8_000;
+// own per-request budget instead of the client's default: no retry — a retried completion would
+// re-run the model (cost) and risks the route's own timeout more than it helps. 15s (rather than
+// something tighter) because this model call can legitimately take a while with
+// max_output_tokens 2000; cutting it short would turn a slow-but-valid answer into an error,
+// which is worse for the visitor than a slow reply. Combined with the embedding call's worst
+// case (lib/ai/index.ts, ~8.5s), worst case here is ~23.5s, leaving ~6.5s under 30s for the
+// route's database work and response.
+const COMPLETION_TIMEOUT_MS = 15_000;
 const COMPLETION_MAX_RETRIES = 0;
 
 /**
