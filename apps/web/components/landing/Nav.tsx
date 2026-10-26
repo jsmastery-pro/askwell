@@ -5,8 +5,11 @@ import { FOCUS_RING } from "./styles";
 
 const LINK = `rounded-full px-3 py-1.5 text-muted transition-colors hover:text-ink ${FOCUS_RING}`;
 
-/** A glass bar that stays at the top, so the page blurs underneath it as you scroll. */
-export function Nav() {
+/**
+ * A glass bar that stays at the top, so the page blurs underneath it as you scroll. Signed in, it
+ * offers the dashboard instead of Sign in / Start free.
+ */
+export function Nav({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <div className="sticky top-3 z-40 px-3 sm:top-4 sm:px-6">
       <nav
@@ -23,15 +26,17 @@ export function Nav() {
           <a href="#pricing" className={LINK}>
             Pricing
           </a>
-          <Link href="/sign-in" className={LINK}>
-            Sign in
-          </Link>
+          {!signedIn && (
+            <Link href="/sign-in" className={LINK}>
+              Sign in
+            </Link>
+          )}
         </div>
         <Link
-          href="/sign-up"
+          href={signedIn ? "/dashboard" : "/sign-up"}
           className={`rounded-full bg-ink px-4 py-2 text-sm font-medium text-inverse transition duration-200 hover:bg-ink/90 ${FOCUS_RING}`}
         >
-          Start free
+          {signedIn ? "Dashboard" : "Start free"}
         </Link>
       </nav>
     </div>
