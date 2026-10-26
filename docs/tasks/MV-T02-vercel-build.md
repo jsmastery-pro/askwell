@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Owner | Bob |
+| Owner | Alice |
 | Track | Platform move |
-| Needs first | MV-T05 (sequencing only). Preview verification needs MV-T01. |
+| Needs first | — (preview verification needs MV-T01) |
 | Files allowed | `Dockerfile`, `.dockerignore`, `.insta/**` (delete), `.gitignore` (InstaCloud lines only), `vercel.json` (new, if needed), `turbo.json`, `package.json`, `apps/web/package.json`, `apps/web/next.config.ts`, `apps/web/app/api/projects/[id]/knowledge/route.ts` and `apps/web/app/api/widget/chat/route.ts` (a `maxDuration` export only), `apps/web/lib/posthog/server.ts`, `apps/web/lib/knowledge/background.ts`, plus InstaCloud-only **comments** anywhere in `apps/web/**` |
 | project.md | §3 Stack, §4 Environments |
 
