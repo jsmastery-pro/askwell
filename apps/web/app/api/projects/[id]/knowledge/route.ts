@@ -32,7 +32,8 @@ export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ id: string }> };
 
-// The 10 MB content limit plus room for multipart boundaries and the title field.
+const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
+// MAX_KNOWLEDGE_FILE_BYTES plus room for multipart boundaries and the title field.
 const MAX_REQUEST_BYTES = MAX_KNOWLEDGE_FILE_BYTES + 64 * 1024;
 
 async function getOwnerPlan(ownerId: string): Promise<Plan> {
@@ -74,7 +75,7 @@ async function handleText(projectId: string, ownerId: string, request: Request) 
   if (!parsed.success) return invalidInput("A title and content are required.");
   // Same cap as uploaded files, since both end up chunked and embedded the same way.
   if (Buffer.byteLength(parsed.data.content, "utf-8") > MAX_KNOWLEDGE_FILE_BYTES) {
-    return invalidInput("The pasted text is too large. Max 10 MB.");
+    return invalidInput(`The pasted text is too large. Max ${MAX_FILE_MB} MB.`);
   }
 
   const reservation = await reserveSource(ownerId, { projectId, title: parsed.data.title, type: "text", storageKey: null });
@@ -105,7 +106,7 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const type = KNOWLEDGE_FILE_TYPES[extension as keyof typeof KNOWLEDGE_FILE_TYPES];
   if (!type) return invalidInput("Only PDF, Markdown, and TXT files are supported.");
-  if (file.size > MAX_KNOWLEDGE_FILE_BYTES) return invalidInput("The file is too large. Max 10 MB.");
+  if (file.size > MAX_KNOWLEDGE_FILE_BYTES) return invalidInput(`The file is too large. Max ${MAX_FILE_MB} MB.`);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   if (type === "pdf" && !hasPdfMagicBytes(buffer)) return invalidInput("The file is not a valid PDF.");
@@ -147,7 +148,7 @@ export async function POST(request: Request, { params }: Context) {
   // Without the header (chunked), the size checks after reading still apply.
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_REQUEST_BYTES) {
-    return errorResponse(ERROR_CODES.invalidInput, "The upload is too large. Max 10 MB.", 413);
+    return errorResponse(ERROR_CODES.invalidInput, `The upload is too large. Max ${MAX_FILE_MB} MB.`, 413);
   }
 
   const contentType = request.headers.get("content-type") ?? "";

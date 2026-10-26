@@ -175,7 +175,7 @@ export function KnowledgeManager({ projectId, initialSources, sourcesLimit, plan
               {uploading ? "Uploading…" : atLimit ? "Source limit reached" : "Upload a file"}
             </span>
             <span id="upload-help" className="mt-1 text-sm text-muted">
-              {atLimit ? "Delete a source to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 10 MB."}
+              {atLimit ? "Delete a source to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 4 MB."}
             </span>
           </label>
           {atLimit && plan === "free" && (
