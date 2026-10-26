@@ -5,7 +5,7 @@
 | Owner | Alice |
 | Track | Platform move |
 | Needs first | MV-T01 step 1 (dev bucket and S3 keys) for the live check |
-| Files allowed | `apps/web/lib/storage/**`, `packages/shared/src/knowledge.ts` (the size constant), `apps/web/components/knowledge/**` (size wording only), `docs/askwell-knowledge.md` and `apps/web/components/landing/askwell-knowledge.test.ts` (size wording), `.env.example` (storage comments), plus co-located tests |
+| Files allowed | `apps/web/lib/storage/**`, `packages/shared/src/knowledge.ts` (the size constant), `apps/web/components/knowledge/**` (size wording only), `docs/askwell-knowledge.md` and `apps/web/components/landing/askwell-knowledge.test.ts` (size wording), `.env.example` (storage comments), `apps/web/app/api/projects/[id]/knowledge/route.ts` and `apps/web/components/landing/Hero.tsx` (size wording only, added 2026-10-26; build the route's messages from `MAX_KNOWLEDGE_FILE_BYTES`), plus co-located tests |
 | project.md | §6.4 Knowledge, §9 File upload, §11 |
 
 ## Why

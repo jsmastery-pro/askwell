@@ -47,6 +47,17 @@ export type AnswerTelemetry = {
 
 export type Answer = { reply: string; telemetry: AnswerTelemetry };
 
+// The chat route's maxDuration (30s) is much tighter than ingest's (300s), so this call gets its
+// own per-request budget instead of the client's default: no retry — a retried completion would
+// re-run the model (cost) and risks the route's own timeout more than it helps. 15s (rather than
+// something tighter) because this model call can legitimately take a while with
+// max_output_tokens 2000; cutting it short would turn a slow-but-valid answer into an error,
+// which is worse for the visitor than a slow reply. Combined with embedQuery's worst case
+// (lib/ai/index.ts: 4s, also no retry), worst case here is ~19s, leaving ~11s under 30s for the
+// route's database work and response.
+const COMPLETION_TIMEOUT_MS = 15_000;
+const COMPLETION_MAX_RETRIES = 0;
+
 /**
  * Answers `message` from `chunks` only. With no chunks, returns DONT_KNOW_REPLY without
  * calling the model. Token counts and latency are for the Phase 4 AI trace (P4-T04).
@@ -57,14 +68,17 @@ export async function answerFromChunks(message: string, chunks: string[]): Promi
   }
 
   const started = performance.now();
-  const response = await getOpenAI().responses.create({
-    model: AI_MODELS.chat,
-    instructions: SYSTEM_PROMPT,
-    input: buildInput(chunks, message),
-    reasoning: { effort: "low" },
-    // Reasoning tokens count toward this cap too, so leave room beyond the visible reply.
-    max_output_tokens: 2000,
-  });
+  const response = await getOpenAI().responses.create(
+    {
+      model: AI_MODELS.chat,
+      instructions: SYSTEM_PROMPT,
+      input: buildInput(chunks, message),
+      reasoning: { effort: "low" },
+      // Reasoning tokens count toward this cap too, so leave room beyond the visible reply.
+      max_output_tokens: 2000,
+    },
+    { timeout: COMPLETION_TIMEOUT_MS, maxRetries: COMPLETION_MAX_RETRIES },
+  );
   const latencyMs = Math.round(performance.now() - started);
 
   const text = response.output_text.trim();

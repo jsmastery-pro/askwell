@@ -7,8 +7,8 @@ export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
 /** A public widget route with its own limit in RATE_LIMITS. */
 export type RateLimitedRoute = keyof typeof RATE_LIMITS;
 
-// Counted per route + public key + client IP. The IP is our own characteristic, not Arcjet's
-// ip.src: behind InstaCloud's Cloudflare edge, getClientIp knows which header to trust.
+// Counted per route + public key + client IP. The IP is our own characteristic, from the one
+// header the platform (Vercel) sets itself; see getClientIp.
 const CHARACTERISTICS = ["route", "publicKey", "clientIp"] as const;
 
 function createClient(key: string, route: RateLimitedRoute) {
@@ -66,9 +66,8 @@ export async function checkRateLimit(
       route,
       publicKey,
       clientIp,
-      // Hands Arcjet's own IP analysis the IP we trust (cf-connecting-ip first) instead of its
-      // guess from x-forwarded-for. Only a real address: Arcjet throws on anything else, and a
-      // throw here would fail open.
+      // Hands Arcjet's own IP analysis the IP we trust instead of its own guess. Only a real
+      // address: Arcjet throws on anything else, and a throw here would fail open.
       ...(isIP(clientIp) ? { ipSrc: clientIp } : {}),
     });
     if (decision.isErrored()) {
@@ -84,16 +83,21 @@ export async function checkRateLimit(
 }
 
 /**
- * Client IP from the platform's proxy headers. InstaCloud's edge is Cloudflare, which sets
- * cf-connecting-ip to the real client and overwrites client-sent forwarding headers.
- * Then x-real-ip, then the last x-forwarded-for hop (earlier hops are client-supplied).
- * Falls back to a fixed string so the limit is never skipped.
+ * The client IP for the per-IP limit, read only from what the platform sets, never from a header
+ * the client controls (§9 Cost abuse).
+ *
+ * On Vercel (`VERCEL=1`, a system env var at build and runtime), `x-real-ip`: Vercel overwrites
+ * `x-forwarded-for` "to prevent IP spoofing", and `x-real-ip` is identical to it
+ * (https://vercel.com/docs/headers/request-headers). It's also the header @vercel/functions'
+ * `ipAddress()` reads. `cf-connecting-ip` is never read: nothing strips it off Cloudflare.
+ *
+ * Anywhere else (local dev, any other host) every header is client-controlled, so all requests
+ * share one fixed key. That's stricter, never bypassable.
  */
-export function getClientIp(headers: Headers): string {
-  for (const name of ["cf-connecting-ip", "x-real-ip"]) {
-    const ip = headers.get(name)?.trim();
-    if (ip) return ip;
+export function getClientIp(headers: Headers, env: Record<string, string | undefined> = process.env): string {
+  if (env["VERCEL"] === "1") {
+    const ip = headers.get("x-real-ip")?.trim();
+    if (ip && isIP(ip)) return ip;
   }
-  const lastHop = headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
-  return lastHop || "unknown";
+  return "unknown";
 }

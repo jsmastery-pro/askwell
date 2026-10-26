@@ -10,6 +10,9 @@ import { readCappedJson } from "../../../../lib/chat/body";
 import { checkRateLimit } from "../../../../lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+// One retrieval + one OpenAI chat completion; generous headroom for a slow model response,
+// still well inside the duration Vercel's free (Hobby) tier allows for a serverless function.
+export const maxDuration = 30;
 
 // Public widget route: any origin, no credentials (§9 CORS).
 const CORS_HEADERS = {

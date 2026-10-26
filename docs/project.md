@@ -38,10 +38,10 @@ The whole product in one flow. When this works end to end, the product is done.
 | ---------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
 | App              | Next.js (App Router) + TypeScript + Tailwind | Landing (`/`), dashboard (`/dashboard`), widget panel (`/embed`), API routes (`/api/*`) |
 | Widget loader    | Vanilla TypeScript, bundled to one file      | Runs on the customer's site. Button + iframe. Under 5 kb.                               |
-| Database         | InstaCloud Postgres + pgvector               | One database per environment                                                            |
+| Database         | Supabase Postgres + pgvector                 | Two projects: dev (shared by developers and Vercel previews) and production. The app connects through the transaction pooler; migrations use the direct connection. |
 | ORM + migrations | Drizzle                                      | Schema and migration files live in Git                                                  |
-| File storage     | InstaCloud storage (S3-compatible)           | Uploaded knowledge files                                                                |
-| Hosting          | InstaCloud compute                           | Next.js standalone build in a Docker container                                          |
+| File storage     | Supabase Storage (S3 protocol)               | Private `knowledge` bucket per Supabase project                                         |
+| Hosting          | Vercel                                       | Preview deployment per PR; production from `main`. Request bodies are capped at 4.5 MB. |
 | Auth             | Clerk                                        | Sign in / sign up UI, sessions, middleware                                              |
 | Payments         | Clerk Billing (Clerk payment gateway, test mode) | Clerk's pricing table, Clerk's account portal, Clerk webhook. No Stripe account.    |
 | AI               | OpenAI                                       | One chat model + one embedding model (`text-embedding-3-small`, 1536 dims)              |
@@ -54,17 +54,19 @@ The whole product in one flow. When this works end to end, the product is done.
 
 ## 4. Environments
 
-| Environment | What it is                                                        | Who deploys                       |
-| ----------- | ----------------------------------------------------------------- | --------------------------------- |
-| `main`      | The real app on InstaCloud                                        | Product owner only, after a merge |
-| `bob`       | InstaCloud branch: a copy of `main` with its own database and URL | Bob                               |
-| `alice`     | InstaCloud branch: same, for Alice                                | Alice                             |
+| Environment | What it is | Who deploys |
+| --- | --- | --- |
+| Production | Vercel production (from `main`) + the Supabase prod project | Product owner only: merges to `main`, runs any migration, then promotes the build |
+| Preview | A Vercel preview deployment per PR + the Supabase dev project | Automatic on every push to a PR |
+| Local | `pnpm dev` + the Supabase dev project | Each developer |
 
-| Rule                     | Detail                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------- |
-| One app in the end       | Branches are temporary copies. Code merges in Git; migrations run on `main`; `main` deploys. |
-| Branch data is throwaway | Only migration files reach `main`. Never copy data from a branch.                            |
-| Never deploy `main`      | Only the product owner deploys `main`                                                        |
+| Rule | Detail |
+| --- | --- |
+| Shared dev database | Bob, Alice and every preview share the dev project. Never apply an unmerged migration to it. Test new migrations on pglite or local Postgres. |
+| Migrations | Run on dev, then prod, only after their PR merges. Every migration is additive ("expand and contract"): the live version keeps working while it runs. Drops and renames come in a later PR, once no deployed code uses the old shape. |
+| Production rollout | A merge to `main` builds production, but it goes live only when the product owner promotes it, after running that PR's migration on prod. Vercel's automatic production promotion is off. |
+| Dev data is throwaway | Only migration files reach production. Never copy data from dev. |
+| Never deploy production | Only the product owner merges to `main` and promotes production |
 
 ---
 
@@ -124,8 +126,8 @@ The whole product in one flow. When this works end to end, the product is done.
 | Item       | Detail                                                                                  |
 | ---------- | --------------------------------------------------------------------------------------- |
 | Input      | Paste text with a title, or upload a file                                               |
-| File types | PDF, Markdown, TXT. Max 10 MB.                                                          |
-| Upload     | File goes to InstaCloud storage; row in `knowledge_sources`                             |
+| File types | PDF, Markdown, TXT. Max 4 MB (Vercel caps request bodies at 4.5 MB). Enforced in code by MV-T04; until it merges, the code still allows 10 MB. |
+| Upload     | File goes to Supabase Storage; row in `knowledge_sources`                               |
 | Processing | Extract text (PDF: `unpdf`) → split into chunks → OpenAI embeddings → store in pgvector |
 | Actions    | List sources with status, delete a source (deletes its file and chunks)                 |
 | Limit      | Free: 3 sources per project. Pro: 25. Files and pasted texts count toward the same limit. |
@@ -242,7 +244,7 @@ Two parts: a small loader script + an iframe.
 | `conversations`     | `id`, `project_id`, `visitor_id`, `created_at`                                                                                       |                                                     |
 | `messages`          | `id`, `conversation_id`, `role` (`visitor`/`bot`), `body`, `created_at`                                                              |                                                     |
 
-**Tenant isolation:** no database RLS. Every owner query goes through one shared helper, `getOwnedProject(projectId)`, which checks the signed-in user owns the project. Public routes resolve the project from `public_key` only.
+**Tenant isolation:** done in the app, not by RLS policies. RLS is enabled on every table with **no policies** only to lock Supabase's Data API (from MV-T03); the app connects as the table owner, which RLS doesn't apply to. The Data API is also turned off in both Supabase projects. Every owner query goes through one shared helper, `getOwnedProject(projectId)`, which checks the signed-in user owns the project. Public routes resolve the project from `public_key` only.
 
 **Schema changes:** a migration file in the same PR. Changing an existing table needs approval first (see `CLAUDE.md`).
 
@@ -274,7 +276,7 @@ Checkout and subscription management are Clerk's own components, not routes we o
 | Route                     | Purpose                                                                                |
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | `POST /api/clerk/webhook` | Signature verified; updates `accounts.plan`                                            |
-| `GET /api/posthog-config` | PostHog's public project key and host at runtime (InstaCloud has no build-time env) |
+| `GET /api/posthog-config` | PostHog's public project key and host, read at request time                          |
 
 Request and response types for every route live in `packages/shared`.
 
@@ -323,8 +325,8 @@ docs/
 
 | Variable                                                                         | Used by         | Public? |
 | -------------------------------------------------------------------------------- | --------------- | ------- |
-| `DATABASE_URL`                                                                   | Server          | No      |
-| `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (bound from the InstaCloud storage service) | Server | No |
+| `DATABASE_URL` (Supabase transaction pooler, used by the app), `DIRECT_URL` (direct connection, migrations only; read from MV-T03 onward, until then migrations use `DATABASE_URL`), `DATABASE_CA_CERT` (Supabase root certificate, PEM; from MV-T03) | Server | No |
+| `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (values from Supabase Storage's S3 settings) | Server | No |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                              | Client          | Yes     |
 | `CLERK_SECRET_KEY`                                                               | Server          | No      |
 | `OPENAI_API_KEY`                                                                 | Server          | No      |
@@ -336,7 +338,7 @@ docs/
 
 `.env.example` lists every variable with no values. `.env` is never committed.
 
-Storage variables come from binding the storage service to the web app on each environment: `insta secrets bind <NAME> storage/storage --source-name <NAME> --to compute/web --branch <branch>`.
+Each Vercel environment gets its Supabase project's values: Production → the prod project, Preview and Development → the dev project.
 
 ---
 

@@ -1,7 +1,8 @@
+import { after } from "next/server";
 import { PostHog } from "posthog-node";
 import { DEFAULT_POSTHOG_HOST, type PostHogConfigResponse } from "./config";
 
-// A computed key, so Next can't inline it at build time: InstaCloud only injects env at runtime.
+// A computed key, so Next can't inline it at build time; read fresh from the environment on every call.
 function runtimeEnv(name: "NEXT_PUBLIC_POSTHOG_KEY" | "NEXT_PUBLIC_POSTHOG_HOST"): string | undefined {
   return process.env[name] || undefined;
 }
@@ -13,6 +14,20 @@ export function getPostHogConfig(): PostHogConfigResponse {
   };
 }
 
+/**
+ * posthog-node's `waitUntil` hook, routed through Next's `after()` when a request scope is
+ * available (it throws synchronously outside one — e.g. instrumentation.ts's onRequestError
+ * isn't guaranteed to run inside one). Don't catch that throw here: posthog-node already wraps
+ * every call to this hook in its own try/catch (`_flushKeepingRuntimeAlive` and
+ * `scheduleDebouncedFlush` in its client), and in the debounce path specifically treats a throw
+ * as "didn't register" rather than "succeeded". Swallowing it here instead would hide that
+ * signal, so posthog-node would wrongly believe a debounce cycle is keeping the runtime alive —
+ * leaving later captures in that window with no lifetime extension at all.
+ */
+function waitUntilAfterResponse(promise: Promise<unknown>): void {
+  after(promise);
+}
+
 /** The server-side product events from project.md §6.11. */
 export type ServerEvent = "signed_up" | "project_created" | "knowledge_added" | "upgraded" | "first_chat";
 
@@ -21,8 +36,10 @@ let client: PostHog | null | undefined;
 function getClient(): PostHog | null {
   if (client === undefined) {
     const { key, host } = getPostHogConfig();
-    // flushAt 1: send each event right away rather than batching in a process that may scale to zero.
-    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0 }) : null;
+    // flushAt 1: send each event right away rather than batching in a process that may scale to
+    // zero. waitUntil keeps a serverless function alive long enough for that flush's request to
+    // land, without making the caller (e.g. the chat reply) wait on it.
+    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0, waitUntil: waitUntilAfterResponse }) : null;
   }
   return client;
 }

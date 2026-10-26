@@ -14,7 +14,7 @@ Agents never create accounts or handle raw keys, so these steps are yours.
 ## Checklist
 1. **Supabase.** Create two projects, `askwell-dev` and `askwell-prod`, in the same region, close to your Vercel region. In **each** project:
    - **Project Settings → Data API → turn it off.** We never use it. With it on, anyone holding the project URL and its public publishable key could read and change every table through Supabase's REST API (found 2026-10-26). MV-T03 also turns on row-level security as a backstop.
-   - Storage → create a **private** bucket named `knowledge`.
+   - Storage → create a **private** bucket (dev uses `askwell`; any name works, since `BUCKET_NAME` holds it).
    - Storage → Settings → S3 access keys → create a key pair. Note the S3 endpoint and the region.
    - Database settings → SSL → download the root certificate. Its PEM text becomes `DATABASE_CA_CERT` (public, not a secret).
    - Connect → copy two connection strings:
@@ -28,7 +28,7 @@ Agents never create accounts or handle raw keys, so these steps are yours.
    - Then set env vars per environment:
    - **Production** → `askwell-prod` values. **Preview and Development** → `askwell-dev` values.
    - Database: `DATABASE_URL`, `DIRECT_URL`, `DATABASE_CA_CERT`.
-   - Storage: `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BUCKET_NAME=knowledge`. These names stay as they were; only the values come from Supabase's S3 settings.
+   - Storage: `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BUCKET_NAME` (the bucket name, e.g. `askwell`). These names stay as they were; only the values come from Supabase's S3 settings.
    - Don't add `NEXT_PUBLIC_SUPABASE_URL` or the publishable key: the app doesn't use the Supabase JS client.
    - In every environment: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `OPENAI_API_KEY`, `ARCJET_KEY` (never `ARCJET_ENV=development`), `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`.
    - **Production only:** `NEXT_PUBLIC_APP_URL` (the production URL) and `LANDING_WIDGET_KEY` (set after step 6). Leave both unset on previews.

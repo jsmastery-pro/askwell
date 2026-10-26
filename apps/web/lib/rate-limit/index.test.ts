@@ -24,12 +24,14 @@ function decision({ conclusion, reason = {} }: Fake) {
   };
 }
 
+// A request as Vercel delivers it: x-real-ip is the client IP Vercel sets.
 function request(ip = "203.0.113.7") {
-  return new Request("https://app.test/api/widget/config?key=pk_test", { headers: { "cf-connecting-ip": ip } });
+  return new Request("https://app.test/api/widget/config?key=pk_test", { headers: { "x-real-ip": ip } });
 }
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
+  vi.stubEnv("VERCEL", "1");
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -114,25 +116,58 @@ describe("checkRateLimit", () => {
   });
 });
 
-describe("getClientIp", () => {
-  it("prefers cf-connecting-ip, which InstaCloud's Cloudflare edge sets", () => {
-    const headers = new Headers({
-      "cf-connecting-ip": "103.0.0.1",
-      "x-real-ip": "1.1.1.1",
-      "x-forwarded-for": "162.158.9.143",
+describe("checkRateLimit with forged IP headers", () => {
+  it("counts by the IP Vercel reports, ignoring a forged cf-connecting-ip and x-forwarded-for", async () => {
+    arcjet.protect.mockResolvedValue(decision({ conclusion: "ALLOW" }));
+    const forged = new Request("https://app.test/api/widget/chat", {
+      headers: { "x-real-ip": "203.0.113.50", "cf-connecting-ip": "6.6.6.6", "x-forwarded-for": "7.7.7.7, 8.8.8.8" },
     });
-    expect(getClientIp(headers)).toBe("103.0.0.1");
+    await checkRateLimit(forged, "widgetChat", "pk_abc");
+    expect(arcjet.protect).toHaveBeenCalledWith(forged, {
+      route: "widgetChat",
+      publicKey: "pk_abc",
+      clientIp: "203.0.113.50",
+      ipSrc: "203.0.113.50",
+    });
+  });
+});
+
+describe("getClientIp", () => {
+  const onVercel = { VERCEL: "1" };
+
+  it("reads x-real-ip on Vercel, the header Vercel sets", () => {
+    expect(getClientIp(new Headers({ "x-real-ip": "203.0.113.7" }), onVercel)).toBe("203.0.113.7");
+    expect(getClientIp(new Headers({ "x-real-ip": " 2001:db8::1 " }), onVercel)).toBe("2001:db8::1");
   });
 
-  it("falls back to x-real-ip", () => {
-    expect(getClientIp(new Headers({ "x-real-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2" }))).toBe("1.1.1.1");
+  it("ignores a forged cf-connecting-ip, even with no x-real-ip", () => {
+    const headers = new Headers({ "cf-connecting-ip": "6.6.6.6", "x-real-ip": "203.0.113.7" });
+    expect(getClientIp(headers, onVercel)).toBe("203.0.113.7");
+    expect(getClientIp(new Headers({ "cf-connecting-ip": "6.6.6.6" }), onVercel)).toBe("unknown");
   });
 
-  it("uses the last x-forwarded-for hop, not the spoofable first one", () => {
-    expect(getClientIp(new Headers({ "x-forwarded-for": "6.6.6.6, 3.3.3.3" }))).toBe("3.3.3.3");
+  it("ignores client-sent x-forwarded-for: Vercel overwrites it, and we don't read it", () => {
+    const headers = new Headers({ "x-forwarded-for": "6.6.6.6, 7.7.7.7", "x-real-ip": "203.0.113.7" });
+    expect(getClientIp(headers, onVercel)).toBe("203.0.113.7");
+    expect(getClientIp(new Headers({ "x-forwarded-for": "6.6.6.6" }), onVercel)).toBe("unknown");
   });
 
-  it("falls back to a fixed string instead of skipping the limit", () => {
-    expect(getClientIp(new Headers())).toBe("unknown");
+  it("off Vercel, trusts no header at all: everything shares one fixed key", () => {
+    const forged = new Headers({ "x-real-ip": "6.6.6.6", "cf-connecting-ip": "7.7.7.7", "x-forwarded-for": "8.8.8.8" });
+    expect(getClientIp(forged, {})).toBe("unknown");
+    expect(getClientIp(forged, { VERCEL: "0" })).toBe("unknown");
+  });
+
+  it("uses the fixed key when x-real-ip isn't an IP address", () => {
+    expect(getClientIp(new Headers({ "x-real-ip": "not-an-ip" }), onVercel)).toBe("unknown");
+    expect(getClientIp(new Headers({ "x-real-ip": "1.2.3.4, 5.6.7.8" }), onVercel)).toBe("unknown");
+    expect(getClientIp(new Headers(), onVercel)).toBe("unknown");
+  });
+
+  it("reads process.env by default", () => {
+    vi.stubEnv("VERCEL", "1");
+    expect(getClientIp(new Headers({ "x-real-ip": "203.0.113.9" }))).toBe("203.0.113.9");
+    vi.stubEnv("VERCEL", "");
+    expect(getClientIp(new Headers({ "x-real-ip": "203.0.113.9" }))).toBe("unknown");
   });
 });
