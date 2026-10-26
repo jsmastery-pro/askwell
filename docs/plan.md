@@ -235,10 +235,10 @@ Lane B (Customize) added once a developer is free for it.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | in progress | Vercel live at askwell-eosin.vercel.app; dev migrations run 2026-10-26 |
+| MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | in progress | Dev done 2026-10-26: Vercel live at askwell-eosin.vercel.app, migrations run, Data API off, Clerk webhook verified (upgrade unlocks Customize). Left: prod Supabase + Production env, `LANDING_WIDGET_KEY`, PostHog receipt |
 | MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | done | #85 (verified live 2026-10-26: forged IP headers, 21st → 429) |
 | MV-T02 | Build and run on Vercel; remove InstaCloud | Alice | — | done | #86 (verified live 2026-10-26: build, headers, chat; PostHog receipt to be confirmed by the product owner) |
 | MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (verified live 2026-10-26: chat flow + RLS holds on all 7 tables) |
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | done | #88 (verified live 2026-10-26: upload → ready, delete, 4.2 MB → 413) |
 | MV-T06 | `vercel.json` for Vercel's import (one service, `web`) | Alice | MV-T02 | done | #89 |
-| MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | in review | #91 (merge-ready) |
+| MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | done | #91 |
