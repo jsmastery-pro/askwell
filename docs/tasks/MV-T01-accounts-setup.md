@@ -15,12 +15,13 @@ Agents never create accounts or handle raw keys, so these steps are yours.
 1. **Supabase.** Create two projects, `askwell-dev` and `askwell-prod`, in the same region, close to your Vercel region. In **each** project:
    - Storage → create a **private** bucket named `knowledge`.
    - Storage → Settings → S3 access keys → create a key pair. Note the S3 endpoint and the region.
+   - Database settings → SSL → download the root certificate. Its PEM text becomes `DATABASE_CA_CERT` (public, not a secret).
    - Connect → copy two connection strings:
      - the **transaction pooler** (port 6543), which becomes `DATABASE_URL`
      - the **direct / session** connection (port 5432), which becomes `DIRECT_URL`, for migrations only
 2. **Vercel.** Import the GitHub repo. Use the root directory and build command from MV-T02's PR. Set env vars per environment:
    - **Production** → `askwell-prod` values. **Preview and Development** → `askwell-dev` values.
-   - Database: `DATABASE_URL`, `DIRECT_URL`.
+   - Database: `DATABASE_URL`, `DIRECT_URL`, `DATABASE_CA_CERT`.
    - Storage: `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `BUCKET_NAME=knowledge`. These names stay as they were; only the values come from Supabase's S3 settings.
    - In every environment: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `OPENAI_API_KEY`, `ARCJET_KEY` (never `ARCJET_ENV=development`), `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`.
    - **Production only:** `NEXT_PUBLIC_APP_URL` (the production URL) and `LANDING_WIDGET_KEY` (set after step 6). Leave both unset on previews.

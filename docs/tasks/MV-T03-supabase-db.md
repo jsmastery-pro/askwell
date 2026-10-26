@@ -11,7 +11,11 @@
 ## Steps
 1. **Two URLs:** the app uses `DATABASE_URL`, Supabase's transaction pooler (port 6543). `drizzle-kit` (`db:generate` / `db:migrate`) uses `DIRECT_URL`, the direct or session connection.
 2. **Serverless pool:** size the `pg` Pool for many short-lived Vercel instances behind the pooler (small `max`, short idle timeout). Confirm nothing uses named prepared statements, which the transaction pooler can't hold.
-3. **SSL:** connect with TLS as Supabase requires, without disabling certificate checks unless Supabase's docs say to.
+3. **TLS, decided 2026-10-26 (product owner):** verify the server.
+   - Read Supabase's root certificate (PEM text) from `DATABASE_CA_CERT` and connect with full verification.
+   - If `DATABASE_CA_CERT` is unset (local dev without it), still require TLS, and log once that the server isn't verified.
+   - Never fall back to plain text.
+   - Add `DATABASE_CA_CERT` to `.env.example`. The certificate is public, not a secret.
 4. **Migrations:** apply all existing migrations to the dev project from `main`. That includes 0000's pgvector extension and the HNSW index. Report anything Supabase needs changed. Don't edit merged migrations; add a new one if needed.
 5. **Docs:** `.env.example` lists `DATABASE_URL` and `DIRECT_URL` with one-line comments. The seed script's InstaCloud instructions become Supabase ones.
 
