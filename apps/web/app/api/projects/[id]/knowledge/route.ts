@@ -29,6 +29,9 @@ import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, una
 import { knowledgeFileKey, uploadKnowledgeFile } from "../../../../../lib/storage";
 
 export const dynamic = "force-dynamic";
+// Covers the request plus its after() ingest (extract, chunk, embed) for a file up to 4 MB.
+// 60s is the longest duration Vercel's free (Hobby) tier allows for a serverless function.
+export const maxDuration = 60;
 
 type Context = { params: Promise<{ id: string }> };
 
