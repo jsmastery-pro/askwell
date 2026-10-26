@@ -47,7 +47,7 @@ Each project has its own script tag on its Install page. It looks like this:
 - Markdown (`.md`)
 - Plain text (`.txt`)
 
-Each file can be up to 10 MB. You can also paste text directly.
+Each file can be up to 4 MB. You can also paste text directly.
 
 ## Limits that protect your quota
 

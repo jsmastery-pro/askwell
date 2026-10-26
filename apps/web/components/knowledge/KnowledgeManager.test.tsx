@@ -79,7 +79,7 @@ describe("KnowledgeManager", () => {
 
     await pick(container, sized("huge.pdf", MAX_KNOWLEDGE_FILE_BYTES + 5 * 1024 * 1024));
 
-    expect(screen.getByRole("alert").textContent).toBe("This file is 15.0 MB. Files can be up to 10 MB.");
+    expect(screen.getByRole("alert").textContent).toBe("This file is 9.0 MB. Files can be up to 4 MB.");
     expect(addFileKnowledge).not.toHaveBeenCalled();
   });
 

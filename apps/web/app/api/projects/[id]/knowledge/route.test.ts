@@ -121,7 +121,7 @@ describe("pasted text", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejects pasted text over the 10 MB cap with 400", async () => {
+  it("rejects pasted text over the MAX_KNOWLEDGE_FILE_BYTES cap with 400", async () => {
     const projectId = await seedProject("owner_text3", "free", "pk_text3");
     as("owner_text3");
     const tooBig = "a".repeat(MAX_KNOWLEDGE_FILE_BYTES + 1);
@@ -225,12 +225,12 @@ describe("file upload", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejects an 11 MB file with 400", async () => {
+  it("rejects an oversized file with 413, even when the early Content-Length check doesn't catch it", async () => {
     const projectId = await seedProject("owner_big", "free", "pk_big");
     as("owner_big");
-    const big = Buffer.alloc(11 * 1024 * 1024, "a");
+    const big = Buffer.alloc(MAX_KNOWLEDGE_FILE_BYTES + 1024, "a");
     const res = await POST(fileRequest(new Blob([big]), "big.txt"), ctx(projectId));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(413);
   });
 
   it("rejects a fake PDF (wrong magic bytes) with 400", async () => {
@@ -332,11 +332,11 @@ describe("upload size (LM4)", () => {
     expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(0);
   });
 
-  it("allows a 10 MB file plus multipart overhead through to the normal checks", async () => {
+  it("allows a file plus multipart overhead through to the normal checks", async () => {
     const projectId = await seedProject("owner_lm4_edge", "free", "pk_lm4_edge");
     as("owner_lm4_edge");
     const request = fileRequest(new Blob([Buffer.from("small")]), "doc.txt");
-    request.headers.set("content-length", String(10 * 1024 * 1024 + 1024));
+    request.headers.set("content-length", String(MAX_KNOWLEDGE_FILE_BYTES + 1024));
     expect((await POST(request, ctx(projectId))).status).toBe(201);
   });
 });

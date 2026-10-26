@@ -26,7 +26,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
 
 const { deleteKnowledgeFile, knowledgeFileKey, readKnowledgeFile, uploadKnowledgeFile } = await import("./index");
 
-// The names InstaCloud injects for a bound storage service.
+// The standard AWS SDK env names, pointed at Supabase's S3-compatible storage endpoint.
 const BOUND = {
   AWS_ENDPOINT_URL_S3: "https://storage.test",
   AWS_REGION: "auto",
@@ -86,13 +86,14 @@ describe("configuration", () => {
     return import("./index");
   }
 
-  it("builds the client from InstaCloud's bound names, with the endpoint set explicitly", async () => {
+  it("builds the client with the endpoint set explicitly and path-style requests for Supabase", async () => {
     send.mockResolvedValue({});
     await (await fresh()).uploadKnowledgeFile("k", Buffer.from("x"), "text/plain");
     expect(clientConfig.last).toEqual({
       endpoint: "https://storage.test",
       region: "auto",
       credentials: { accessKeyId: "key", secretAccessKey: "secret" },
+      forcePathStyle: true,
     });
   });
 

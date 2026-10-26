@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { MAX_CHAT_MESSAGE_LENGTH, PLAN_LIMITS, RATE_LIMITS } from "@askwell/shared";
+import { MAX_CHAT_MESSAGE_LENGTH, MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS, RATE_LIMITS } from "@askwell/shared";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -21,5 +21,9 @@ describe("docs/askwell-knowledge.md", () => {
   it("matches the message length and rate limits", () => {
     expect(doc).toContain(`up to ${n(MAX_CHAT_MESSAGE_LENGTH)} characters`);
     expect(doc).toContain(`up to ${RATE_LIMITS.widgetChat.max} messages a minute`);
+  });
+
+  it("matches the knowledge file size limit", () => {
+    expect(doc).toContain(`up to ${MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024)} MB`);
   });
 });

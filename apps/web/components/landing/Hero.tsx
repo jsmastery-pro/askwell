@@ -1,9 +1,12 @@
+import { MAX_KNOWLEDGE_FILE_BYTES } from "@askwell/shared";
 import Link from "next/link";
 import { BrowserFrame } from "./BrowserFrame";
 import { ChatTranscript } from "./ChatTranscript";
 import { FONT_DISPLAY } from "./fonts";
 import { Section } from "./Section";
 import { BUTTON_GLASS, BUTTON_PRIMARY } from "./styles";
+
+const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 
 export function Hero() {
   return (
@@ -35,7 +38,7 @@ export function Hero() {
           messages={[
             { from: "bot", text: "Hi, ask me anything about our product." },
             { from: "visitor", text: "Does it support PDF uploads?" },
-            { from: "bot", text: "Yes — PDF, Markdown, or plain text, up to 10 MB per file." },
+            { from: "bot", text: `Yes — PDF, Markdown, or plain text, up to ${MAX_FILE_MB} MB per file.` },
           ]}
         />
       </BrowserFrame>
