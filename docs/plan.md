@@ -218,7 +218,7 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T03 | Landing page runs Askwell's own widget | Bob | P3-T06 | done | #79 |
 | P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
 | P6-T06 | Fix the landing "Install in one line" section | Bob | P6-T03, P6-T04 | done | #83 |
-| P6-T07 | Landing nav knows you're signed in | Bob | — | in review | #90 |
+| P6-T07 | Landing nav knows you're signed in | Bob | — | in review | #90 (merge-ready) |
 | P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05 | todo | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
@@ -235,7 +235,7 @@ Lane B (Customize) added once a developer is free for it.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | todo | — |
+| MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | in progress | Vercel live at askwell-eosin.vercel.app; dev migrations run 2026-10-26 |
 | MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | done | #85 (live 429 check on the first Vercel preview) |
 | MV-T02 | Build and run on Vercel; remove InstaCloud | Alice | — | done | #86 (preview check on the first Vercel preview) |
 | MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (product owner runs migrations 0000–0003; app check on the first Vercel preview) |
