@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Track | Platform move |
 | Needs first | — |
-| Files allowed | `apps/web/lib/rate-limit/**`, `docs/security-review.md` (status of L10 only) |
+| Files allowed | `apps/web/lib/rate-limit/**`, `docs/security-review.md` (status of L10 only), `apps/web/app/api/widget/chat/route.test.ts` and `apps/web/app/api/widget/config/route.test.ts` (test-only, added 2026-10-26) |
 | project.md | §9 Security rules (Cost abuse) |
 
 ## Why
@@ -26,5 +26,6 @@
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
+- **Decided 2026-10-26 (John, with Bob):** trust `x-real-ip` only when `VERCEL === "1"`. Vercel overwrites it to prevent spoofing, per vercel.com/docs/headers/request-headers. Off Vercel, use the fixed key `"unknown"`. No `@vercel/functions` dependency, since its `ipAddress()` only reads `x-real-ip`. It can merge before the cutover: InstaCloud `main` has no real visitors.
 - CodeRabbit is required.
 - New dependency `@vercel/functions` is fine if used. Name it in the PR body.
