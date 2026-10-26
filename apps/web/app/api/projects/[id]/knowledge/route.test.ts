@@ -225,12 +225,12 @@ describe("file upload", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejects an 11 MB file with 400", async () => {
+  it("rejects an oversized file with 413, even when the early Content-Length check doesn't catch it", async () => {
     const projectId = await seedProject("owner_big", "free", "pk_big");
     as("owner_big");
-    const big = Buffer.alloc(11 * 1024 * 1024, "a");
+    const big = Buffer.alloc(MAX_KNOWLEDGE_FILE_BYTES + 1024, "a");
     const res = await POST(fileRequest(new Blob([big]), "big.txt"), ctx(projectId));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(413);
   });
 
   it("rejects a fake PDF (wrong magic bytes) with 400", async () => {

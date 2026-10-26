@@ -106,7 +106,12 @@ async function handleFile(projectId: string, ownerId: string, request: Request) 
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const type = KNOWLEDGE_FILE_TYPES[extension as keyof typeof KNOWLEDGE_FILE_TYPES];
   if (!type) return invalidInput("Only PDF, Markdown, and TXT files are supported.");
-  if (file.size > MAX_KNOWLEDGE_FILE_BYTES) return invalidInput(`The file is too large. Max ${MAX_FILE_MB} MB.`);
+  // A file can exceed the limit while the whole multipart request still stays under
+  // MAX_REQUEST_BYTES's overhead allowance, so the early Content-Length check above (413) isn't
+  // guaranteed to catch it — this one must also be 413, not 400, for the same oversized-payload reason.
+  if (file.size > MAX_KNOWLEDGE_FILE_BYTES) {
+    return errorResponse(ERROR_CODES.invalidInput, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   if (type === "pdf" && !hasPdfMagicBytes(buffer)) return invalidInput("The file is not a valid PDF.");
