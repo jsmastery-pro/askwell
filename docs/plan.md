@@ -236,8 +236,8 @@ Lane B (Customize) added once a developer is free for it.
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | MV-T01 | Supabase + Vercel accounts and setup | Product owner | — | in progress | Vercel live at askwell-eosin.vercel.app; dev migrations run 2026-10-26 |
-| MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | done | #85 (live 429 check on the first Vercel preview) |
+| MV-T05 | Client IP from Vercel's trusted headers (security) | Bob | — | done | #85 (verified live 2026-10-26: forged IP headers, 21st → 429) |
 | MV-T02 | Build and run on Vercel; remove InstaCloud | Alice | — | done | #86 (preview check on the first Vercel preview) |
-| MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (product owner runs migrations 0000–0003; app check on the first Vercel preview) |
+| MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (verified live 2026-10-26: chat flow + RLS holds on all 7 tables) |
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | done | #88 (storage verified live on dev; upload → ready on the first Vercel preview) |
 | MV-T06 | `vercel.json` for Vercel's import (one service, `web`) | Alice | MV-T02 | done | #89 |
