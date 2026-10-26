@@ -11,7 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "build": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node -e \"if (!process.env.DIRECT_URL) { console.error('db:migrate needs DIRECT_URL: the Supabase direct connection, or postgresql://localhost/... for a local Postgres'); process.exit(1) }\" && drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
