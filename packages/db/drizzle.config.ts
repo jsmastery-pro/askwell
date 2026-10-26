@@ -18,11 +18,17 @@ export function findRepoRoot(start: string = process.cwd()): string | null {
   }
 }
 
-/** Variables from env files, earlier files winning. Missing files are skipped. */
+/**
+ * Variables from env files, earlier files winning unless their value is blank (so `DIRECT_URL=`
+ * in .env.local doesn't hide a real one in .env). Missing files are skipped.
+ */
 export function readEnvFiles(files: string[]): Env {
   const merged: Env = {};
-  for (const file of [...files].reverse()) {
-    if (existsSync(file)) Object.assign(merged, parseEnv(readFileSync(file, "utf8")));
+  for (const file of files) {
+    if (!existsSync(file)) continue;
+    for (const [name, value] of Object.entries(parseEnv(readFileSync(file, "utf8")))) {
+      if (!merged[name]?.trim()) merged[name] = value;
+    }
   }
   return merged;
 }

@@ -29,6 +29,15 @@ describe("readEnvFiles", () => {
     expect(envFilesIn(root)).toMatchObject({ DIRECT_URL: DEV, OTHER: "1" });
     expect(envFilesIn(tempRoot({}))).toEqual({});
   });
+
+  it("keeps .env's value when .env.local leaves the same variable blank", () => {
+    const root = tempRoot({
+      ".env.local": "DIRECT_URL=\nDATABASE_CA_CERT=\n",
+      ".env": `DIRECT_URL=${PROD}\nDATABASE_CA_CERT=pem-from-env\n`,
+    });
+    expect(envFilesIn(root)).toMatchObject({ DIRECT_URL: PROD, DATABASE_CA_CERT: "pem-from-env" });
+    expect(migrationTarget({}, envFilesIn(root))).toMatchObject({ ok: true, url: PROD, caCert: "pem-from-env" });
+  });
 });
 
 describe("migrationTarget", () => {
