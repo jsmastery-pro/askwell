@@ -241,4 +241,4 @@ Lane B (Customize) added once a developer is free for it.
 | MV-T03 | Database on Supabase (pooled + direct URLs) | Bob | MV-T01 | done | #87 (verified live 2026-10-26: chat flow + RLS holds on all 7 tables) |
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | done | #88 (verified live 2026-10-26: upload → ready, delete, 4.2 MB → 413) |
 | MV-T06 | `vercel.json` for Vercel's import (one service, `web`) | Alice | MV-T02 | done | #89 |
-| MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | in progress | — |
+| MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | in review | #91 |
