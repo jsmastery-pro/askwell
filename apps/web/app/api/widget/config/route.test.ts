@@ -29,6 +29,8 @@ arcjet.protect.mockImplementation(async () => {
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
+  // Requests arrive as on Vercel, which sets x-real-ip to the client IP.
+  vi.stubEnv("VERCEL", "1");
   arcjet.conclusion = "ALLOW";
 });
 
@@ -52,7 +54,7 @@ let ip = 0;
 function get(key: string | null, clientIp = `10.0.0.${++ip}`) {
   const url = new URL("https://app.test/api/widget/config");
   if (key !== null) url.searchParams.set("key", key);
-  return GET(new Request(url, { headers: { Origin: "https://example.com", "cf-connecting-ip": clientIp } }));
+  return GET(new Request(url, { headers: { Origin: "https://example.com", "x-real-ip": clientIp } }));
 }
 
 describe("GET /api/widget/config", () => {
