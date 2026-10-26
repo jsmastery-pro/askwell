@@ -7,7 +7,7 @@ type Env = Record<string, string | undefined>;
 
 // libpq SSL parameters. pg lets them override the `ssl` option (dropping the CA, or turning TLS
 // off), so TLS is configured only through `tlsOptions`, never on the URL.
-const URL_SSL_PARAMS = ["sslmode", "sslrootcert", "sslcert", "sslkey", "sslpassword", "uselibpqcompat"];
+const URL_SSL_PARAMS = ["ssl", "sslmode", "sslrootcert", "sslcert", "sslkey", "sslpassword", "uselibpqcompat"];
 
 /**
  * TLS for a remote database connection, never plain text. With DATABASE_CA_CERT (the PEM root
@@ -33,6 +33,12 @@ export function tlsFor(host: string, env: Env = process.env): ConnectionOptions 
   return isLocalHost(host) ? false : tlsOptions(env);
 }
 
+/** The host pg will really connect to: a `?host=` parameter overrides the URL's hostname. */
+export function effectiveHost(url: string): string {
+  const parsed = new URL(url);
+  return parsed.searchParams.get("host") || parsed.hostname;
+}
+
 /** A connection string without its SSL parameters, so they can't override `tlsOptions`. */
 export function withoutSslParams(url: string): string {
   const parsed = new URL(url);
@@ -53,7 +59,7 @@ export function poolConfig(env: Env = process.env): PoolConfig {
   return {
     connectionString: url ? withoutSslParams(url) : undefined,
     // No URL yet (e.g. at build) counts as remote: TLS, never plain text.
-    ssl: url ? tlsFor(new URL(url).hostname, env) : tlsOptions(env),
+    ssl: url ? tlsFor(effectiveHost(url), env) : tlsOptions(env),
     max: 1,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,

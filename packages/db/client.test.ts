@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import { poolConfig, tlsFor, tlsOptions, withoutSslParams } from "./client";
+import { effectiveHost, poolConfig, tlsFor, tlsOptions, withoutSslParams } from "./client";
 
 // pg's own parsing of a client config, to check what a connection would really use.
 const ConnectionParameters = createRequire(import.meta.url)("pg/lib/connection-parameters") as new (config: object) => {
@@ -45,7 +45,7 @@ describe("tlsFor", () => {
 
 describe("withoutSslParams", () => {
   it("drops libpq SSL parameters and keeps everything else", () => {
-    const url = `${POOLER}?sslmode=require&sslrootcert=/x.crt&uselibpqcompat=true&application_name=askwell`;
+    const url = `${POOLER}?ssl=0&sslmode=require&sslrootcert=/x.crt&uselibpqcompat=true&application_name=askwell`;
     expect(withoutSslParams(url)).toBe(`${POOLER}?application_name=askwell`);
   });
 });
@@ -70,6 +70,21 @@ describe("poolConfig", () => {
     expect(params.ssl).toEqual({ ca: PEM, rejectUnauthorized: true });
     expect(params.host).toBe("aws-0-eu-central-1.pooler.supabase.com");
     expect(params.port).toBe(6543);
+  });
+
+  it("can't be switched to plain text by ?ssl=0 or ?ssl=false on the URL", () => {
+    for (const flag of ["0", "false"]) {
+      const params = new ConnectionParameters(poolConfig({ DATABASE_URL: `${POOLER}?ssl=${flag}` }));
+      expect(params.ssl).toEqual({ rejectUnauthorized: false });
+    }
+  });
+
+  it("decides TLS by the host pg really connects to, so ?host= can't make a remote look local", () => {
+    const url = "postgresql://postgres:pw@localhost:5432/postgres?host=db.example.com";
+    expect(effectiveHost(url)).toBe("db.example.com");
+    const params = new ConnectionParameters(poolConfig({ DATABASE_URL: url }));
+    expect(params.host).toBe("db.example.com");
+    expect(params.ssl).toEqual({ rejectUnauthorized: false });
   });
 
   it("connects to a local Postgres without SSL, e.g. to test a migration", () => {
