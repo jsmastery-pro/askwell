@@ -1,13 +1,14 @@
 #!/usr/bin/env -S pnpm exec tsx --conditions=react-server
 // Dev tool: seeds a project with real knowledge chunks, so the chat route (P3-T05) can be
-// tested before Lane A's upload pipeline (P3-T02) exists. Never run this against `main`.
+// tested before Lane A's upload pipeline (P3-T02) exists. Dev only: never run it against production.
 //
 // Usage:
 //   pnpm seed-knowledge <publicKey> <path-to-text-file> [title]
 //
-// Reads DATABASE_URL and OPENAI_API_KEY from .env.local / .env, checking this app's own
-// directory first and the repo root second (where this monorepo's secrets actually live).
-// Run with `insta run --` to get DATABASE_URL from the branch instead (project.md env vars).
+// Reads DATABASE_URL (the dev Supabase project's transaction pooler) and OPENAI_API_KEY from
+// .env.local / .env, checking this app's own directory first and the repo root second (where
+// this monorepo's secrets actually live). DATABASE_CA_CERT, if set, verifies the server's TLS
+// certificate. The dev project is shared by everyone, so seeded rows are visible to the team.
 
 import { CHUNKING } from "@askwell/shared";
 import { eq } from "drizzle-orm";
@@ -22,7 +23,7 @@ for (const file of [".env.local", ".env", join(repoRoot, ".env.local"), join(rep
   try {
     process.loadEnvFile(file);
   } catch {
-    // Fine if a candidate doesn't exist; env may already be set some other way (e.g. `insta run`).
+    // Fine if a candidate doesn't exist; env may already be set some other way (e.g. exported in the shell).
   }
 }
 

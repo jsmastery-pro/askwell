@@ -13,8 +13,8 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "build": "turbo run build",
-    "db:generate": "turbo run db:generate",
-    "db:migrate": "turbo run db:migrate"
+    "db:generate": "pnpm --filter @askwell/db db:generate",
+    "db:migrate": "pnpm --filter @askwell/db db:migrate"
   },
   "devDependencies": {
     "turbo": "catalog:",
