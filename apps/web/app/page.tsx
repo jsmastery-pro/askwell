@@ -29,7 +29,7 @@ export default async function Home() {
       <Hero signedIn={signedIn} />
       <HowItWorks />
       <LiveDemo live={widgetKey !== null} />
-      <Pricing />
+      <Pricing signedIn={signedIn} />
       <InstallSnippet appUrl={appUrl} />
       <Footer />
       <LandingWidget publicKey={widgetKey} />

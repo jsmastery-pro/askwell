@@ -104,6 +104,29 @@ describe("Home: sign-in state", () => {
     expect(link(hero, "Start free")).toBeNull();
   });
 
+  it("signed out: both pricing cards say Start free, with the Pro hint", async () => {
+    const { container } = await renderHome();
+    const pricing = container.querySelector("#pricing") as HTMLElement;
+    const ctas = [...pricing.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(ctas).toEqual([
+      ["Start free", "/sign-up"],
+      ["Start free", "/sign-up"],
+    ]);
+    expect(pricing.textContent).toContain("Upgrade to Pro from your dashboard once you're signed in.");
+  });
+
+  it("signed in: Free goes to the dashboard and Pro to billing, without the sign-in hint", async () => {
+    session.userId = "user_123";
+    const { container } = await renderHome();
+    const pricing = container.querySelector("#pricing") as HTMLElement;
+    const ctas = [...pricing.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(ctas).toEqual([
+      ["Go to dashboard", "/dashboard"],
+      ["Upgrade to Pro", "/dashboard/billing"],
+    ]);
+    expect(pricing.textContent).not.toContain("once you're signed in");
+  });
+
   it("renders the signed-in nav on the server, so there's no flash of Sign in", async () => {
     session.userId = "user_123";
     const html = renderToString(await Home());

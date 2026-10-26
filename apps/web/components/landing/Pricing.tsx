@@ -28,12 +28,27 @@ export const PRICING_ROWS = [
 
 const GROUPS = ["Usage", "Customization"] as const;
 
+// Signed out, both cards lead to sign-up. Signed in, each leads where that plan lives.
 const PLANS = [
-  { key: "free", name: "Free", caption: "Try it with one project.", highlight: false },
-  { key: "pro", name: "Pro", caption: "Most teams pick this.", highlight: true },
+  {
+    key: "free",
+    name: "Free",
+    caption: "Try it with one project.",
+    highlight: false,
+    signedInCta: { href: "/dashboard", label: "Go to dashboard" },
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    caption: "Most teams pick this.",
+    highlight: true,
+    signedInCta: { href: "/dashboard/billing", label: "Upgrade to Pro" },
+  },
 ] as const;
 
-export function Pricing() {
+const SIGNED_OUT_CTA = { href: "/sign-up", label: "Start free" };
+
+export function Pricing({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <section id="pricing" className="scroll-mt-24 py-24 sm:py-28">
       <Section>
@@ -51,10 +66,13 @@ export function Pricing() {
             >
               <h3 className="text-xl font-semibold text-ink">{plan.name}</h3>
               <p className="mt-1 text-sm text-muted">{plan.caption}</p>
-              <Link href="/sign-up" className={`mt-6 w-full py-2.5 text-sm ${plan.highlight ? BUTTON_PRIMARY : BUTTON_GLASS}`}>
-                Start free
+              <Link
+                href={(signedIn ? plan.signedInCta : SIGNED_OUT_CTA).href}
+                className={`mt-6 w-full py-2.5 text-sm ${plan.highlight ? BUTTON_PRIMARY : BUTTON_GLASS}`}
+              >
+                {(signedIn ? plan.signedInCta : SIGNED_OUT_CTA).label}
               </Link>
-              {plan.highlight && (
+              {plan.highlight && !signedIn && (
                 <p className="mt-3 text-xs text-muted">Upgrade to Pro from your dashboard once you&apos;re signed in.</p>
               )}
               <div className="mt-8 space-y-6">
