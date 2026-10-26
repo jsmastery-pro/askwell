@@ -14,6 +14,22 @@ export function getPostHogConfig(): PostHogConfigResponse {
   };
 }
 
+/**
+ * posthog-node's `waitUntil` hook, routed through Next's `after()` when a request scope is
+ * available. `after()` throws synchronously outside one — e.g. instrumentation.ts's
+ * onRequestError isn't guaranteed to run inside one, and nesting it inside another after()
+ * callback (knowledge ingest) isn't a documented-supported case either. Either way, falling
+ * back to doing nothing here is safe: the capture call already happened; this only affects
+ * whether the function stays alive long enough for its flush to land.
+ */
+function waitUntilAfterResponse(promise: Promise<unknown>): void {
+  try {
+    after(promise);
+  } catch {
+    // Outside a request scope; nothing here can extend the function's lifetime.
+  }
+}
+
 /** The server-side product events from project.md §6.11. */
 export type ServerEvent = "signed_up" | "project_created" | "knowledge_added" | "upgraded" | "first_chat";
 
@@ -23,9 +39,9 @@ function getClient(): PostHog | null {
   if (client === undefined) {
     const { key, host } = getPostHogConfig();
     // flushAt 1: send each event right away rather than batching in a process that may scale to
-    // zero. waitUntil: after() keeps a serverless function alive long enough for that flush's
-    // request to land, without making the caller (e.g. the chat reply) wait on it.
-    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0, waitUntil: after }) : null;
+    // zero. waitUntil keeps a serverless function alive long enough for that flush's request to
+    // land, without making the caller (e.g. the chat reply) wait on it.
+    client = key ? new PostHog(key, { host, flushAt: 1, flushInterval: 0, waitUntil: waitUntilAfterResponse }) : null;
   }
   return client;
 }

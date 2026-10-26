@@ -1,16 +1,28 @@
 // @vitest-environment node
-import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const after = vi.hoisted(() => vi.fn());
+vi.mock("next/server", () => ({ after }));
 
 const capture = vi.hoisted(() => vi.fn());
 const captureException = vi.hoisted(() => vi.fn());
 const constructed = vi.hoisted(() => vi.fn());
 vi.mock("posthog-node", () => ({
+  // Mirrors posthog-node's real flushAt: 1 behavior enough to test it: a capture call also
+  // invokes the client's own `waitUntil` option with the (fake) flush promise.
   PostHog: class {
-    capture = capture;
-    captureException = captureException;
-    constructor(key: string, options: unknown) {
+    #waitUntil: ((promise: Promise<unknown>) => void) | undefined;
+    constructor(key: string, options: { waitUntil?: (promise: Promise<unknown>) => void }) {
       constructed(key, options);
+      this.#waitUntil = options.waitUntil;
+    }
+    capture(...args: unknown[]) {
+      capture(...args);
+      this.#waitUntil?.(Promise.resolve());
+    }
+    captureException(...args: unknown[]) {
+      captureException(...args);
+      this.#waitUntil?.(Promise.resolve());
     }
   },
 }));
@@ -76,7 +88,20 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
   it("wires the client's flush to Next's after(), so events survive a serverless freeze", async () => {
     const { captureServerEvent } = await load();
     captureServerEvent("user_1", "signed_up");
-    expect(constructed).toHaveBeenCalledWith("phc_test", expect.objectContaining({ waitUntil: after }));
+    expect(after).toHaveBeenCalledOnce();
+  });
+
+  // after() throws outside a request scope — e.g. instrumentation.ts's onRequestError, or a
+  // capture nested inside another after() callback (knowledge ingest) — and must not take the
+  // capture down with it.
+  it("still captures the event when after() throws (no request scope)", async () => {
+    after.mockImplementationOnce(() => {
+      throw new Error("`after` was called outside a request scope");
+    });
+    const { captureServerEvent } = await load();
+
+    expect(() => captureServerEvent("user_1", "signed_up")).not.toThrow();
+    expect(capture).toHaveBeenCalledWith({ distinctId: "user_1", event: "signed_up", properties: undefined });
   });
 
   it("forwards exceptions", async () => {
