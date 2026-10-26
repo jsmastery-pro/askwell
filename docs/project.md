@@ -56,16 +56,17 @@ The whole product in one flow. When this works end to end, the product is done.
 
 | Environment | What it is | Who deploys |
 | --- | --- | --- |
-| Production | Vercel production (from `main`) + the Supabase prod project | Product owner only: merging to `main` deploys it |
+| Production | Vercel production (from `main`) + the Supabase prod project | Product owner only: merges to `main`, runs any migration, then promotes the build |
 | Preview | A Vercel preview deployment per PR + the Supabase dev project | Automatic on every push to a PR |
 | Local | `pnpm dev` + the Supabase dev project | Each developer |
 
 | Rule | Detail |
 | --- | --- |
 | Shared dev database | Bob, Alice and every preview share the dev project. Never apply an unmerged migration to it. Test new migrations on pglite or local Postgres. |
-| Migrations | Run on dev, then prod, only after their PR merges. The product owner runs them on prod. |
+| Migrations | Run on dev, then prod, only after their PR merges. Every migration is additive ("expand and contract"): the live version keeps working while it runs. Drops and renames come in a later PR, once no deployed code uses the old shape. |
+| Production rollout | A merge to `main` builds production, but it goes live only when the product owner promotes it, after running that PR's migration on prod. Vercel's automatic production promotion is off. |
 | Dev data is throwaway | Only migration files reach production. Never copy data from dev. |
-| Never deploy production | Only the product owner merges to `main`, which deploys production |
+| Never deploy production | Only the product owner merges to `main` and promotes production |
 
 ---
 

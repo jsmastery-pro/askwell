@@ -73,7 +73,8 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 - Every schema change is a migration in the same PR (`pnpm db:generate`). Never edit a merged migration.
 - Add a new table or column only if your task says so.
 - The Supabase dev project is shared by everyone and every preview. Its data is throwaway, but never apply an unmerged migration to it: test new migrations on pglite or local Postgres.
-- Never touch the production database. Migrations reach dev, then production, only after their PR merges; the product owner runs them on production.
+- Never touch the production database. Migrations reach dev, then production, only after their PR merges; the product owner runs them on production before promoting the build.
+- Migrations are additive: the version already live must keep working while one runs. Dropping or renaming a table or column happens in a later PR, once no deployed code uses it.
 
 ## Security rules
 
