@@ -244,7 +244,7 @@ Two parts: a small loader script + an iframe.
 | `conversations`     | `id`, `project_id`, `visitor_id`, `created_at`                                                                                       |                                                     |
 | `messages`          | `id`, `conversation_id`, `role` (`visitor`/`bot`), `body`, `created_at`                                                              |                                                     |
 
-**Tenant isolation:** no database RLS. Every owner query goes through one shared helper, `getOwnedProject(projectId)`, which checks the signed-in user owns the project. Public routes resolve the project from `public_key` only.
+**Tenant isolation:** done in the app, not by RLS policies. RLS is enabled on every table with **no policies** only to lock Supabase's Data API (from MV-T03); the app connects as the table owner, which RLS doesn't apply to. The Data API is also turned off in both Supabase projects. Every owner query goes through one shared helper, `getOwnedProject(projectId)`, which checks the signed-in user owns the project. Public routes resolve the project from `public_key` only.
 
 **Schema changes:** a migration file in the same PR. Changing an existing table needs approval first (see `CLAUDE.md`).
 
