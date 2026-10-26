@@ -17,7 +17,10 @@
    - Never fall back to plain text.
    - Add `DATABASE_CA_CERT` to `.env.example`. The certificate is public, not a secret.
 4. **Migrations:** apply all existing migrations to the dev project from `main`. That includes 0000's pgvector extension and the HNSW index. Report anything Supabase needs changed. Don't edit merged migrations; add a new one if needed.
-5. **Docs:** `.env.example` lists `DATABASE_URL` and `DIRECT_URL` with one-line comments. The seed script's InstaCloud instructions become Supabase ones.
+5. **Lock Supabase's Data API (security, 2026-10-26):** Supabase exposes every `public` table through its REST API to anyone with the project's public key. Add a **new** migration that runs `ENABLE ROW LEVEL SECURITY` on every table, with no policies, so those API roles see nothing. Our app connects as the tables' owner, which RLS doesn't apply to (don't use `FORCE`). Prove it two ways:
+   - The app still works against dev Supabase.
+   - A `GET` to the project's REST API returns no rows. The product owner also turns the Data API off (MV-T01).
+6. **Docs:** `.env.example` lists `DATABASE_URL` and `DIRECT_URL` with one-line comments. The seed script's InstaCloud instructions become Supabase ones.
 
 ## Done when
 - [ ] Migrations apply cleanly to the dev Supabase project
