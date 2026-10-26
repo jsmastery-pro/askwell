@@ -126,7 +126,7 @@ The whole product in one flow. When this works end to end, the product is done.
 | Item       | Detail                                                                                  |
 | ---------- | --------------------------------------------------------------------------------------- |
 | Input      | Paste text with a title, or upload a file                                               |
-| File types | PDF, Markdown, TXT. Max 4 MB (Vercel caps request bodies at 4.5 MB).                    |
+| File types | PDF, Markdown, TXT. Max 4 MB (Vercel caps request bodies at 4.5 MB). Enforced in code by MV-T04; until it merges, the code still allows 10 MB. |
 | Upload     | File goes to Supabase Storage; row in `knowledge_sources`                               |
 | Processing | Extract text (PDF: `unpdf`) → split into chunks → OpenAI embeddings → store in pgvector |
 | Actions    | List sources with status, delete a source (deletes its file and chunks)                 |
@@ -325,7 +325,7 @@ docs/
 
 | Variable                                                                         | Used by         | Public? |
 | -------------------------------------------------------------------------------- | --------------- | ------- |
-| `DATABASE_URL` (Supabase transaction pooler, used by the app), `DIRECT_URL` (direct connection, migrations only) | Server | No |
+| `DATABASE_URL` (Supabase transaction pooler, used by the app), `DIRECT_URL` (direct connection, migrations only; read from MV-T03 onward, until then migrations use `DATABASE_URL`), `DATABASE_CA_CERT` (Supabase root certificate, PEM; from MV-T03) | Server | No |
 | `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (values from Supabase Storage's S3 settings) | Server | No |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                              | Client          | Yes     |
 | `CLERK_SECRET_KEY`                                                               | Server          | No      |
