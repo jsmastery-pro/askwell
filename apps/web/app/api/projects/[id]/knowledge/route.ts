@@ -30,8 +30,10 @@ import { knowledgeFileKey, uploadKnowledgeFile } from "../../../../../lib/storag
 
 export const dynamic = "force-dynamic";
 // Covers the request plus its after() ingest (extract, chunk, embed) for a file up to 4 MB.
-// 60s is the longest duration Vercel's free (Hobby) tier allows for a serverless function.
-export const maxDuration = 60;
+// 300s is Hobby's current default and max with Fluid Compute (on by default for new Vercel
+// projects); without Fluid Compute, Hobby's max is 60s instead — confirm which applies once
+// MV-T01's project exists, and lower this if the actual ingest time comes in well under it.
+export const maxDuration = 300;
 
 type Context = { params: Promise<{ id: string }> };
 
