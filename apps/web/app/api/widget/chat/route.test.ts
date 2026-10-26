@@ -69,6 +69,8 @@ afterAll(() => close());
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
+  // Requests arrive as on Vercel, which sets x-real-ip to the client IP.
+  vi.stubEnv("VERCEL", "1");
   vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
   arcjet.conclusion = "ALLOW";
   arcjet.protect.mockImplementation(async () => {
@@ -96,7 +98,7 @@ function chat(body: unknown, ip = "203.0.113.9") {
   return POST(
     new Request("https://app.test/api/widget/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Origin: "https://customer.example", "cf-connecting-ip": ip },
+      headers: { "Content-Type": "application/json", Origin: "https://customer.example", "x-real-ip": ip },
       body: typeof body === "string" ? body : JSON.stringify(body),
     }),
   );
