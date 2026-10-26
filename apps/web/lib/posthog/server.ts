@@ -16,18 +16,16 @@ export function getPostHogConfig(): PostHogConfigResponse {
 
 /**
  * posthog-node's `waitUntil` hook, routed through Next's `after()` when a request scope is
- * available. `after()` throws synchronously outside one — e.g. instrumentation.ts's
- * onRequestError isn't guaranteed to run inside one, and nesting it inside another after()
- * callback (knowledge ingest) isn't a documented-supported case either. Either way, falling
- * back to doing nothing here is safe: the capture call already happened; this only affects
- * whether the function stays alive long enough for its flush to land.
+ * available (it throws synchronously outside one — e.g. instrumentation.ts's onRequestError
+ * isn't guaranteed to run inside one). Don't catch that throw here: posthog-node already wraps
+ * every call to this hook in its own try/catch (`_flushKeepingRuntimeAlive` and
+ * `scheduleDebouncedFlush` in its client), and in the debounce path specifically treats a throw
+ * as "didn't register" rather than "succeeded". Swallowing it here instead would hide that
+ * signal, so posthog-node would wrongly believe a debounce cycle is keeping the runtime alive —
+ * leaving later captures in that window with no lifetime extension at all.
  */
 function waitUntilAfterResponse(promise: Promise<unknown>): void {
-  try {
-    after(promise);
-  } catch {
-    // Outside a request scope; nothing here can extend the function's lifetime.
-  }
+  after(promise);
 }
 
 /** The server-side product events from project.md §6.11. */

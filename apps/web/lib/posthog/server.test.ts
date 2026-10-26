@@ -9,20 +9,28 @@ const captureException = vi.hoisted(() => vi.fn());
 const constructed = vi.hoisted(() => vi.fn());
 vi.mock("posthog-node", () => ({
   // Mirrors posthog-node's real flushAt: 1 behavior enough to test it: a capture call also
-  // invokes the client's own `waitUntil` option with the (fake) flush promise.
+  // invokes the client's own `waitUntil` option with the (fake) flush promise, wrapped in its
+  // own try/catch — exactly as the real client does (waitUntil may throw outside a request scope).
   PostHog: class {
     #waitUntil: ((promise: Promise<unknown>) => void) | undefined;
     constructor(key: string, options: { waitUntil?: (promise: Promise<unknown>) => void }) {
       constructed(key, options);
       this.#waitUntil = options.waitUntil;
     }
+    #callWaitUntil() {
+      try {
+        this.#waitUntil?.(Promise.resolve());
+      } catch {
+        // Same as posthog-node's own client: waitUntil may throw outside a request scope.
+      }
+    }
     capture(...args: unknown[]) {
       capture(...args);
-      this.#waitUntil?.(Promise.resolve());
+      this.#callWaitUntil();
     }
     captureException(...args: unknown[]) {
       captureException(...args);
-      this.#waitUntil?.(Promise.resolve());
+      this.#callWaitUntil();
     }
   },
 }));
@@ -91,9 +99,9 @@ describe("with NEXT_PUBLIC_POSTHOG_KEY", () => {
     expect(after).toHaveBeenCalledOnce();
   });
 
-  // after() throws outside a request scope — e.g. instrumentation.ts's onRequestError, or a
-  // capture nested inside another after() callback (knowledge ingest) — and must not take the
-  // capture down with it.
+  // after() throws outside a request scope — e.g. instrumentation.ts's onRequestError. Our hook
+  // must let that throw reach posthog-node (not swallow it), which is what actually keeps the
+  // capture itself unaffected.
   it("still captures the event when after() throws (no request scope)", async () => {
     after.mockImplementationOnce(() => {
       throw new Error("`after` was called outside a request scope");
