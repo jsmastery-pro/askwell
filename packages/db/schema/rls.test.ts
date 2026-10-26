@@ -23,16 +23,20 @@ let client: PGlite;
 
 beforeAll(async () => {
   client = new PGlite({ extensions: { vector } });
+  // Like a Supabase project: its API roles exist before our migrations, and default privileges
+  // give them every privilege on new tables, TRUNCATE included.
+  await client.exec(`
+    create role anon nologin;
+    create role authenticated nologin;
+    grant usage on schema public to anon, authenticated;
+    alter default privileges in schema public grant all on tables to anon, authenticated;
+  `);
   await migrate(drizzle(client, { schema }), {
     migrationsFolder: new URL("../migrations", import.meta.url).pathname,
   });
   await client.exec(`
     insert into accounts (clerk_user_id) values ('user_rls');
     insert into projects (owner_id, name, public_key) values ('user_rls', 'RLS', 'pk_rls');
-    -- Like Supabase's anon role: a non-owner with table privileges, as the Data API grants them.
-    create role anon nologin;
-    grant usage on schema public to anon;
-    grant select, insert, update, delete on all tables in schema public to anon;
   `);
 });
 
@@ -65,6 +69,24 @@ describe("row-level security", () => {
       );
       const updated = await client.query(`update projects set name = 'pwned'`);
       expect(updated.affectedRows ?? 0).toBe(0);
+    } finally {
+      await client.exec("reset role");
+    }
+  });
+
+  it("takes TRUNCATE (which RLS doesn't cover) away from both API roles on every table", async () => {
+    for (const role of ["anon", "authenticated"]) {
+      for (const table of TABLES) {
+        const { rows } = await client.query<{ allowed: boolean }>(
+          `select has_table_privilege($1, $2, 'TRUNCATE') as allowed`,
+          [role, `public."${table}"`],
+        );
+        expect(rows[0]!.allowed, `${role} on ${table}`).toBe(false);
+      }
+    }
+    await client.exec("set role anon");
+    try {
+      await expect(client.query(`truncate projects cascade`)).rejects.toThrow(/permission denied/);
     } finally {
       await client.exec("reset role");
     }
