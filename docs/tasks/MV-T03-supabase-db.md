@@ -27,6 +27,12 @@
 - [ ] The app works locally against dev Supabase: sign in, create a project, chat
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
+## Live check moved (2026-10-26)
+Agent sandboxes can only make HTTP requests through a proxy, and Postgres needs a raw TCP connection, so no sandbox can reach Supabase's database. #87 merges on review + CodeRabbit. Then:
+1. The product owner runs `DIRECT_URL=<session pooler URL> pnpm db:migrate` on `main` from their machine (0000–0003).
+2. The app check (sign in → create project → chat) happens on the first Vercel preview.
+3. Checking that the REST API returns nothing happens after the migration.
+
 ## Notes
 - CodeRabbit is required (database).
 - **Shared dev database (new rule):** never apply an unmerged migration to the dev project. Test new migrations on pglite or local Postgres; they reach dev only after the PR merges.
