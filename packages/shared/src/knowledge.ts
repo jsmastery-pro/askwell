@@ -4,7 +4,8 @@ import { deleteResponseSchema, type DeleteResponse } from "./projects";
 export const SOURCE_TYPES = ["text", "pdf", "md", "txt"] as const;
 export const SOURCE_STATUSES = ["processing", "ready", "failed"] as const;
 
-export const MAX_KNOWLEDGE_FILE_BYTES = 10 * 1024 * 1024;
+// 4 MB, not 10: Vercel caps function request bodies at 4.5 MB (project.md §9).
+export const MAX_KNOWLEDGE_FILE_BYTES = 4 * 1024 * 1024;
 // Uploaded file extension → source type. The server checks type and size (§9).
 export const KNOWLEDGE_FILE_TYPES = { pdf: "pdf", md: "md", txt: "txt" } as const;
 
