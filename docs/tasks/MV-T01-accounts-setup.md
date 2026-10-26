@@ -34,7 +34,11 @@ Agents never create accounts or handle raw keys, so these steps are yours.
    - **Production only:** `NEXT_PUBLIC_APP_URL` (the production URL) and `LANDING_WIDGET_KEY` (set after step 6). Leave both unset on previews.
    - **Turn off automatic production promotion**, so you can run a merged PR's migration on prod before its build goes live. Merging still builds production; you promote it by hand. This is in project.md §4, from CodeRabbit on #84.
    - **Deployment Protection → Protection Bypass for Automation:** generate a secret, and add it to Bob's and Alice's env as `VERCEL_AUTOMATION_BYPASS_SECRET`. PR previews stay behind Vercel's login; agents send the secret as the `x-vercel-protection-bypass` header for their checks (decided 2026-10-26).
-3. **Clerk.** Point the billing webhook at `https://<production URL>/api/clerk/webhook`, with the same subscription events as before.
+3. **Clerk webhook (required for Pro to unlock).** Clerk → Configure → Webhooks → Add Endpoint:
+   - URL: `https://<the deployment's URL>/api/clerk/webhook`. Today that's `https://askwell-eosin.vercel.app/api/clerk/webhook`; add another endpoint whenever the production URL changes.
+   - Events: `subscriptionItem.active` and `subscriptionItem.ended` (or all `subscriptionItem.*`). `subscription.*` alone isn't enough.
+   - Copy the endpoint's signing secret (`whsec_…`) into Vercel's `CLERK_WEBHOOK_SIGNING_SECRET` for that environment, then redeploy. A new endpoint always has a new secret.
+   - Without it, upgrades succeed in Clerk but `accounts.plan` stays `free` and Customize stays locked (found 2026-10-26).
 4. **Migrations.** After MV-T03 merges, run them once on each project: `DIRECT_URL=<project's direct URL> pnpm db:migrate`. After that, for every PR with a migration: merge it, run the migration on dev and then prod, and only then promote the production build.
 5. **Developers.** Put the `askwell-dev` values into Bob's and Alice's `.env.local`. Update their `ROLE.md`: their "deploy" is now the Vercel preview URL on each PR, not an InstaCloud branch.
 6. **Askwell project.** On production, once the app is up: create the "Askwell" project on a **Pro** account, upload `docs/askwell-knowledge.md`, set `LANDING_WIDGET_KEY` to its public key, and redeploy.
