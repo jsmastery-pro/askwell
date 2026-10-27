@@ -12,9 +12,10 @@
 1. **Widget config:** look the project up by `public_key` through the **service client** (visitors have no token), and return the plan-applied config as today.
 2. **Chat:**
    - same order as today: rate limit, then key, then quota
-   - the quota check uses `rpc("consume_message")`
+   - check a given `conversationId` belongs to the project (service client select) **before** the quota, as today, so a foreign ID gets 404 without using quota or a model call
+   - the quota uses `rpc("consume_message")` **before** the embedding and model call. It counts the message right away: `false` means quota exceeded, with no OpenAI call. This replaces today's early check + count-at-save, and the race note in `docs/security-review.md` goes away. A model timeout still counts, as today (it saves the fallback reply).
    - retrieval uses `rpc("match_chunks")`
-   - saving uses `rpc("save_chat_turn")`
+   - saving uses `rpc("save_chat_turn")`; map its codes: `AWNOC` → 404, `AWNOP` → 404
    - prompts, the leak guard, timeouts, the PostHog trace and `first_chat` stay as they are; `first_chat` now comes from the function's result
 3. **Clerk webhook:** `setPlan` through the service client. Keep the signature check, plan slug check, Clerk confirmation (L5) and idempotency.
 4. Visitors never get a Supabase key; everything stays in our server routes.
