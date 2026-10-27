@@ -6,7 +6,8 @@ import {
   type KnowledgeSource,
 } from "@askwell/shared";
 import { getOwnedProject } from "@askwell/db/queries";
-import { createServiceClient } from "@/lib/supabase/service";
+import type { Enums } from "@askwell/db/types";
+import { createServiceClient } from "../../../../../../lib/supabase/service";
 import { runAfterResponse } from "../../../../../../lib/knowledge/background";
 import { extractFileText, hasPdfMagicBytes } from "../../../../../../lib/knowledge/extract";
 import { deleteKnowledgeSource, processKnowledgeSource } from "../../../../../../lib/knowledge";
@@ -26,6 +27,11 @@ const uploadNotFound = () => errorResponse(ERROR_CODES.notFound, "Upload not fou
 const alreadyFinalized = () => invalidInput("This upload was already finalized.");
 
 type ClaimedRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
+
+// `db:types` is generated from dev, which doesn't have this PR's `uploading` status until it
+// merges and the migration runs there (project.md's migration rule). It's real in the migration
+// itself; this bridges the gap so the service client's generic types still catch every other typo.
+const UPLOADING = "uploading" as unknown as Enums<"source_status">;
 
 function toKnowledgeSource(row: ClaimedRow): KnowledgeSource {
   return {
@@ -54,7 +60,7 @@ async function claimForFinalize(service: ServiceClient, sourceId: string, projec
     .update({ status: "processing" })
     .eq("id", sourceId)
     .eq("project_id", projectId)
-    .eq("status", "uploading")
+    .eq("status", UPLOADING)
     .select("id, title, type, storage_key, status, created_at")
     .maybeSingle();
   if (error) throw error;
@@ -110,7 +116,7 @@ export async function POST(request: Request, { params }: Context) {
     // Nothing was read, so ingest never started — no double-billing risk here. Hand the
     // `uploading` state back (best effort) so a genuine retry can still claim it, instead of
     // leaving it stuck `processing` with no way back in.
-    await service.from("knowledge_sources").update({ status: "uploading" }).eq("id", row.id).eq("status", "processing");
+    await service.from("knowledge_sources").update({ status: UPLOADING }).eq("id", row.id).eq("status", "processing");
     return errorResponse(ERROR_CODES.invalidInput, "The upload didn't complete. Try again.", 400);
   }
 

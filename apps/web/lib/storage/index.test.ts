@@ -9,11 +9,13 @@ const storage = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 const from = vi.hoisted(() => vi.fn(() => storage));
-vi.mock("@/lib/supabase/service", () => ({
+vi.mock("../supabase/service", () => ({
   createServiceClient: () => ({ storage: { from } }),
 }));
 
-const { createKnowledgeUploadUrl, deleteKnowledgeFile, knowledgeFileKey, readKnowledgeFile } = await import("./index");
+const { createKnowledgeUploadUrl, deleteKnowledgeFile, deleteKnowledgeFiles, knowledgeFileKey, readKnowledgeFile } = await import(
+  "./index"
+);
 
 afterEach(() => {
   from.mockClear();
@@ -70,5 +72,18 @@ describe("deleteKnowledgeFile", () => {
   it("throws the storage error", async () => {
     storage.remove.mockResolvedValue({ data: null, error: new Error("gone") });
     await expect(deleteKnowledgeFile("projects/p/s")).rejects.toThrow("gone");
+  });
+});
+
+describe("deleteKnowledgeFiles", () => {
+  it("removes every key from the knowledge bucket in one request", async () => {
+    storage.remove.mockResolvedValue({ data: [], error: null });
+    await deleteKnowledgeFiles(["projects/p/s1", "projects/p/s2"]);
+    expect(storage.remove).toHaveBeenCalledWith(["projects/p/s1", "projects/p/s2"]);
+  });
+
+  it("throws the storage error", async () => {
+    storage.remove.mockResolvedValue({ data: null, error: new Error("gone") });
+    await expect(deleteKnowledgeFiles(["projects/p/s1"])).rejects.toThrow("gone");
   });
 });

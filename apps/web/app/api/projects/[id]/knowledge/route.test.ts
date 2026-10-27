@@ -52,7 +52,7 @@ async function rpc(name: string, args: Record<string, unknown>) {
     error: null,
   };
 }
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
+vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
 
 const { POST } = await import("./route");
 

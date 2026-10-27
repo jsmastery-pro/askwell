@@ -1,7 +1,7 @@
 // Server-only: the service key never ships to the client (SB-T06: supabase-js Storage, not the
 // AWS SDK — the `knowledge` bucket and its limits are set in supabase/migrations).
 import "server-only";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createServiceClient } from "../supabase/service";
 
 const BUCKET = "knowledge";
 
@@ -26,6 +26,11 @@ export async function readKnowledgeFile(key: string): Promise<Buffer> {
 
 /** Used when a source is deleted, or an upload is refused or abandoned. */
 export async function deleteKnowledgeFile(key: string): Promise<void> {
-  const { error } = await createServiceClient().storage.from(BUCKET).remove([key]);
+  await deleteKnowledgeFiles([key]);
+}
+
+/** Used when a project is deleted: removes every file its sources reserved, in one request. */
+export async function deleteKnowledgeFiles(keys: string[]): Promise<void> {
+  const { error } = await createServiceClient().storage.from(BUCKET).remove(keys);
   if (error) throw error;
 }

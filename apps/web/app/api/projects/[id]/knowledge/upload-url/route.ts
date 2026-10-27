@@ -9,7 +9,8 @@ import {
   type Plan,
   type RequestKnowledgeUploadResponse,
 } from "@askwell/shared";
-import { createServiceClient } from "@/lib/supabase/service";
+import type { Enums } from "@askwell/db/types";
+import { createServiceClient } from "../../../../../../lib/supabase/service";
 import { randomUUID } from "node:crypto";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../../lib/projects/http";
 import { createKnowledgeUploadUrl, deleteKnowledgeFile, knowledgeFileKey } from "../../../../../../lib/storage";
@@ -30,13 +31,18 @@ const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 // is actually running, not abandoned — reclaiming that would delete a source mid-ingest.
 const ABANDONED_AFTER_MS = 2 * 60 * 60 * 1000;
 
+// `db:types` is generated from dev, which doesn't have this PR's `uploading` status until it
+// merges and the migration runs there (project.md's migration rule). It's real in the migration
+// itself; this bridges the gap so the service client's generic types still catch every other typo.
+const UPLOADING = "uploading" as unknown as Enums<"source_status">;
+
 async function reclaimAbandoned(service: ServiceClient, projectId: string): Promise<void> {
   const cutoff = new Date(Date.now() - ABANDONED_AFTER_MS).toISOString();
   const { data: stale, error } = await service
     .from("knowledge_sources")
     .select("id, storage_key")
     .eq("project_id", projectId)
-    .eq("status", "uploading")
+    .eq("status", UPLOADING)
     .lt("created_at", cutoff);
   if (error) {
     console.error(`Could not look up abandoned reservations for project ${projectId}`, error);

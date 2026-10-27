@@ -36,7 +36,7 @@ function from(table: string) {
   }
   throw new Error(`unexpected table ${table}`);
 }
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ rpc: fake.rpc, from }) }));
+vi.mock("../../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ rpc: fake.rpc, from }) }));
 
 const createKnowledgeUploadUrl = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());

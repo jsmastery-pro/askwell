@@ -58,7 +58,7 @@ function from(table: string) {
     select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => fake.existingResult }) }) }),
   };
 }
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
+vi.mock("../../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
 
 const { POST } = await import("./route");
 
