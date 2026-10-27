@@ -25,7 +25,8 @@
     "@types/pg": "catalog:",
     "@types/node": "catalog:",
     "@electric-sql/pglite": "catalog:",
-    "@electric-sql/pglite-pgvector": "catalog:"
+    "@electric-sql/pglite-pgvector": "catalog:",
+    "supabase": "^2.122.0"
   },
   "exports": {
     ".": "./schema/index.ts",
