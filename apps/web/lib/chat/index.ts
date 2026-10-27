@@ -78,7 +78,10 @@ export async function handleChat(
   if (await hasReadyChunks(service, projectId)) {
     const { data: matches, error: matchError } = await service.rpc("match_chunks", {
       p_project_id: projectId,
-      p_query_embedding: await embedQuery(message),
+      // pgvector columns and args are typed as `string`: the generator has no TS type for
+      // `vector`, so this is the permanent shape, not a dev-lag gap. JSON's array syntax is also
+      // pgvector's text input syntax, so stringifying is enough — no separate formatting needed.
+      p_query_embedding: JSON.stringify(await embedQuery(message)),
       p_match_count: RETRIEVAL_TOP_K,
     });
     if (matchError) throw matchError;
@@ -93,7 +96,10 @@ export async function handleChat(
 
   const { data: savedRows, error: saveError } = await service.rpc("save_chat_turn", {
     p_project_id: projectId,
-    p_conversation_id: conversationId ?? null,
+    // The generator has no way to mark a Postgres function argument nullable (unlike a column),
+    // so `db:types` types this as a plain `string` even though the real function accepts null for
+    // a new conversation — a permanent generator gap, not a dev-lag one like source_status.
+    p_conversation_id: (conversationId ?? null) as unknown as string,
     p_visitor_id: visitorId,
     p_question: message,
     p_reply: reply,
