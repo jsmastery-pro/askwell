@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | SB-T04, SB-T05, SB-T06, SB-T07 |
-| Files allowed | `packages/db/**`, `apps/web/lib/widget-config/test-db.ts`, `package.json`, `apps/web/package.json`, `packages/db/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/next.config.ts` (only if it references removed packages), any remaining test that still imports Drizzle |
+| Files allowed | `packages/db/**`, `apps/web/lib/widget-config/test-db.ts`, `package.json`, `pnpm-workspace.yaml` (Drizzle/pg catalog entries only), `turbo.json` (`db:generate`/`db:migrate` tasks only), `apps/web/package.json`, `packages/db/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/next.config.ts` (only if it references removed packages), any remaining test that still imports Drizzle |
 | project.md | §3, §11 |
 
 ## Steps
