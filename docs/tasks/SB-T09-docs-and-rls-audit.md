@@ -21,3 +21,7 @@
 ## Done when
 - [ ] Docs match the code
 - [ ] The audit report is written, with no open high or medium findings before launch
+
+## Notes
+- **From SB-T04 (Bob, 2026-10-27):** the dev security advisor flags `rls_auto_enable()`, Supabase's own SECURITY DEFINER event-trigger function, as executable by `anon` and `authenticated` through `/rest/v1/rpc`. It's not ours. An event-trigger function can't be called directly, so the risk looks low, but the audit confirms that on dev and on prod. If it's reachable, a migration revokes EXECUTE from `PUBLIC`, `anon` and `authenticated`.
+- `pnpm db:types` uses the Supabase CLI, which needs `SUPABASE_ACCESS_TOKEN` or `supabase login`. Agents don't have either and generate types through the MCP (same generator). The `CLAUDE.md` rewrite says so.
