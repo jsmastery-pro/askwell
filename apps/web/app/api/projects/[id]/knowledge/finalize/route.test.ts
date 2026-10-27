@@ -36,16 +36,42 @@ const actualDeleteKnowledgeSource = (
   await vi.importActual<typeof import("../../../../../../lib/knowledge")>("../../../../../../lib/knowledge")
 ).deleteKnowledgeSource;
 
-// The claim and revert steps are tested directly against this fake; the status updates and chunk
-// inserts that follow (processKnowledgeSource, deleteKnowledgeSource — SB-T07, also on the service
-// client) proxy straight through to a pglite db with the real Supabase migrations, which this
-// file's own SQL asserts read, so a row they touch is visible here and vice versa.
-type ClaimRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
-const fake = vi.hoisted(() => ({
-  claimResult: { data: null as ClaimRow | null, error: null as { message: string } | null },
-  existingResult: { data: null as { type: string } | null, error: null as { message: string } | null },
-  revertEq: vi.fn(async () => ({ data: null, error: null })),
-}));
+// The service client is faked over a pglite db with the real Supabase migrations, which this
+// file's own SQL asserts read: the route's claim (uploading → processing), its fallback lookup and
+// its revert (processing → uploading) run as the same filtered UPDATE/SELECT on the real row, as
+// do the status updates, row delete and chunk inserts that follow (processKnowledgeSource,
+// deleteKnowledgeSource, SB-T07). So a status transition the route makes is one the asserts see.
+type SourceRow = { id: string; title: string; type: string; storage_key: string | null; status: string; created_at: Date };
+
+const SOURCE_FILTER_COLUMNS = ["id", "project_id", "status"];
+
+/** A knowledge_sources query filtered by .eq() calls: `sql` gets the WHERE clause, `params` come first. */
+function sourcesQuery(sql: (where: string) => string, params: unknown[]) {
+  const filters: [string, unknown][] = [];
+  const run = async () => {
+    const where = filters.map(([column], i) => `${column} = $${params.length + i + 1}`).join(" AND ");
+    const { rows } = await db.query<SourceRow>(sql(where), [...params, ...filters.map(([, value]) => value)]);
+    return rows;
+  };
+  // As PostgREST returns it: timestamps as ISO strings.
+  const first = async () => {
+    const [row] = await run();
+    return { data: row ? { ...row, created_at: row.created_at.toISOString() } : null, error: null };
+  };
+  const query = {
+    eq(column: string, value: unknown) {
+      if (!SOURCE_FILTER_COLUMNS.includes(column)) throw new Error(`unexpected filter ${column}`);
+      filters.push([column, value]);
+      return query;
+    },
+    select: () => ({ maybeSingle: first }),
+    maybeSingle: first,
+    // Awaited without .select(): a plain update, like the real builder's { error }.
+    then: (resolve: (result: { error: null }) => void, reject: (error: unknown) => void) =>
+      run().then(() => resolve({ error: null }), reject),
+  };
+  return query;
+}
 
 function from(table: string) {
   if (table === "knowledge_chunks") {
@@ -65,25 +91,9 @@ function from(table: string) {
   }
   if (table !== "knowledge_sources") throw new Error(`unexpected table ${table}`);
   return {
-    update(values: { status: "processing" | "uploading" | "ready" | "failed" }) {
-      if (values.status === "processing") {
-        // The atomic claim: processing only from uploading, once.
-        return { eq: () => ({ eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => fake.claimResult }) }) }) }) };
-      }
-      if (values.status === "uploading") {
-        // The best-effort revert on a storage-read failure: fire-and-forget, no select after it.
-        return { eq: () => ({ eq: fake.revertEq }) };
-      }
-      // ready/failed: processKnowledgeSource's real status update, proxied to the real pglite row.
-      const status = values.status as "ready" | "failed";
-      return {
-        eq: async (_column: string, id: string) => {
-          await db.query("UPDATE public.knowledge_sources SET status = $1 WHERE id = $2", [status, id]);
-          return { error: null };
-        },
-      };
-    },
-    select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => fake.existingResult }) }) }),
+    update: (values: { status: "processing" | "uploading" | "ready" | "failed" }) =>
+      sourcesQuery((where) => `UPDATE public.knowledge_sources SET status = $1 WHERE ${where} RETURNING *`, [values.status]),
+    select: () => sourcesQuery((where) => `SELECT * FROM public.knowledge_sources WHERE ${where}`, []),
     delete: () => ({
       eq: async (_column: string, id: string) => {
         await db.query("DELETE FROM public.knowledge_sources WHERE id = $1", [id]);
@@ -115,9 +125,6 @@ beforeEach(() => {
   deleteKnowledgeFile.mockResolvedValue(undefined);
   embedTexts.mockReset();
   embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
-  fake.claimResult = { data: null, error: null };
-  fake.existingResult = { data: null, error: null };
-  fake.revertEq.mockClear();
   deleteKnowledgeSource.mockReset();
   deleteKnowledgeSource.mockImplementation(actualDeleteKnowledgeSource);
 });
@@ -139,13 +146,11 @@ async function seedProject(ownerId: string, publicKey: string) {
   return rows[0]!.id;
 }
 
-type SourceRow = { id: string; title: string; type: string; storage_key: string | null; status: string; created_at: Date };
-
 async function seedSource(
   projectId: string,
   overrides: { title?: string; type?: string; storage_key?: string | null; status?: string } = {},
 ) {
-  const { title = "doc.pdf", type = "pdf", storage_key = "projects/p/s", status = "processing" } = overrides;
+  const { title = "doc.pdf", type = "pdf", storage_key = "projects/p/s", status = "uploading" } = overrides;
   const { rows } = await db.query<SourceRow>(
     `INSERT INTO public.knowledge_sources (project_id, title, type, storage_key, status)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -157,21 +162,6 @@ async function seedSource(
 async function sourceRows(id: string) {
   const { rows } = await db.query<SourceRow>("SELECT * FROM public.knowledge_sources WHERE id = $1", [id]);
   return rows;
-}
-
-/** Arms a successful claim with the real seeded row's fields, so ids line up with the SQL asserts. */
-function claimable(source: SourceRow) {
-  fake.claimResult = {
-    data: {
-      id: source.id,
-      title: source.title,
-      type: source.type,
-      storage_key: source.storage_key!,
-      status: "processing",
-      created_at: source.created_at.toISOString(),
-    },
-    error: null,
-  };
 }
 
 function request(sourceId: string) {
@@ -220,9 +210,8 @@ describe("not found", () => {
 
   it("returns 404 for a pasted-text source (no file to finalize)", async () => {
     const projectId = await seedProject("owner_text", "pk_text");
-    const source = await seedSource(projectId, { type: "text", storage_key: null });
+    const source = await seedSource(projectId, { type: "text", storage_key: null, status: "processing" });
     signIn("owner_text", projectId);
-    fake.existingResult = { data: { type: "text" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(404);
   });
@@ -233,7 +222,6 @@ describe("already finalized", () => {
     const projectId = await seedProject("owner_done", "pk_done");
     const source = await seedSource(projectId, { status: "ready" });
     signIn("owner_done", projectId);
-    fake.existingResult = { data: { type: "pdf" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
   });
@@ -244,7 +232,6 @@ describe("success", () => {
     const projectId = await seedProject("owner_ok", "pk_ok");
     const source = await seedSource(projectId, { title: "handbook.pdf" });
     signIn("owner_ok", projectId);
-    claimable(source);
     readKnowledgeFile.mockResolvedValue(samplePdf);
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -268,7 +255,6 @@ describe("success", () => {
     const projectId = await seedProject("owner_txt", "pk_txt");
     const source = await seedSource(projectId, { type: "txt", title: "notes.txt" });
     signIn("owner_txt", projectId);
-    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("Some notes."));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -281,7 +267,6 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_empty", "pk_empty");
     const source = await seedSource(projectId);
     signIn("owner_empty", projectId);
-    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(0));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -295,7 +280,6 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_big", "pk_big");
     const source = await seedSource(projectId);
     signIn("owner_big", projectId);
-    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(11 * 1024 * 1024));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -307,7 +291,6 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_fake", "pk_fake");
     const source = await seedSource(projectId);
     signIn("owner_fake", projectId);
-    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("not a real pdf"));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -320,7 +303,6 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_delfail", "pk_delfail");
     const source = await seedSource(projectId);
     signIn("owner_delfail", projectId);
-    claimable(source);
     vi.spyOn(console, "error").mockImplementation(() => {});
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(0));
     deleteKnowledgeSource.mockRejectedValueOnce(new Error("db down"));
@@ -328,10 +310,9 @@ describe("refusals clean up the row and the object", () => {
     const res = await POST(request(source.id), ctx(projectId));
 
     expect(res.status).toBe(500);
-    // The row is untouched (never reached the real pglite delete) and the object is never removed.
-    expect(await sourceRows(source.id)).toHaveLength(1);
+    // The row is kept (never reached the real pglite delete) and claimable again; the object is never removed.
+    expect(await sourceRows(source.id)).toMatchObject([{ status: "uploading" }]);
     expect(deleteKnowledgeFile).not.toHaveBeenCalled();
-    expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });
 });
 
@@ -340,14 +321,12 @@ describe("storage read failure", () => {
     const projectId = await seedProject("owner_readfail", "pk_readfail");
     const source = await seedSource(projectId);
     signIn("owner_readfail", projectId);
-    claimable(source);
     vi.spyOn(console, "error").mockImplementation(() => {});
     readKnowledgeFile.mockRejectedValue(new Error("object not found"));
 
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
-    expect(await sourceRows(source.id)).toHaveLength(1);
+    expect(await sourceRows(source.id)).toMatchObject([{ status: "uploading" }]);
     expect(deleteKnowledgeFile).not.toHaveBeenCalled();
-    expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });
 });
