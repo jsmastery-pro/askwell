@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | SB-T03 and SB-T11, merged and applied to dev |
-| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only), co-located tests |
+| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only), `supabase/migrations/**` (one new migration: `owner_activity`), `packages/db/supabase-*.test.ts` (its tests), co-located tests |
 | project.md | §6.3, §6.7, §6.8, §6.12, §9 |
 
 ## Steps
@@ -38,5 +38,6 @@ You can write steps 1–4 before this, with an untyped client; the PR opens once
 
 ## Notes
 - CodeRabbit is required.
+- **Dashboard analytics (decided 2026-10-27, John):** PostgREST caps responses at 1,000 rows and has aggregates off, so daily counts and period totals become one Postgres function, `owner_activity(p_start, p_end)`: `SECURITY INVOKER`, `search_path = ''`, EXECUTE for `authenticated` only (revoked from `PUBLIC`, `anon`), no owner or limit parameter, so RLS scopes it to the caller. Refuse `p_end < p_start` or a range over 366 days with `22023`. Test on pglite: A's call never counts B's rows; `anon` can't execute. Don't turn on PostgREST aggregates project-wide. Recent chats and the conversation list stay on PostgREST (embedded counts, referenced-table order and limit).
 - **Deleting a project** must also delete its files in Storage. RLS deletes the row and cascades the child rows, but not Storage objects. List the project's `storage_key`s first, delete the row with the owner client, then remove the objects with the service client.
 - Our owner client runs on the server, but the Data API is public: any signed-in user can call it with the publishable key and their own Clerk token. RLS and the grants in SB-T02 are the real boundary, so never add a policy or grant just to make a route work. Ask John first.
