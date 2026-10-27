@@ -2,10 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Owner | Alice (API and database checks) + product owner (browser steps) |
+| Owner | Alice (API and database checks only) |
 | Track | Supabase-native |
 | Needs first | SB-T04…T08 merged; the three Supabase vars in Vercel Preview |
 | Files allowed | None. This is a check, not a code change. Report results to John; open a bug note for anything that fails. |
+
+## Scope change (2026-10-27)
+The product owner tests the whole app in a browser at launch (P6-T05), so the browser steps below are skipped here. Alice seeds her own throwaway test project on dev and runs the API and database checks that need no browser.
 
 ## Why
 SB-T04…T07 were checked with tests and against dev's database, but never on a running preview: the Vercel env wasn't there yet. This covers every preview "Done when" left open on those tasks, in one pass.
