@@ -269,6 +269,6 @@ Lane B (Customize) added once a developer is free for it.
 | SB-T04 | Generated types; owner side on `supabase-js` + RLS | Bob | SB-T03, SB-T11 (on dev) | in progress | — |
 | SB-T05 | Widget, chat, billing webhook on `supabase-js` + `rpc()` | Alice | SB-T04, SB-T11 | in progress | — |
 | SB-T06 | Storage with direct signed uploads; 10 MB | Alice | SB-T03, SB-T04 | in progress | — |
-| SB-T07 | Knowledge processing on Supabase | Alice | SB-T05, SB-T06 | todo | — |
+| SB-T07 | Knowledge processing on Supabase | Alice | SB-T05, SB-T06 | in progress | — |
 | SB-T08 | Remove Drizzle, pg, S3 SDK, old env (pglite stays for tests) | Bob | SB-T04…T07 | todo | — |
 | SB-T09 | Spec rewrite + RLS / function-grant security audit | John | alongside; audit after SB-T08 | in progress | — |
