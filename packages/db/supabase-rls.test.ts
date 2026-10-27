@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { actAs, connectLocalSupabase } from "./supabase-local";
 
 const local = await connectLocalSupabase();
-if (!local.client) console.warn(`Skipping the Supabase RLS tests: ${local.reason}`);
+if (!local.client) process.stderr.write(`\nSkipping the Supabase RLS tests: ${local.reason}\n\n`);
 
 const A = "user_a";
 const B = "user_b";
