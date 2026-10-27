@@ -134,7 +134,9 @@ ALTER TABLE public.knowledge_chunks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- `(SELECT auth.jwt() ...)` is evaluated once per statement, not once per row.
+-- `(SELECT auth.jwt() ...)` is evaluated once per statement, not once per row. The ownership
+-- helpers take the row's column, so they're called per row (one indexed lookup each); wrapping
+-- them in SELECT wouldn't cache anything.
 
 -- accounts: read your own row. The plan is written by the server (Clerk billing webhook) only.
 CREATE POLICY accounts_select_own ON public.accounts
@@ -160,23 +162,23 @@ CREATE POLICY projects_delete_own ON public.projects
 -- save, knowledge add, the message quota) or come from widget visitors, so they get no policy.
 CREATE POLICY widget_configs_select_own ON public.widget_configs
   FOR SELECT TO authenticated
-  USING ((SELECT public.owns_project(project_id)));
+  USING (public.owns_project(project_id));
 
 CREATE POLICY knowledge_sources_select_own ON public.knowledge_sources
   FOR SELECT TO authenticated
-  USING ((SELECT public.owns_project(project_id)));
+  USING (public.owns_project(project_id));
 
 CREATE POLICY knowledge_chunks_select_own ON public.knowledge_chunks
   FOR SELECT TO authenticated
-  USING ((SELECT public.owns_project(project_id)));
+  USING (public.owns_project(project_id));
 
 CREATE POLICY conversations_select_own ON public.conversations
   FOR SELECT TO authenticated
-  USING ((SELECT public.owns_project(project_id)));
+  USING (public.owns_project(project_id));
 
 CREATE POLICY messages_select_own ON public.messages
   FOR SELECT TO authenticated
-  USING ((SELECT public.owns_conversation(conversation_id)));
+  USING (public.owns_conversation(conversation_id));
 
 -- Privileges ----------------------------------------------------------------------------------
 -- RLS covers rows; these cover what policies can't.
