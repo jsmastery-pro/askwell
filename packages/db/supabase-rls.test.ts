@@ -56,11 +56,16 @@ async function visibleProjects(db: PGlite, table: (typeof ALL_TABLES)[number]): 
   return rows.map((r) => r.project);
 }
 
-describe("Supabase RLS", () => {
+// Both Data API defaults: existing projects auto-grant new tables to the API roles, new projects
+// don't. The migration grants and revokes explicitly, so every case must hold under both.
+describe.each([
+  { autoExposeNewTables: true, label: "auto-exposed tables" },
+  { autoExposeNewTables: false, label: "opt-in exposure" },
+])("Supabase RLS ($label)", ({ autoExposeNewTables }) => {
   let db: PGlite;
 
   beforeAll(async () => {
-    db = await createSupabaseTestDb();
+    db = await createSupabaseTestDb({ autoExposeNewTables });
   });
   beforeEach(async () => {
     await db.exec("BEGIN");
@@ -97,19 +102,20 @@ describe("Supabase RLS", () => {
     await actAs(db, A);
     await expect(
       db.query("INSERT INTO projects (owner_id, name, public_key) VALUES ($1, 'direct', 'pk_direct')", [A]),
-    ).rejects.toThrow(/row-level security/);
+    ).rejects.toThrow(/permission denied/);
   });
 
   it("doesn't let an owner write child tables directly", async () => {
     await actAs(db, A);
-    await expect(
-      db.query("UPDATE widget_configs SET label = 'x' WHERE project_id = $1 RETURNING 1", [PROJECT_A]),
-    ).resolves.toMatchObject({ affectedRows: 0 });
-    await db.query("SAVEPOINT s");
-    await expect(
-      db.query("INSERT INTO knowledge_sources (project_id, title, type) VALUES ($1, 't', 'text')", [PROJECT_A]),
-    ).rejects.toThrow(/row-level security/);
-    await db.query("ROLLBACK TO SAVEPOINT s");
+    for (const sql of [
+      "UPDATE widget_configs SET label = 'x'",
+      "INSERT INTO knowledge_sources (project_id, title, type) VALUES ($1, 't', 'text')",
+      "DELETE FROM messages",
+    ]) {
+      await db.query("SAVEPOINT s");
+      await expect(db.query(sql, sql.includes("$1") ? [PROJECT_A] : []), sql).rejects.toThrow(/permission denied/);
+      await db.query("ROLLBACK TO SAVEPOINT s");
+    }
   });
 
   it("lets an owner rename only their own project, and not touch the quota or key", async () => {

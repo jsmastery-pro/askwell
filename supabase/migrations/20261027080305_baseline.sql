@@ -181,17 +181,21 @@ CREATE POLICY messages_select_own ON public.messages
   USING (public.owns_conversation(conversation_id));
 
 -- Privileges ----------------------------------------------------------------------------------
--- RLS covers rows; these cover what policies can't.
-
--- anon gets nothing, not even a privilege for a future policy to open up by mistake.
+-- RLS covers rows; grants cover operations and columns. Supabase is moving new projects from
+-- automatic grants on new `public` tables to opt-in, so nothing here relies on the default either
+-- way: revoke everything from the API roles, then grant exactly what the policies above use.
+-- (A missing grant fails with 42501 before any policy runs.)
 REVOKE ALL ON public.accounts, public.projects, public.widget_configs, public.knowledge_sources,
-  public.knowledge_chunks, public.conversations, public.messages FROM anon;
+  public.knowledge_chunks, public.conversations, public.messages FROM anon, authenticated;
 
--- RLS doesn't apply to TRUNCATE, and Supabase grants it to its API roles.
-REVOKE TRUNCATE ON public.accounts, public.projects, public.widget_configs, public.knowledge_sources,
-  public.knowledge_chunks, public.conversations, public.messages FROM authenticated;
+-- anon gets nothing, not even a privilege for a future policy to open up by mistake. Neither role
+-- keeps TRUNCATE, which RLS doesn't apply to.
+
+-- authenticated reads every table (rows filtered by the policies) and deletes projects.
+GRANT SELECT ON public.accounts, public.projects, public.widget_configs, public.knowledge_sources,
+  public.knowledge_chunks, public.conversations, public.messages TO authenticated;
+GRANT DELETE ON public.projects TO authenticated;
 
 -- A policy can't limit columns: the owner may rename a project, but not reset messages_used or
 -- period_start (the quota), change public_key, or hand the project to someone else.
-REVOKE UPDATE ON public.projects FROM authenticated;
 GRANT UPDATE (name) ON public.projects TO authenticated;
