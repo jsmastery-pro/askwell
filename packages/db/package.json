@@ -31,6 +31,7 @@
   "exports": {
     ".": "./schema/index.ts",
     "./client": "./client.ts",
-    "./queries": "./queries/index.ts"
+    "./queries": "./queries/index.ts",
+    "./types": "./types.ts"
   }
 }
