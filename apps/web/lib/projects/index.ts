@@ -6,6 +6,7 @@ import { ensureAccount } from "../../app/dashboard/account";
 import { getAccountPlan } from "../data/billing";
 import { isUuid } from "../data/ids";
 import { captureServerEvent } from "../posthog/server";
+import { deleteKnowledgeFiles } from "../storage";
 import { createOwnerClient, type OwnerClient } from "../supabase/owner";
 import { isoTimestamp, SupabaseQueryError, unwrap } from "../supabase/query";
 import { createServiceClient, type ServiceClient } from "../supabase/service";
@@ -89,10 +90,7 @@ export async function renameProject(
  * cascade in the database; its files in Storage don't, so their keys are read first and the
  * objects removed after the row is gone. False if it doesn't exist or isn't theirs.
  */
-export async function deleteProject(
-  id: string,
-  { owner = createOwnerClient(), service = createServiceClient() }: { owner?: OwnerClient; service?: ServiceClient } = {},
-): Promise<boolean> {
+export async function deleteProject(id: string, owner: OwnerClient = createOwnerClient()): Promise<boolean> {
   if (!isUuid(id)) return false;
   // Plans cap sources per project at a few dozen, well under one page.
   const sources = unwrap(
@@ -104,16 +102,13 @@ export async function deleteProject(
   // The row goes first: a storage failure then only orphans files, never leaves a project whose
   // files are gone (the same order as deleting one knowledge source).
   const keys = (sources ?? []).flatMap((source) => (source.storage_key ? [source.storage_key] : []));
-  if (keys.length > 0) await removeProjectFiles(id, keys, service);
+  if (keys.length > 0) await removeProjectFiles(id, keys);
   return true;
 }
 
-async function removeProjectFiles(projectId: string, keys: string[], service: ServiceClient): Promise<void> {
-  const bucket = process.env.BUCKET_NAME;
+async function removeProjectFiles(projectId: string, keys: string[]): Promise<void> {
   try {
-    if (!bucket) throw new Error("BUCKET_NAME is not set");
-    const { error } = await service.storage.from(bucket).remove(keys);
-    if (error) throw error;
+    await deleteKnowledgeFiles(keys);
   } catch (error) {
     console.error(`Could not delete ${keys.length} storage object(s) of deleted project ${projectId}`, error);
   }
