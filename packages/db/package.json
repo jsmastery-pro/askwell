@@ -3,35 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "./schema/index.ts",
-  "types": "./schema/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "build": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
-  },
-  "dependencies": {
-    "drizzle-orm": "catalog:",
-    "pg": "catalog:"
+    "build": "tsc --noEmit"
   },
   "devDependencies": {
-    "drizzle-kit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "eslint": "catalog:",
-    "@types/pg": "catalog:",
     "@types/node": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@electric-sql/pglite-pgvector": "catalog:",
     "supabase": "^2.122.0"
   },
   "exports": {
-    ".": "./schema/index.ts",
-    "./client": "./client.ts",
-    "./queries": "./queries/index.ts",
     "./types": "./types.ts"
   }
 }
