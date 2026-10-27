@@ -219,7 +219,7 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
 | P6-T06 | Fix the landing "Install in one line" section | Bob | P6-T03, P6-T04 | done | #83 |
 | P6-T07 | Landing nav knows you're signed in | Bob | — | done | #90 |
-| P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05 | todo | — |
+| P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05, SB-T01…T10 | todo | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
 
@@ -242,3 +242,30 @@ Lane B (Customize) added once a developer is free for it.
 | MV-T04 | Storage on Supabase; 4 MB uploads | Alice | MV-T01 | done | #88 (verified live 2026-10-26: upload → ready, delete, 4.2 MB → 413) |
 | MV-T06 | `vercel.json` for Vercel's import (one service, `web`) | Alice | MV-T02 | done | #89 |
 | MV-T07 | `pnpm db:migrate` reads `DIRECT_URL` from `.env.local` | Bob | MV-T03 | done | #91 |
+
+---
+
+## Supabase-native data layer
+
+> **Decision (2026-10-27, product owner):** Askwell is built for a JSM video, and Supabase is a sponsor, so it uses Supabase the native way, not as plain Postgres + S3:
+> - `supabase-js` everywhere
+> - RLS policies enforce tenant isolation for owner data, with Clerk connected through Supabase's third-party auth, so Clerk keeps sign-in and billing
+> - Postgres functions through `rpc()` for atomic operations, callable only by our server
+> - Storage with direct signed uploads, so uploads go back to **10 MB**
+> - Supabase CLI migrations and generated types
+> - the Supabase MCP for agents, dev only
+>
+> Drizzle, `pg`, pglite and the S3 SDK are removed at the end. The current app stays live until the new layer replaces it. The P6-T05 launch check runs on this version.
+
+| ID | Task | Owner | Needs | Status | PR |
+|---|---|---|---|---|---|
+| SB-T01 | Clerk ↔ Supabase, Data API on, keys, MCP (dev only), agent skills | Product owner | — | todo | — |
+| SB-T10 | Spike: local Supabase + MCP inside the sandboxes | Alice | — | in progress | — |
+| SB-T02 | Supabase schema, RLS policies, generated types | Bob | — | in progress | — |
+| SB-T03 | Postgres functions for atomic operations (`rpc()`) | Bob | SB-T02 | todo | — |
+| SB-T04 | Owner side on `supabase-js` + RLS | Bob | SB-T03 | todo | — |
+| SB-T05 | Widget, chat, billing webhook on `supabase-js` + `rpc()` | Alice | SB-T03 | todo | — |
+| SB-T06 | Storage with direct signed uploads; 10 MB | Alice | SB-T03 | todo | — |
+| SB-T07 | Knowledge processing on Supabase | Alice | SB-T05, SB-T06 | todo | — |
+| SB-T08 | Remove Drizzle, pg, pglite, S3 SDK, old env | Bob | SB-T04…T07 | todo | — |
+| SB-T09 | Spec rewrite + RLS / function-grant security audit | John | alongside; audit after SB-T08 | in progress | — |
