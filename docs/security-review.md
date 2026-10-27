@@ -57,3 +57,44 @@ All closed on 2026-10-20 (John):
 
 - ~~Whether `verifyWebhook` rejects requests when `CLERK_WEBHOOK_SIGNING_SECRET` is unset.~~ **Verified in #80:** with the secret unset, a correctly signed request gets 400 and nothing changes (webhook route test).
 - ~~Whether the installed `@arcjet/next` version supports `proxies` (L11).~~ **Answered in #80:** it does, but on InstaCloud Arcjet resolves the IP from `x-forwarded-for`, so `cloudflare()` didn't apply. #80 passes a validated `ipSrc` instead.
+
+---
+
+# Supabase-native audit (SB-T09)
+
+Audit of every RLS policy, table and column grant, function grant, Storage setting and Supabase advisor finding after the Supabase-native track (#92–#99), against `main` at `f982e41`, 2026-10-27, by John. The database facts are read-only query results from the dev project (`pasgozggqtprenfgtghb`), collected by Bob through the MCP. The code checks are mine, on `main`.
+
+**Result:** no high or medium findings. 2 low, 2 informational. The design in `project.md` §7 matches the live database.
+
+## Findings
+
+| ID | Severity | Where | What | Fix | Status |
+|---|---|---|---|---|---|
+| S1 | low | `public.rls_auto_enable()` (Supabase's own, created by the project's "auto-enable RLS" setting) | SECURITY DEFINER, and `PUBLIC`, `anon` and `authenticated` all have EXECUTE. Advisor lints 0028/0029. Called as `anon` through `/rest/v1/rpc` (GET and POST), it returns 400 `0A000` ("cannot display a value of type event_trigger"). Postgres doesn't run an event-trigger function outside its trigger, so it does nothing, but nothing should be able to call it. | A migration that revokes EXECUTE from `PUBLIC`, `anon` and `authenticated`, guarded so it skips a project where the function doesn't exist. | Open (fix task) |
+| S2 | low | Storage bucket `askwell` (dev) | The pre-SB-T06 bucket: private, but with no size or type limit. Nothing has used it since #96. Its objects are throwaway. | Delete it on dev. Prod must only have `knowledge` (P6-T05 cutover step 5 checks this). | Open (product owner, dashboard) |
+| S3 | info | `owned_project_ids()`, `owned_conversation_ids()` | SECURITY DEFINER and executable by `authenticated`, so an owner can call them through `/rest/v1/rpc` (lint 0029). They return only the caller's own IDs (`auth.jwt()->>'sub'`), which the owner can already read. `anon` can't execute them. | None needed. Optional hardening: move them to a schema the Data API doesn't expose. | Accepted |
+| S4 | info | Policies on `accounts` and `projects` | Performance lint 0003 (`auth_rls_initplan`). The stored policies already use `(select auth.jwt() ->> 'sub')`, the form the lint asks for, so this looks like a false positive. Not checked with `EXPLAIN` (dev has no rows). | Re-run the advisor on prod after launch data exists; check with `EXPLAIN` if it persists. | Accepted |
+
+Also from the advisor: `knowledge_chunks_embedding_idx` unused (INFO 0005), expected with 0 rows.
+
+## Passing checks
+
+| Check | Evidence |
+|---|---|
+| RLS on every table | All 7 `public` tables have RLS on. All Storage tables have RLS on. |
+| Policies | 9, all for `authenticated`: SELECT on all 7 tables (own rows: `owner_id`/`clerk_user_id = (select auth.jwt()->>'sub')`, or `project_id in owned_project_ids()`, or `conversation_id in owned_conversation_ids()`), plus UPDATE and DELETE on own `projects`. No policy for `anon`. No Storage policies. |
+| `anon` | No table grant, no column grant and no EXECUTE on any of our functions. |
+| `authenticated` writes | Table grants: SELECT on all 7, plus DELETE on `projects`. Column grants: UPDATE on `projects.name` only. So an owner can't change `owner_id`, `public_key`, `messages_used`, `period_start` or their plan. |
+| `service_role` | SELECT, INSERT, UPDATE and DELETE on the 7 tables. No TRUNCATE, REFERENCES or TRIGGER on `public` (TRUNCATE revoked from every API role). |
+| Limit functions | `create_project`, `reserve_knowledge_source`, `consume_message`, `save_chat_turn`, `match_chunks` and `add_one_month`: SECURITY INVOKER, `search_path=""`, EXECUTE for `service_role` only. |
+| `owner_activity` | SECURITY INVOKER, `search_path=""`, EXECUTE for `authenticated` only (not `service_role`, which would see every owner). Bob's dev check: owner A sees only A's rows; `anon` and `service_role` get 42501. |
+| `search_path` | Pinned to `''` on all 9 of our functions. |
+| Storage | `knowledge` bucket: private, 10,485,760 bytes, `application/pdf`, `text/markdown`, `text/plain`. No Storage policies, so only the secret key or a one-time signed upload URL reaches it. |
+| Secret key | `SUPABASE_SECRET_KEY` is read only in `apps/web/lib/supabase/service.ts`, which imports `server-only`. No `"use client"` file and no widget code imports it. The widget bundle has no Supabase code at all. |
+| Owner reads | Owner pages and routes read through `createOwnerClient()` (RLS). The service client is used only by visitor routes, the webhook, knowledge processing, Storage, sign-up and the gated writes (create project, reserve and finalize a source, save widget config), each after the route checks ownership and plan. |
+| Aggregates | PostgREST aggregates stay off. The one embedded `messages(count)` was verified against dev in #95 (200, no PGRST123). |
+
+## Not verified
+
+- Prod. Everything above is dev. P6-T05's cutover runs the security advisor on prod before promoting.
+- That `rls_auto_enable()`'s body never runs when called through the API. Inferred from Postgres's rule for event-trigger functions plus the 400; no server logs were read.
