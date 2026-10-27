@@ -50,8 +50,8 @@ describe("Billing page", () => {
     );
     expect(within(list).getByRole("meter", { name: "Help center: messages used this month" }).getAttribute("aria-valuenow")).toBe("85");
     expect(within(list).getByText("85% used.")).toBeTruthy();
-    expect(listProjectUsage).toHaveBeenCalledWith("user_owner");
-    expect(getAccountPlan).toHaveBeenCalledWith("user_owner");
+    expect(listProjectUsage).toHaveBeenCalledWith();
+    expect(getAccountPlan).toHaveBeenCalledWith();
   });
 
   it("shows Pro with Manage subscription, and the limit on every project", async () => {

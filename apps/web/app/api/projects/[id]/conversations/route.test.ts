@@ -1,79 +1,97 @@
 // @vitest-environment node
-import { accounts, conversations, projects } from "@askwell/db";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, type TestDb } from "../../../../../lib/widget-config/test-db";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { argsOf, callsTo, fakeSupabase, type FakeHandlers, type FakeSupabase } from "../../../../../lib/supabase/fake";
 
+// The project and its conversations are read through the owner client (RLS); that RLS hides
+// another owner's project is tested against the real migrations on pglite (packages/db). Here,
+// another owner's project is one the fake owner client doesn't return.
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
+const state = vi.hoisted(() => ({ userId: null as string | null, owner: undefined as unknown }));
+vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
+vi.mock("../../../../../lib/supabase/owner", () => ({ createOwnerClient: () => state.owner }));
+vi.mock("../../../../../lib/supabase/service", () => ({
+  createServiceClient: () => {
+    throw new Error("real service client used in a test");
   },
 }));
-vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
 
 const { GET } = await import("./route");
 
-let db: TestDb;
-let close: () => Promise<void>;
+const PROJECT_ID = "00000000-0000-4000-8000-000000000001";
 
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
-});
+let owner: FakeSupabase;
 
-afterAll(() => close());
+function signIn(userId: string, handlers: FakeHandlers = {}) {
+  state.userId = userId;
+  owner = fakeSupabase(handlers);
+  state.owner = owner;
+}
+
+const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+const req = () => new Request("https://app.test");
 
 beforeEach(() => {
   state.userId = null;
+  state.owner = undefined;
 });
-
-const as = (userId: string | null) => {
-  state.userId = userId;
-};
-const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-
-async function seedProjectWithConversation(ownerId: string, publicKey: string) {
-  await db.insert(accounts).values({ clerkUserId: ownerId, plan: "free" }).onConflictDoNothing();
-  const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
-  await db.insert(conversations).values({ projectId: project!.id, visitorId: "v1" });
-  return project!.id;
-}
 
 describe("unauthenticated", () => {
   it("returns 401", async () => {
-    const res = await GET(new Request("https://app.test"), ctx("00000000-0000-4000-8000-000000000000"));
+    const res = await GET(req(), ctx(PROJECT_ID));
     expect(res.status).toBe(401);
   });
 });
 
 describe("GET /api/projects/:id/conversations", () => {
   it("lists the project's conversations", async () => {
-    const projectId = await seedProjectWithConversation("owner_a", "pk_conv_route_a");
-    as("owner_a");
+    signIn("owner_a", {
+      from: {
+        projects: { data: { id: PROJECT_ID, owner_id: "owner_a" } },
+        // One page, then an empty one (fetchAll stops on an empty page).
+        conversations: [
+          {
+            data: [
+              {
+                id: "c1",
+                visitor_id: "v1",
+                created_at: "2026-10-01T00:00:00+00:00",
+                message_count: [{ count: 2 }],
+                preview: [{ body: "Hi" }],
+              },
+            ],
+          },
+          { data: [] },
+        ],
+      },
+    });
 
-    const res = await GET(new Request("https://app.test"), ctx(projectId));
+    const res = await GET(req(), ctx(PROJECT_ID));
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.conversations).toHaveLength(1);
-    expect(body.conversations[0].visitorId).toBe("v1");
+    expect(body.conversations).toEqual([
+      { id: "c1", visitorId: "v1", messageCount: 2, preview: "Hi", createdAt: "2026-10-01T00:00:00.000Z" },
+    ]);
+    expect(argsOf(callsTo(owner, "projects")[0], "eq")).toEqual(["id", PROJECT_ID]);
+    const [list] = callsTo(owner, "conversations");
+    expect(list?.ops).toContainEqual(["eq", "project_id", PROJECT_ID]);
   });
 
   it("returns 404 for another owner's project", async () => {
-    const projectId = await seedProjectWithConversation("owner_b", "pk_conv_route_b");
-    as("owner_c");
+    signIn("owner_c");
 
-    const res = await GET(new Request("https://app.test"), ctx(projectId));
+    const res = await GET(req(), ctx(PROJECT_ID));
 
     expect(res.status).toBe(404);
     expect((await res.json()).error.code).toBe("not_found");
+    expect(callsTo(owner, "conversations")).toEqual([]);
   });
 
   it("returns 404 for a malformed id", async () => {
-    as("owner_d");
-    const res = await GET(new Request("https://app.test"), ctx("not-a-uuid"));
+    signIn("owner_d");
+    const res = await GET(req(), ctx("not-a-uuid"));
     expect(res.status).toBe(404);
+    expect(owner.calls).toEqual([]);
   });
 });

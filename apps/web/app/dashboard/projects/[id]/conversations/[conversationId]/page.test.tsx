@@ -1,13 +1,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { getOwnedProject, type ProjectRow } from "@askwell/db/queries";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MOCK_OTHER_PROJECT_ID, MOCK_OTHER_PROJECT_THREAD, MOCK_THREADS } from "../../../../../../lib/mock/conversations";
 import { getConversation } from "../../../../../../lib/data/conversations";
+import { getOwnedProject, type ProjectRow } from "../../../../../../lib/projects";
 import ConversationPage from "./page";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@clerk/nextjs/server", () => ({ auth: { protect: vi.fn(async () => ({ userId: "user_owner" })) } }));
-vi.mock("@askwell/db/queries", () => ({ getOwnedProject: vi.fn() }));
+vi.mock("../../../../../../lib/projects", () => ({ getOwnedProject: vi.fn() }));
 vi.mock("../../../../../../lib/data/conversations", () => ({ getConversation: vi.fn() }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -20,12 +20,12 @@ const PROJECT = "11111111-2222-4333-8444-555555555555";
 
 const owned = (id: string): ProjectRow => ({
   id,
-  ownerId: "user_owner",
+  owner_id: "user_owner",
   name: "Docs bot",
-  publicKey: "pk_test",
-  messagesUsed: 0,
-  periodStart: new Date(),
-  createdAt: new Date(),
+  public_key: "pk_test",
+  messages_used: 0,
+  period_start: new Date().toISOString(),
+  created_at: new Date().toISOString(),
 });
 
 afterEach(() => {

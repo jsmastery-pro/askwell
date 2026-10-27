@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { getOwnedProject } from "@askwell/db/queries";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getOwnedProject } from "../../../../lib/projects";
 import ProjectLayout from "./layout";
 
 const pathname = vi.hoisted(() => ({ current: "" }));
@@ -8,7 +8,7 @@ const pathname = vi.hoisted(() => ({ current: "" }));
 vi.mock("@clerk/nextjs/server", () => ({
   auth: { protect: vi.fn(async () => ({ userId: "user_owner" })) },
 }));
-vi.mock("@askwell/db/queries", () => ({ getOwnedProject: vi.fn() }));
+vi.mock("../../../../lib/projects", () => ({ getOwnedProject: vi.fn() }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
@@ -32,18 +32,19 @@ describe("ProjectLayout", () => {
   it("renders the project name and all five tabs", async () => {
     vi.mocked(getOwnedProject).mockResolvedValue({
       id: PROJECT_ID,
-      ownerId: "user_owner",
+      owner_id: "user_owner",
       name: "Docs bot",
-      publicKey: "pk_test",
-      messagesUsed: 0,
-      periodStart: new Date(),
-      createdAt: new Date(),
+      public_key: "pk_test",
+      messages_used: 0,
+      period_start: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
     pathname.current = `${base}/knowledge`;
 
     await renderLayout();
 
-    expect(getOwnedProject).toHaveBeenCalledWith(PROJECT_ID, "user_owner");
+    expect(screen.getByText("pk_test")).toBeTruthy();
+    expect(getOwnedProject).toHaveBeenCalledWith(PROJECT_ID);
     expect(screen.getByRole("heading", { name: "Docs bot" })).toBeTruthy();
     const tabs = screen.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")]);
     expect(tabs).toEqual([
