@@ -2,7 +2,9 @@ import { z } from "zod";
 import { deleteResponseSchema, type DeleteResponse } from "./projects";
 
 export const SOURCE_TYPES = ["text", "pdf", "md", "txt"] as const;
-export const SOURCE_STATUSES = ["processing", "ready", "failed"] as const;
+// `uploading`: a file reservation waiting for the browser's signed PUT and finalize's claim
+// (SB-T06). Pasted text and a claimed file both go straight to `processing`.
+export const SOURCE_STATUSES = ["uploading", "processing", "ready", "failed"] as const;
 
 // Back to 10 MB (SB-T06): the file goes straight from the browser to Supabase Storage with a
 // signed URL, so Vercel's 4.5 MB function-body limit no longer applies.

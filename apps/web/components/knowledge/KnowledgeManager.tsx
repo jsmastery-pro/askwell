@@ -341,7 +341,7 @@ export function KnowledgeManager({ projectId, initialSources, sourcesLimit, plan
 }
 
 function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
-  if (status === "processing") {
+  if (status === "processing" || status === "uploading") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
         <span className="h-1.5 w-1.5 rounded-full bg-warning motion-safe:animate-pulse" aria-hidden />

@@ -26,6 +26,40 @@ const readKnowledgeFile = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/storage", () => ({ readKnowledgeFile, deleteKnowledgeFile }));
 
+// The claim step now goes through the service client, not Drizzle (SB-T06 review item 1): a fake
+// of the one `.from("knowledge_sources")` shape finalize uses, independent of the real pglite
+// row's Drizzle-tracked status (which only ever needs to hold values its own enum already has —
+// `uploading` lives solely in supabase/migrations, exercised by packages/db's pglite tests, not
+// packages/db/migrations, which this fixture runs on).
+type ClaimRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
+const fake = vi.hoisted(() => ({
+  claimResult: { data: null as ClaimRow | null, error: null as { message: string } | null },
+  existingResult: { data: null as { type: string } | null, error: null as { message: string } | null },
+  revertEq: vi.fn(async () => ({ data: null, error: null })),
+}));
+
+function from(table: string) {
+  if (table !== "knowledge_sources") throw new Error(`unexpected table ${table}`);
+  return {
+    update(values: { status: string }) {
+      if (values.status === "uploading") {
+        // The best-effort revert on a storage-read failure: fire-and-forget, no select after it.
+        return { eq: () => ({ eq: fake.revertEq }) };
+      }
+      // The atomic claim: processing only from uploading, once.
+      return {
+        eq: () => ({
+          eq: () => ({
+            eq: () => ({ select: () => ({ maybeSingle: async () => fake.claimResult }) }),
+          }),
+        }),
+      };
+    },
+    select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => fake.existingResult }) }) }),
+  };
+}
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
+
 const { POST } = await import("./route");
 
 const samplePdf = readFileSync(fileURLToPath(new URL("../../../../../../lib/knowledge/fixtures/sample.pdf", import.meta.url)));
@@ -48,6 +82,9 @@ beforeEach(() => {
   deleteKnowledgeFile.mockResolvedValue(undefined);
   embedTexts.mockReset();
   embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
+  fake.claimResult = { data: null, error: null };
+  fake.existingResult = { data: null, error: null };
+  fake.revertEq.mockClear();
 });
 
 const as = (userId: string | null) => {
@@ -61,15 +98,27 @@ async function seedProject(ownerId: string, publicKey: string) {
   return project!.id;
 }
 
-async function seedSource(
-  projectId: string,
-  overrides: Partial<typeof knowledgeSources.$inferInsert> = {},
-) {
+async function seedSource(projectId: string, overrides: Partial<typeof knowledgeSources.$inferInsert> = {}) {
   const [source] = await db
     .insert(knowledgeSources)
     .values({ projectId, title: "doc.pdf", type: "pdf", status: "processing", storageKey: "projects/p/s", ...overrides })
     .returning();
   return source!;
+}
+
+/** Arms a successful claim with the real seeded row's fields, so ids line up with Drizzle asserts. */
+function claimable(source: Awaited<ReturnType<typeof seedSource>>) {
+  fake.claimResult = {
+    data: {
+      id: source.id,
+      title: source.title,
+      type: source.type,
+      storage_key: source.storageKey!,
+      status: "processing",
+      created_at: source.createdAt.toISOString(),
+    },
+    error: null,
+  };
 }
 
 function request(sourceId: string) {
@@ -110,6 +159,8 @@ describe("not found", () => {
     const otherProjectId = await seedProject("owner_mismatch2", "pk_mismatch2");
     const source = await seedSource(otherProjectId);
     as("owner_mismatch");
+    // Not claimable (wrong project), and the fallback lookup is scoped to this project too, so it
+    // finds nothing — same as an unknown id.
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(404);
   });
@@ -118,16 +169,18 @@ describe("not found", () => {
     const projectId = await seedProject("owner_text", "pk_text");
     const source = await seedSource(projectId, { type: "text", storageKey: null });
     as("owner_text");
+    fake.existingResult = { data: { type: "text" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(404);
   });
 });
 
 describe("already finalized", () => {
-  it("rejects finalizing a source that isn't processing any more", async () => {
+  it("rejects finalizing a source that isn't `uploading` any more", async () => {
     const projectId = await seedProject("owner_done", "pk_done");
     const source = await seedSource(projectId, { status: "ready" });
     as("owner_done");
+    fake.existingResult = { data: { type: "pdf" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
   });
@@ -138,6 +191,7 @@ describe("success", () => {
     const projectId = await seedProject("owner_ok", "pk_ok");
     const source = await seedSource(projectId, { title: "handbook.pdf" });
     as("owner_ok");
+    claimable(source);
     readKnowledgeFile.mockResolvedValue(samplePdf);
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -161,6 +215,7 @@ describe("success", () => {
     const projectId = await seedProject("owner_txt", "pk_txt");
     const source = await seedSource(projectId, { type: "txt", title: "notes.txt" });
     as("owner_txt");
+    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("Some notes."));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -173,6 +228,7 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_empty", "pk_empty");
     const source = await seedSource(projectId);
     as("owner_empty");
+    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(0));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -186,6 +242,7 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_big", "pk_big");
     const source = await seedSource(projectId);
     as("owner_big");
+    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(11 * 1024 * 1024));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -197,6 +254,7 @@ describe("refusals clean up the row and the object", () => {
     const projectId = await seedProject("owner_fake", "pk_fake");
     const source = await seedSource(projectId);
     as("owner_fake");
+    claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("not a real pdf"));
 
     const res = await POST(request(source.id), ctx(projectId));
@@ -207,10 +265,11 @@ describe("refusals clean up the row and the object", () => {
 });
 
 describe("storage read failure", () => {
-  it("returns 400 but keeps the source for a retry, since the upload may not have landed yet", async () => {
+  it("returns 400, keeps the source for a retry, and hands `uploading` back", async () => {
     const projectId = await seedProject("owner_readfail", "pk_readfail");
     const source = await seedSource(projectId);
     as("owner_readfail");
+    claimable(source);
     vi.spyOn(console, "error").mockImplementation(() => {});
     readKnowledgeFile.mockRejectedValue(new Error("object not found"));
 
@@ -218,5 +277,6 @@ describe("storage read failure", () => {
     expect(res.status).toBe(400);
     expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(1);
     expect(deleteKnowledgeFile).not.toHaveBeenCalled();
+    expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });
 });

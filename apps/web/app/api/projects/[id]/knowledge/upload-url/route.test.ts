@@ -73,7 +73,7 @@ function rpcRow(overrides: Partial<{ id: string; title: string; type: string; st
     id: "00000000-0000-4000-8000-000000000001",
     title: "doc.pdf",
     type: "pdf",
-    status: "processing",
+    status: "uploading",
     created_at: "2026-10-27T10:00:00+00:00",
     ...overrides,
   };
@@ -155,7 +155,7 @@ describe("success", () => {
 
     expect(res.status).toBe(201);
     expect(body).toMatchObject({
-      source: { id: rpcRow().id, title: "doc.pdf", type: "pdf", status: "processing" },
+      source: { id: rpcRow().id, title: "doc.pdf", type: "pdf", status: "uploading" },
       path: "projects/p/s",
       token: "tok",
     });

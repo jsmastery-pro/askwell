@@ -155,6 +155,11 @@ describe("KnowledgeManager", () => {
     expect(within(row("Scan.pdf")).queryByRole("button", { name: "Try again" })).toBeNull();
   });
 
+  it("shows an uploading source the same as processing (SB-T06)", () => {
+    renderManager([source({ title: "Still-uploading.pdf", status: "uploading" })]);
+    expect(within(row("Still-uploading.pdf")).getByText("Processing")).toBeTruthy();
+  });
+
   it("deletes after confirming, and keeps the row when cancelled", async () => {
     const keep = source({ title: "Keep me" });
     const drop = source({ title: "Delete me" });

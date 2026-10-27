@@ -25,6 +25,9 @@ const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 // reservation this old is unreachable either way — the browser's upload can no longer land. Reclaim
 // it here, lazily, before counting against the plan's source limit, rather than running a cron for
 // something that only needs to happen right before the next reservation.
+//
+// Only `uploading` rows qualify: once finalize claims one it becomes `processing`, meaning ingest
+// is actually running, not abandoned — reclaiming that would delete a source mid-ingest.
 const ABANDONED_AFTER_MS = 2 * 60 * 60 * 1000;
 
 async function reclaimAbandoned(service: ServiceClient, projectId: string): Promise<void> {
@@ -33,7 +36,7 @@ async function reclaimAbandoned(service: ServiceClient, projectId: string): Prom
     .from("knowledge_sources")
     .select("id, storage_key")
     .eq("project_id", projectId)
-    .eq("status", "processing")
+    .eq("status", "uploading")
     .lt("created_at", cutoff);
   if (error) {
     console.error(`Could not look up abandoned reservations for project ${projectId}`, error);
