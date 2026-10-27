@@ -1,8 +1,6 @@
 // @vitest-environment node
-import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
-import { eq } from "drizzle-orm";
+import { createSupabaseTestDb } from "@askwell/db/supabase-pglite";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { createTestDb, type TestDb } from "../widget-config/test-db";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,8 +8,8 @@ const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../ai", () => ({ embedTexts }));
 
 // deleteKnowledgeSource and processKnowledgeSource run through the service client (SB-T07). This
-// fake proxies straight through to the same pglite db this file's own Drizzle asserts read and
-// write, so a row they touch is visible here, and vice versa.
+// fake proxies straight through to a pglite db with the real Supabase migrations, which this
+// file's own SQL asserts read and write, so a row they touch is visible here, and vice versa.
 const fake = vi.hoisted(() => ({
   failedUpdateError: null as { message: string } | null,
   // 1-based chunk-insert call to fail (no rows inserted that call), to test a later batch failing.
@@ -25,13 +23,13 @@ function from(table: string) {
       update: (values: { status: "ready" | "failed" }) => ({
         eq: async (_c: string, id: string) => {
           if (values.status === "failed" && fake.failedUpdateError) return { error: fake.failedUpdateError };
-          await db.update(knowledgeSources).set({ status: values.status }).where(eq(knowledgeSources.id, id));
+          await db.query("UPDATE public.knowledge_sources SET status = $1 WHERE id = $2", [values.status, id]);
           return { error: null };
         },
       }),
       delete: () => ({
         eq: async (_c: string, id: string) => {
-          await db.delete(knowledgeSources).where(eq(knowledgeSources.id, id));
+          await db.query("DELETE FROM public.knowledge_sources WHERE id = $1", [id]);
           return { error: null };
         },
       }),
@@ -39,26 +37,17 @@ function from(table: string) {
   }
   if (table === "knowledge_chunks") {
     return {
-      // The real client sends embeddings as pgvector's text form (JSON.stringify'd); parse them
-      // back to number[] for Drizzle, which wants the array itself.
+      // The real client sends embeddings as pgvector's text form (JSON.stringify'd), which is
+      // what the vector cast reads here too.
       insert: async (rows: { project_id: string; source_id: string; content: string; embedding: string }[]) => {
         fake.chunkInsertCalls += 1;
         if (fake.failChunkBatch === fake.chunkInsertCalls) return { error: { message: "insert failed" } };
-        await db
-          .insert(knowledgeChunks)
-          .values(
-            rows.map((r) => ({
-              projectId: r.project_id,
-              sourceId: r.source_id,
-              content: r.content,
-              embedding: JSON.parse(r.embedding) as number[],
-            })),
-          );
+        await insertChunks(rows);
         return { error: null };
       },
       delete: () => ({
         eq: async (_c: string, sourceId: string) => {
-          await db.delete(knowledgeChunks).where(eq(knowledgeChunks.sourceId, sourceId));
+          await db.query("DELETE FROM public.knowledge_chunks WHERE source_id = $1", [sourceId]);
           return { error: null };
         },
       }),
@@ -70,29 +59,59 @@ vi.mock("../supabase/service", () => ({ createServiceClient: () => ({ from }) })
 
 const { deleteKnowledgeSource, processKnowledgeSource } = await import("./index");
 
-let db: TestDb;
-let close: () => Promise<void>;
+// Hundreds of 1536-dim chunks into the real HNSW index take a few seconds on pglite: close to
+// Vitest's 5s default once the rest of the suite runs alongside.
+const LARGE_INPUT_TIMEOUT_MS = 20_000;
+
+let db: Awaited<ReturnType<typeof createSupabaseTestDb>>;
 let projectId: string;
 
-async function insertSource(overrides: Partial<typeof knowledgeSources.$inferInsert> = {}) {
-  const [row] = await db
-    .insert(knowledgeSources)
-    .values({ projectId, title: "Source", type: "text", status: "processing", ...overrides })
-    .returning();
-  return row!;
+type SourceRow = { id: string; status: string };
+
+async function insertSource(overrides: { title?: string; type?: string; storage_key?: string } = {}) {
+  const { title = "Source", type = "text", storage_key = null } = overrides;
+  const { rows } = await db.query<SourceRow>(
+    `INSERT INTO public.knowledge_sources (project_id, title, type, storage_key, status)
+     VALUES ($1, $2, $3, $4, 'processing') RETURNING id, status`,
+    [projectId, title, type, storage_key],
+  );
+  return rows[0]!;
+}
+
+async function insertChunks(rows: { project_id: string; source_id: string; content: string; embedding: string }[]) {
+  await db.query(
+    `INSERT INTO public.knowledge_chunks (project_id, source_id, content, embedding)
+     SELECT r.project_id, r.source_id, r.content, r.embedding::extensions.vector
+     FROM jsonb_to_recordset($1::jsonb) AS r(project_id uuid, source_id uuid, content text, embedding text)`,
+    [JSON.stringify(rows)],
+  );
+}
+
+async function sourceStatus(id: string) {
+  const { rows } = await db.query<SourceRow>("SELECT id, status FROM public.knowledge_sources WHERE id = $1", [id]);
+  return rows[0]?.status;
+}
+
+async function chunksOf(sourceId: string) {
+  const { rows } = await db.query<{ content: string }>("SELECT content FROM public.knowledge_chunks WHERE source_id = $1", [sourceId]);
+  return rows;
+}
+
+async function sourceCount() {
+  const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM public.knowledge_sources WHERE project_id = $1", [projectId]);
+  return rows[0]!.n;
 }
 
 beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  await db.insert(accounts).values({ clerkUserId: "owner_1", plan: "free" });
-  const [project] = await db
-    .insert(projects)
-    .values({ ownerId: "owner_1", name: "Docs", publicKey: "pk_test" })
-    .returning();
-  projectId = project!.id;
+  db = await createSupabaseTestDb();
+  await db.query("INSERT INTO public.accounts (clerk_user_id, plan) VALUES ('owner_1', 'free')");
+  const { rows } = await db.query<{ id: string }>(
+    "INSERT INTO public.projects (owner_id, name, public_key) VALUES ('owner_1', 'Docs', 'pk_test') RETURNING id",
+  );
+  projectId = rows[0]!.id;
 });
 
-afterAll(() => close());
+afterAll(() => db.close());
 
 afterEach(() => {
   embedTexts.mockReset();
@@ -108,9 +127,8 @@ describe("processKnowledgeSource", () => {
 
     await processKnowledgeSource(source.id, projectId, () => "Some content about the product.");
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("ready");
-    const chunks = await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id));
+    expect(await sourceStatus(source.id)).toBe("ready");
+    const chunks = await chunksOf(source.id);
     expect(chunks).toHaveLength(1);
     expect(chunks[0]?.content).toBe("Some content about the product.");
   });
@@ -123,31 +141,28 @@ describe("processKnowledgeSource", () => {
 
     await processKnowledgeSource(source.id, projectId, () => words);
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("ready");
-    const chunks = await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id));
+    expect(await sourceStatus(source.id)).toBe("ready");
+    const chunks = await chunksOf(source.id);
     expect(chunks.length).toBeGreaterThan(200);
-  });
+  }, LARGE_INPUT_TIMEOUT_MS);
 
   it("sets the source failed when there's no extractable text", async () => {
     const source = await insertSource({ title: "Empty" });
 
     await processKnowledgeSource(source.id, projectId, () => "   ");
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("failed");
+    expect(await sourceStatus(source.id)).toBe("failed");
     expect(embedTexts).not.toHaveBeenCalled();
   });
 
   it("sets the source failed when extraction throws", async () => {
-    const source = await insertSource({ title: "Bad", type: "pdf", storageKey: "k" });
+    const source = await insertSource({ title: "Bad", type: "pdf", storage_key: "k" });
 
     await processKnowledgeSource(source.id, projectId, () => {
       throw new Error("corrupt file");
     });
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("failed");
+    expect(await sourceStatus(source.id)).toBe("failed");
   });
 
   it("sets the source failed when embedding throws", async () => {
@@ -156,8 +171,7 @@ describe("processKnowledgeSource", () => {
 
     await processKnowledgeSource(source.id, projectId, () => "Some content.");
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("failed");
+    expect(await sourceStatus(source.id)).toBe("failed");
   });
 
   it("deletes already-inserted chunks when a later batch fails", async () => {
@@ -171,10 +185,9 @@ describe("processKnowledgeSource", () => {
 
     await processKnowledgeSource(source.id, projectId, () => words);
 
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("failed");
-    expect(await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id))).toHaveLength(0);
-  });
+    expect(await sourceStatus(source.id)).toBe("failed");
+    expect(await chunksOf(source.id)).toHaveLength(0);
+  }, LARGE_INPUT_TIMEOUT_MS);
 
   it("never throws when marking the source failed itself fails", async () => {
     const source = await insertSource({ title: "Doubly broken" });
@@ -184,29 +197,27 @@ describe("processKnowledgeSource", () => {
     await expect(processKnowledgeSource(source.id, projectId, () => "   ")).resolves.toBeUndefined();
 
     // Runs after the response (after()/runAfterResponse): nothing is left to catch a throw here.
-    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(row?.status).toBe("processing");
+    expect(await sourceStatus(source.id)).toBe("processing");
   });
 });
 
 describe("deleteKnowledgeSource", () => {
   it("removes the row only, freeing the file slot it reserved (the object is the caller's job)", async () => {
-    const source = await insertSource({ title: "Upload failed", type: "pdf", storageKey: "k" });
-    const countBefore = (await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).length;
+    const source = await insertSource({ title: "Upload failed", type: "pdf", storage_key: "k" });
+    const countBefore = await sourceCount();
 
     await deleteKnowledgeSource(source.id);
 
-    const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
-    expect(rows).toHaveLength(0);
-    expect((await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).length).toBe(countBefore - 1);
+    expect(await sourceStatus(source.id)).toBeUndefined();
+    expect(await sourceCount()).toBe(countBefore - 1);
   });
 
   it("cascades to the source's chunks", async () => {
     const source = await insertSource({ title: "With chunks" });
-    await db.insert(knowledgeChunks).values({ projectId, sourceId: source.id, content: "x", embedding: Array(1536).fill(0.1) });
+    await insertChunks([{ project_id: projectId, source_id: source.id, content: "x", embedding: JSON.stringify(Array(1536).fill(0.1)) }]);
 
     await deleteKnowledgeSource(source.id);
 
-    expect(await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id))).toHaveLength(0);
+    expect(await chunksOf(source.id)).toHaveLength(0);
   });
 });

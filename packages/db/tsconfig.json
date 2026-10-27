@@ -4,5 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["schema", "queries", "client.ts", "drizzle.config.ts", "supabase-pglite.ts"]
+  "include": ["*.ts"]
 }

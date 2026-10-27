@@ -25,10 +25,6 @@ catalog:
   typescript-eslint: ^8.71.1
   turbo: ^2.11.7
   esbuild: ^0.28.2
-  drizzle-orm: ^0.45.3
-  drizzle-kit: ^0.31.11
-  pg: ^8.23.1
-  "@types/pg": ^8.23.1
   "@types/node": ^22.20.5
   "@electric-sql/pglite": ^0.5.8
   "@electric-sql/pglite-pgvector": ^0.0.9
