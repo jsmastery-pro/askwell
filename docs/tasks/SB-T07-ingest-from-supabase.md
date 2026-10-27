@@ -10,7 +10,7 @@
 
 ## Steps
 1. Processing (after finalize, or after a text paste) downloads the file from Supabase Storage, extracts and chunks it as today, embeds it, and inserts the chunks through the service client. It sets status `ready`, or `failed` on any error.
-2. Delete removes the source row (chunks cascade) and the object.
+2. Delete removes the source row (chunks cascade) and the object. `deleteKnowledgeSource` stays row-only; each caller removes the object after the row (the delete route, finalize's refusal, the upload reclaim).
 3. The seed script uses the service client.
 4. A 10 MB PDF must finish within the route's `maxDuration` (300 s).
 
