@@ -23,14 +23,6 @@
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
-    },
-    "db:generate": {
-      "cache": false,
-      "passThroughEnv": ["DATABASE_URL"]
-    },
-    "db:migrate": {
-      "cache": false,
-      "passThroughEnv": ["DATABASE_URL"]
     }
   }
 }
