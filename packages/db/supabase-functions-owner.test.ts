@@ -273,3 +273,21 @@ describe.each([
     });
   });
 });
+
+// SB-T06: the bucket itself isn't affected by the Data API exposure setting, so this runs once
+// against its own database rather than inside the describe.each above.
+describe("knowledge bucket (SB-T06)", () => {
+  it("is private, with a 10 MB limit and exactly the three allowed MIME types", async () => {
+    const db = await createSupabaseTestDb();
+    try {
+      const { rows } = await db.query<{ public: boolean; file_size_limit: number; allowed_mime_types: string[] }>(
+        "SELECT public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'knowledge'",
+      );
+      expect(rows).toEqual([
+        { public: false, file_size_limit: 10485760, allowed_mime_types: ["application/pdf", "text/markdown", "text/plain"] },
+      ]);
+    } finally {
+      await db.close();
+    }
+  });
+});

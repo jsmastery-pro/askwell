@@ -11,16 +11,6 @@
 --
 -- The old `askwell` bucket (S3-compatible API, pre-SB-T06) is unrelated and untouched: its objects
 -- are throwaway and aren't migrated into this one.
---
--- `storage.buckets` is a Supabase platform table, not something any migration creates — it exists
--- on dev and production already, but not on the pglite harness packages/db's tests run migrations
--- against (packages/db/supabase-pglite.ts stubs only `auth` and `extensions`). Guard the insert so
--- those tests keep working: the bucket itself is checked on dev after merge, per this task's notes.
-do $$
-begin
-  if to_regclass('storage.buckets') is not null then
-    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-    values ('knowledge', 'knowledge', false, 10485760, array['application/pdf', 'text/markdown', 'text/plain'])
-    on conflict (id) do nothing;
-  end if;
-end $$;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('knowledge', 'knowledge', false, 10485760, array['application/pdf', 'text/markdown', 'text/plain'])
+on conflict (id) do nothing;
