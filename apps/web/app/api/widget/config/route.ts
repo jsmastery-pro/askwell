@@ -1,4 +1,5 @@
 import { ERROR_CODES, widgetConfigQuerySchema, type ApiError, type WidgetConfigResponse } from "@askwell/shared";
+import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit } from "../../../../lib/rate-limit";
 import { getWidgetConfigByKey } from "../../../../lib/widget-config";
 
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const config = await getWidgetConfigByKey(key);
+    const config = await getWidgetConfigByKey(key, createServiceClient());
     if (!config) {
       return error(ERROR_CODES.notFound, "Widget not found.", 404);
     }

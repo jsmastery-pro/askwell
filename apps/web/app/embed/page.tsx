@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { publicKeySchema, type WidgetConfig } from "@askwell/shared";
+import { createServiceClient } from "../../lib/supabase/service";
 import { getWidgetConfigByKey } from "../../lib/widget-config";
 import { Panel } from "../../components/widget-panel/Panel";
 import { Unavailable } from "../../components/widget-panel/Unavailable";
@@ -12,7 +13,7 @@ type SearchParams = Promise<{ key?: string | string[]; origin?: string | string[
 
 async function configFor(key: string): Promise<WidgetConfig | null> {
   try {
-    return await getWidgetConfigByKey(key);
+    return await getWidgetConfigByKey(key, createServiceClient());
   } catch {
     return null;
   }

@@ -6,6 +6,7 @@ import EmbedPage from "./page";
 import { parentOriginFrom } from "./parent-origin";
 
 vi.mock("../../lib/widget-config", () => ({ getWidgetConfigByKey: vi.fn() }));
+vi.mock("../../lib/supabase/service", () => ({ createServiceClient: vi.fn(() => ({})) }));
 
 afterEach(() => {
   cleanup();
@@ -22,7 +23,7 @@ describe("EmbedPage", () => {
 
     await renderPage({ key: "pk_known", origin: "https://customer.example" });
 
-    expect(getWidgetConfigByKey).toHaveBeenCalledWith("pk_known");
+    expect(getWidgetConfigByKey).toHaveBeenCalledWith("pk_known", expect.anything());
     expect(screen.getByRole("heading", { name: "Ask Acme" })).toBeTruthy();
   });
 
