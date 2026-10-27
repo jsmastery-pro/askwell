@@ -1,11 +1,9 @@
-// Row-level security against the local Supabase stack (supabase/migrations). Each test seeds two
-// owners in one transaction, acts as an API role, and rolls back, so the database stays empty.
-import type pg from "pg";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { actAs, connectLocalSupabase } from "./supabase-local";
-
-const local = await connectLocalSupabase();
-if (!local.client) process.stderr.write(`\nSkipping the Supabase RLS tests: ${local.reason}\n\n`);
+// Row-level security from supabase/migrations, on pglite with Supabase's roles, auth.jwt() and
+// default privileges recreated (supabase-pglite.ts). Each test seeds two owners in one
+// transaction, acts as an API role, and rolls back, so the database stays empty.
+import type { PGlite } from "@electric-sql/pglite";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { actAs, createSupabaseTestDb } from "./supabase-pglite";
 
 const A = "user_a";
 const B = "user_b";
@@ -15,7 +13,7 @@ const PROJECT_B = "00000000-0000-4000-8000-00000000000b";
 const CHILD_TABLES = ["widget_configs", "knowledge_sources", "knowledge_chunks", "conversations"] as const;
 const ALL_TABLES = ["accounts", "projects", ...CHILD_TABLES, "messages"] as const;
 
-async function seed(db: pg.Client) {
+async function seed(db: PGlite) {
   for (const [owner, project] of [
     [A, PROJECT_A],
     [B, PROJECT_B],
@@ -48,7 +46,7 @@ async function seed(db: pg.Client) {
 }
 
 /** Project IDs a table's visible rows belong to (messages through their conversation). */
-async function visibleProjects(db: pg.Client, table: (typeof ALL_TABLES)[number]): Promise<string[]> {
+async function visibleProjects(db: PGlite, table: (typeof ALL_TABLES)[number]): Promise<string[]> {
   const sql = {
     accounts: "SELECT clerk_user_id AS project FROM accounts",
     projects: "SELECT id AS project FROM projects",
@@ -58,18 +56,21 @@ async function visibleProjects(db: pg.Client, table: (typeof ALL_TABLES)[number]
   return rows.map((r) => r.project);
 }
 
-describe.skipIf(!local.client)("Supabase RLS (local)", () => {
-  const db = local.client!;
+describe("Supabase RLS", () => {
+  let db: PGlite;
 
+  beforeAll(async () => {
+    db = await createSupabaseTestDb();
+  });
   beforeEach(async () => {
-    await db.query("BEGIN");
+    await db.exec("BEGIN");
     await seed(db);
   });
   afterEach(async () => {
-    await db.query("ROLLBACK");
+    await db.exec("ROLLBACK");
   });
   afterAll(async () => {
-    await db.end();
+    await db.close();
   });
 
   it("shows owner A only A's account, projects and child rows, never B's", async () => {
@@ -79,8 +80,8 @@ describe.skipIf(!local.client)("Supabase RLS (local)", () => {
       expect(await visibleProjects(db, table), table).toEqual([PROJECT_A]);
     }
     // messages joins conversations, which A only sees for A's project anyway; check messages alone too.
-    expect((await db.query("SELECT count(*)::int AS n FROM messages")).rows[0].n).toBe(1);
-    expect((await db.query("SELECT * FROM knowledge_chunks WHERE project_id = $1", [PROJECT_B])).rowCount).toBe(0);
+    expect((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM messages")).rows[0]!.n).toBe(1);
+    expect((await db.query("SELECT * FROM knowledge_chunks WHERE project_id = $1", [PROJECT_B])).rows).toEqual([]);
   });
 
   it("gives anon nothing on any table", async () => {
@@ -103,7 +104,7 @@ describe.skipIf(!local.client)("Supabase RLS (local)", () => {
     await actAs(db, A);
     await expect(
       db.query("UPDATE widget_configs SET label = 'x' WHERE project_id = $1 RETURNING 1", [PROJECT_A]),
-    ).resolves.toMatchObject({ rowCount: 0 });
+    ).resolves.toMatchObject({ affectedRows: 0 });
     await db.query("SAVEPOINT s");
     await expect(
       db.query("INSERT INTO knowledge_sources (project_id, title, type) VALUES ($1, 't', 'text')", [PROJECT_A]),
@@ -113,8 +114,8 @@ describe.skipIf(!local.client)("Supabase RLS (local)", () => {
 
   it("lets an owner rename only their own project, and not touch the quota or key", async () => {
     await actAs(db, A);
-    expect((await db.query("UPDATE projects SET name = 'renamed' WHERE id = $1", [PROJECT_A])).rowCount).toBe(1);
-    expect((await db.query("UPDATE projects SET name = 'hijacked' WHERE id = $1", [PROJECT_B])).rowCount).toBe(0);
+    expect((await db.query("UPDATE projects SET name = 'renamed' WHERE id = $1", [PROJECT_A])).affectedRows).toBe(1);
+    expect((await db.query("UPDATE projects SET name = 'hijacked' WHERE id = $1", [PROJECT_B])).affectedRows).toBe(0);
     for (const column of ["messages_used = 0", "public_key = 'pk_new'", "owner_id = 'user_b'"]) {
       await db.query("SAVEPOINT s");
       await expect(db.query(`UPDATE projects SET ${column} WHERE id = $1`, [PROJECT_A]), column).rejects.toThrow(
@@ -126,8 +127,8 @@ describe.skipIf(!local.client)("Supabase RLS (local)", () => {
 
   it("cascades an owner's project delete to every child table, and can't delete B's", async () => {
     await actAs(db, A);
-    expect((await db.query("DELETE FROM projects WHERE id = $1", [PROJECT_B])).rowCount).toBe(0);
-    expect((await db.query("DELETE FROM projects WHERE id = $1", [PROJECT_A])).rowCount).toBe(1);
+    expect((await db.query("DELETE FROM projects WHERE id = $1", [PROJECT_B])).affectedRows).toBe(0);
+    expect((await db.query("DELETE FROM projects WHERE id = $1", [PROJECT_A])).affectedRows).toBe(1);
 
     await db.query("RESET ROLE");
     for (const table of ["projects", ...CHILD_TABLES, "messages"] as const) {
