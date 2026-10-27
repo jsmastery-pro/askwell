@@ -24,7 +24,7 @@ Audit of every project.md §9 rule against `main` at `7383d7e`, 2026-10-18, by J
 
 - **Prompt-leak guard** (`lib/chat/answer.ts:29-36`): matches exact prompt prefixes only, so paraphrases get past it. It's a backstop behind the prompt's own rule. Acceptable.
 - **`/embed?origin=`**: the page that frames `/embed` chooses `parentOrigin`. The panel only sends close, resize and unread counts, never chat content, so nothing leaks. Worth a code comment.
-- **Race at the quota limit:** a request that loses the race still pays for one model call. Bounded by requests in flight.
+- **Race at the quota limit:** a request that loses the race still pays for one model call. Bounded by requests in flight. **Closed by SB-T05** (Supabase-native): `consume_message` counts the message atomically before the embedding and model call, so a request over the limit never reaches OpenAI. Trade-off: a model error now still uses one message of quota.
 - **PostHog on scale-to-zero:** there's no `shutdown()`, so a final event may be lost when the container stops. Analytics only, not security.
 
 ## Passing rules

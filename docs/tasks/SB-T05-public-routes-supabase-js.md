@@ -13,7 +13,7 @@
 2. **Chat:**
    - same order as today: rate limit, then key, then quota
    - check a given `conversationId` belongs to the project (service client select) **before** the quota, as today, so a foreign ID gets 404 without using quota or a model call
-   - the quota uses `rpc("consume_message")` **before** the embedding and model call. It counts the message right away: `false` means quota exceeded, with no OpenAI call. This replaces today's early check + count-at-save, and the race note in `docs/security-review.md` goes away. A model timeout still counts, as today (it saves the fallback reply).
+   - the quota uses `rpc("consume_message")` **before** the embedding and model call. It counts the message right away: `false` means quota exceeded, with no OpenAI call. This replaces today's early check + count-at-save, and the race note in `docs/security-review.md` goes away. Correction (John): today a model error or timeout returns 500 and counts nothing. Now it still counts, because the message was counted before the call. Accepted: it's rare (15 s timeout), and it closes the race. No refund step.
    - retrieval uses `rpc("match_chunks")`
    - saving uses `rpc("save_chat_turn")`; map its codes: `AWNOC` → 404, `AWNOP` → 404
    - prompts, the leak guard, timeouts, the PostHog trace and `first_chat` stay as they are; `first_chat` now comes from the function's result
