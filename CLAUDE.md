@@ -69,11 +69,12 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 
 ## Database rules
 
-- Schema and migrations live in `packages/db` (Drizzle).
-- Every schema change is a migration in the same PR (`pnpm db:generate`). Never edit a merged migration.
-- Add a new table or column only if your task says so.
-- The Supabase dev project is shared by everyone and every preview. Its data is throwaway, but never apply an unmerged migration to it: test new migrations on pglite or local Postgres.
-- Never touch the production database. Migrations reach dev, then production, only after their PR merges; the product owner runs them on production before promoting the build.
+- The app reaches the database only through `supabase-js`: `createOwnerClient()` (the owner's Clerk token, RLS applies) and `createServiceClient()` (secret key, server only), both in `apps/web/lib/supabase`.
+- Migrations are SQL files in `supabase/migrations`, named `<UTC timestamp>_<name>.sql`, newer than the latest one on `main`. Never edit a merged migration.
+- Every new table or function ships with its RLS policies and grants in the same migration (see `project.md` §7 and §9). Add a new table or column only if your task says so.
+- Test migrations, policies and functions on pglite (`packages/db/supabase-pglite.ts`). Never run a local Supabase stack or a Docker database.
+- The Supabase dev project is shared by everyone and every preview. Its data is throwaway, but never apply an unmerged migration to it. After your PR merges, apply it to dev through the Supabase MCP, recording the file's version, then regenerate the types (`pnpm db:types`, or the MCP's type generator) and confirm there's no diff.
+- The Supabase MCP is scoped to the dev project. Never touch the production database; the product owner applies migrations to production before promoting the build.
 - Migrations are additive: the version already live must keep working while one runs. Dropping or renaming a table or column happens in a later PR, once no deployed code uses it.
 
 ## Security rules
@@ -81,7 +82,7 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 `docs/project.md` §9 lists every rule. The ones you must never break:
 
 - Read the plan on the server in every gated action. Never trust the client.
-- Every owner query goes through `getOwnedProject(projectId)`.
+- Owner reads go through the owner client, so RLS scopes them. Never use the service client with a manual owner filter; use it only after the route has checked ownership.
 - Render visitor messages and bot replies as text, never HTML.
 - No secret in `NEXT_PUBLIC_*`, the widget bundle, or a commit. Never remove `.env` or `ROLE.md` from `.gitignore`.
 
@@ -103,5 +104,4 @@ Task status lives only in `docs/plan.md`. Only John edits it.
 |---|---|
 | `pnpm dev` | Run the app locally |
 | `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` | Checks. All must pass before a PR. |
-| `pnpm db:generate` | Create a migration from schema changes |
-| `pnpm db:migrate` | Apply migrations to the database in `DIRECT_URL` |
+| `pnpm db:types` | Regenerate `packages/db/types.ts` from the dev project (needs `SUPABASE_ACCESS_TOKEN`; agents use the MCP's type generator instead) |
