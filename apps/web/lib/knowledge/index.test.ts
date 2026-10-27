@@ -9,35 +9,17 @@ vi.mock("server-only", () => ({}));
 const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../ai", () => ({ embedTexts }));
 
-// getKnowledgeSourceById, deleteKnowledgeSource and processKnowledgeSource now run through the
-// service client (SB-T07). This fake proxies straight through to the same pglite db
-// listProjectKnowledgeSources/countProjectKnowledgeSources (still Drizzle) read and write, so a
-// row these functions touch is visible to Drizzle assertions, and vice versa.
-function toRawRow(row: typeof knowledgeSources.$inferSelect) {
-  return {
-    id: row.id,
-    project_id: row.projectId,
-    title: row.title,
-    type: row.type,
-    storage_key: row.storageKey,
-    status: row.status,
-    created_at: row.createdAt.toISOString(),
-  };
-}
+// deleteKnowledgeSource and processKnowledgeSource run through the service client (SB-T07). This
+// fake proxies straight through to the same pglite db this file's own Drizzle asserts read and
+// write, so a row they touch is visible here, and vice versa.
+const fake = vi.hoisted(() => ({ failedUpdateError: null as { message: string } | null }));
 
 function from(table: string) {
   if (table === "knowledge_sources") {
     return {
-      select: () => ({
-        eq: (_c: string, id: string) => ({
-          maybeSingle: async () => {
-            const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, id));
-            return { data: row ? toRawRow(row) : null, error: null };
-          },
-        }),
-      }),
       update: (values: { status: "ready" | "failed" }) => ({
         eq: async (_c: string, id: string) => {
+          if (values.status === "failed" && fake.failedUpdateError) return { error: fake.failedUpdateError };
           await db.update(knowledgeSources).set({ status: values.status }).where(eq(knowledgeSources.id, id));
           return { error: null };
         },
@@ -73,14 +55,7 @@ function from(table: string) {
 }
 vi.mock("../supabase/service", () => ({ createServiceClient: () => ({ from }) }));
 
-const {
-  countProjectKnowledgeSources,
-  deleteKnowledgeSource,
-  getKnowledgeSourceById,
-  listProjectKnowledgeSources,
-  processKnowledgeSource,
-  toKnowledgeSource,
-} = await import("./index");
+const { deleteKnowledgeSource, processKnowledgeSource } = await import("./index");
 
 let db: TestDb;
 let close: () => Promise<void>;
@@ -108,74 +83,7 @@ afterAll(() => close());
 
 afterEach(() => {
   embedTexts.mockReset();
-});
-
-describe("toKnowledgeSource", () => {
-  it("maps a row to the public shape", async () => {
-    const source = await insertSource({ title: "Pasted" });
-    expect(toKnowledgeSource(source)).toEqual({
-      id: source.id,
-      title: "Pasted",
-      type: "text",
-      status: "processing",
-      createdAt: source.createdAt.toISOString(),
-    });
-  });
-});
-
-describe("countProjectKnowledgeSources", () => {
-  it("counts every source, pasted text included", async () => {
-    const otherProject = (
-      await db.insert(projects).values({ ownerId: "owner_1", name: "Other", publicKey: "pk_other" }).returning()
-    )[0]!;
-    await db.insert(knowledgeSources).values([
-      { projectId: otherProject.id, title: "t", type: "text" },
-      { projectId: otherProject.id, title: "f1", type: "pdf", storageKey: "k1" },
-      { projectId: otherProject.id, title: "f2", type: "md", storageKey: "k2" },
-    ]);
-
-    expect(await countProjectKnowledgeSources(otherProject.id, db)).toBe(3);
-  });
-});
-
-describe("listProjectKnowledgeSources", () => {
-  it("returns a project's sources, newest first", async () => {
-    const otherProject = (
-      await db.insert(projects).values({ ownerId: "owner_1", name: "List", publicKey: "pk_list" }).returning()
-    )[0]!;
-    // Explicit, distinct timestamps: two inserts can land in the same instant, which would
-    // make the ordering this test checks for ambiguous.
-    const [first, second] = await db
-      .insert(knowledgeSources)
-      .values([
-        { projectId: otherProject.id, title: "First", type: "text", createdAt: new Date("2026-01-01T00:00:00.000Z") },
-        { projectId: otherProject.id, title: "Second", type: "pdf", storageKey: "k", createdAt: new Date("2026-01-02T00:00:00.000Z") },
-      ])
-      .returning();
-
-    const sources = await listProjectKnowledgeSources(otherProject.id, db);
-
-    expect(sources.map((s) => s.id)).toEqual([second!.id, first!.id]);
-  });
-
-  it("returns nothing for a project with no sources", async () => {
-    const empty = (
-      await db.insert(projects).values({ ownerId: "owner_1", name: "Empty", publicKey: "pk_empty" }).returning()
-    )[0]!;
-    expect(await listProjectKnowledgeSources(empty.id, db)).toEqual([]);
-  });
-});
-
-describe("getKnowledgeSourceById", () => {
-  it("returns the row for a known id", async () => {
-    const source = await insertSource({ title: "Findable" });
-    expect((await getKnowledgeSourceById(source.id))?.id).toBe(source.id);
-  });
-
-  it("returns null for an unknown or malformed id", async () => {
-    expect(await getKnowledgeSourceById("00000000-0000-4000-8000-000000000000")).toBeNull();
-    expect(await getKnowledgeSourceById("not-a-uuid")).toBeNull();
-  });
+  fake.failedUpdateError = null;
 });
 
 describe("processKnowledgeSource", () => {
@@ -236,18 +144,30 @@ describe("processKnowledgeSource", () => {
     const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
     expect(row?.status).toBe("failed");
   });
+
+  it("never throws when marking the source failed itself fails", async () => {
+    const source = await insertSource({ title: "Doubly broken" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fake.failedUpdateError = { message: "db down" };
+
+    await expect(processKnowledgeSource(source.id, projectId, () => "   ")).resolves.toBeUndefined();
+
+    // Runs after the response (after()/runAfterResponse): nothing is left to catch a throw here.
+    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
+    expect(row?.status).toBe("processing");
+  });
 });
 
 describe("deleteKnowledgeSource", () => {
   it("removes the row only, freeing the file slot it reserved (the object is the caller's job)", async () => {
     const source = await insertSource({ title: "Upload failed", type: "pdf", storageKey: "k" });
-    const countBefore = await countProjectKnowledgeSources(projectId, db);
+    const countBefore = (await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).length;
 
     await deleteKnowledgeSource(source.id);
 
     const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
     expect(rows).toHaveLength(0);
-    expect(await countProjectKnowledgeSources(projectId, db)).toBe(countBefore - 1);
+    expect((await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).length).toBe(countBefore - 1);
   });
 
   it("cascades to the source's chunks", async () => {

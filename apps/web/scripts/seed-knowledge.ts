@@ -102,7 +102,8 @@ async function main() {
     unwrap(await service.from("knowledge_sources").update({ status: "ready" }).eq("id", source.id));
   } catch (error) {
     // Leaves no `ready` source with zero (or partial) chunks: remove it instead.
-    await service.from("knowledge_sources").delete().eq("id", source.id);
+    const { error: deleteError } = await service.from("knowledge_sources").delete().eq("id", source.id);
+    if (deleteError) console.error(`Could not remove the failed source ${source.id}; it's stuck processing`, deleteError);
     throw error;
   }
 

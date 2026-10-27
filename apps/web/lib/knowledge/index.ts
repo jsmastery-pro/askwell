@@ -1,89 +1,10 @@
 import "server-only";
-import { knowledgeSources } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
-import type { Tables } from "@askwell/db/types";
-import { SOURCE_TYPES, type KnowledgeSource } from "@askwell/shared";
-import { eq, desc } from "drizzle-orm";
 import { createServiceClient } from "../supabase/service";
 import { unwrap } from "../supabase/query";
 import { embedTexts } from "../ai";
 import { chunkText } from "./chunk";
 
-export type SourceType = (typeof SOURCE_TYPES)[number];
-export type KnowledgeSourceRow = typeof knowledgeSources.$inferSelect;
-
 type ServiceClient = ReturnType<typeof createServiceClient>;
-
-// Same shape check as getOwnedProject in packages/db: a malformed id would make Postgres
-// throw on the uuid cast, so callers treat it as "not found" instead.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function toKnowledgeSource(row: KnowledgeSourceRow): KnowledgeSource {
-  return {
-    id: row.id,
-    title: row.title,
-    type: row.type,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-type SourceRow = Pick<Tables<"knowledge_sources">, "id" | "project_id" | "title" | "type" | "storage_key" | "status" | "created_at">;
-
-function fromRawRow(row: SourceRow): KnowledgeSourceRow {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    title: row.title,
-    type: row.type,
-    storageKey: row.storage_key,
-    // Drizzle's schema enum (packages/db, out of this task's scope) doesn't have 'uploading' yet;
-    // the real column does (SB-T06), and a source fetched here can be in that status.
-    status: row.status as KnowledgeSourceRow["status"],
-    createdAt: new Date(row.created_at),
-  };
-}
-
-const SOURCE_COLUMNS = "id, project_id, title, type, storage_key, status, created_at";
-
-/**
- * A project's sources, newest first. The caller is trusted to have already checked ownership.
- *
- * Stays on Drizzle (SB-T07): this is an owner read, which SB-T04 moves onto the owner client
- * (RLS), not the service client — SB-T08 removes this Drizzle helper once that lands.
- */
-export async function listProjectKnowledgeSources(
-  projectId: string,
-  database: Database = defaultDb,
-): Promise<KnowledgeSourceRow[]> {
-  return database
-    .select()
-    .from(knowledgeSources)
-    .where(eq(knowledgeSources.projectId, projectId))
-    .orderBy(desc(knowledgeSources.createdAt));
-}
-
-/** A single source by id, or `null` if it doesn't exist. Doesn't check ownership. */
-export async function getKnowledgeSourceById(
-  sourceId: string,
-  service: ServiceClient = createServiceClient(),
-): Promise<KnowledgeSourceRow | null> {
-  if (!UUID_RE.test(sourceId)) return null;
-  const data = unwrap(await service.from("knowledge_sources").select(SOURCE_COLUMNS).eq("id", sourceId).maybeSingle());
-  return data ? fromRawRow(data) : null;
-}
-
-/**
- * Every source counts toward the plan limit: uploaded files and pasted text alike (§5, §6.4).
- *
- * Stays on Drizzle (SB-T07): this is an owner read, which SB-T04 moves onto the owner client
- * (RLS), not the service client — SB-T08 removes this Drizzle helper once that lands.
- */
-export async function countProjectKnowledgeSources(projectId: string, database: Database = defaultDb): Promise<number> {
-  const rows = await database.select({ id: knowledgeSources.id }).from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
-  return rows.length;
-}
 
 /**
  * Deletes a source row. Its chunks cascade (FK `onDelete: "cascade"`). Row only — never the
@@ -136,6 +57,12 @@ export async function processKnowledgeSource(
     await setSourceStatus(service, sourceId, "ready");
   } catch (error) {
     console.error(`Knowledge ingest failed for source ${sourceId}`, error);
-    await setSourceStatus(service, sourceId, "failed");
+    // This runs after the response has already been sent (runAfterResponse/after()): a failure
+    // here must never throw, or it becomes an unhandled rejection with no one left to catch it.
+    try {
+      await setSourceStatus(service, sourceId, "failed");
+    } catch (statusError) {
+      console.error(`Could not mark source ${sourceId} failed`, statusError);
+    }
   }
 }
