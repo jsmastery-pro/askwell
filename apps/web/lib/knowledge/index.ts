@@ -2,9 +2,11 @@ import "server-only";
 import { knowledgeSources } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import type { Database } from "@askwell/db/queries";
+import type { Tables } from "@askwell/db/types";
 import { SOURCE_TYPES, type KnowledgeSource } from "@askwell/shared";
 import { eq, desc } from "drizzle-orm";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createServiceClient } from "../supabase/service";
+import { unwrap } from "../supabase/query";
 import { embedTexts } from "../ai";
 import { chunkText } from "./chunk";
 
@@ -27,26 +29,20 @@ export function toKnowledgeSource(row: KnowledgeSourceRow): KnowledgeSource {
   };
 }
 
-type RawSourceRow = {
-  id: string;
-  project_id: string;
-  title: string;
-  type: string;
-  storage_key: string | null;
-  status: string;
-  created_at: string;
-};
+type SourceRow = Pick<Tables<"knowledge_sources">, "id" | "project_id" | "title" | "type" | "storage_key" | "status" | "created_at">;
 
-function fromRawRow(row: RawSourceRow): KnowledgeSourceRow {
+function fromRawRow(row: SourceRow): KnowledgeSourceRow {
   return {
     id: row.id,
     projectId: row.project_id,
     title: row.title,
-    type: row.type as KnowledgeSourceRow["type"],
+    type: row.type,
     storageKey: row.storage_key,
+    // Drizzle's schema enum (packages/db, out of this task's scope) doesn't have 'uploading' yet;
+    // the real column does (SB-T06), and a source fetched here can be in that status.
     status: row.status as KnowledgeSourceRow["status"],
     createdAt: new Date(row.created_at),
-  } as KnowledgeSourceRow;
+  };
 }
 
 const SOURCE_COLUMNS = "id, project_id, title, type, storage_key, status, created_at";
@@ -74,9 +70,8 @@ export async function getKnowledgeSourceById(
   service: ServiceClient = createServiceClient(),
 ): Promise<KnowledgeSourceRow | null> {
   if (!UUID_RE.test(sourceId)) return null;
-  const { data, error } = await service.from("knowledge_sources").select(SOURCE_COLUMNS).eq("id", sourceId).maybeSingle();
-  if (error) throw error;
-  return data ? fromRawRow(data as RawSourceRow) : null;
+  const data = unwrap(await service.from("knowledge_sources").select(SOURCE_COLUMNS).eq("id", sourceId).maybeSingle());
+  return data ? fromRawRow(data) : null;
 }
 
 /**
@@ -97,13 +92,11 @@ export async function countProjectKnowledgeSources(projectId: string, database: 
  * order its own error-handling needs, so this never double-deletes it.
  */
 export async function deleteKnowledgeSource(sourceId: string, service: ServiceClient = createServiceClient()): Promise<void> {
-  const { error } = await service.from("knowledge_sources").delete().eq("id", sourceId);
-  if (error) throw error;
+  unwrap(await service.from("knowledge_sources").delete().eq("id", sourceId));
 }
 
 async function setSourceStatus(service: ServiceClient, sourceId: string, status: "ready" | "failed"): Promise<void> {
-  const { error } = await service.from("knowledge_sources").update({ status }).eq("id", sourceId);
-  if (error) throw error;
+  unwrap(await service.from("knowledge_sources").update({ status }).eq("id", sourceId));
 }
 
 // One insert per batch, not per row, and not one insert for the whole file either: a 10 MB PDF
@@ -129,10 +122,16 @@ export async function processKnowledgeSource(
     if (chunks.length === 0) throw new Error("No extractable text");
 
     const vectors = await embedTexts(chunks);
-    const rows = chunks.map((content, i) => ({ project_id: projectId, source_id: sourceId, content, embedding: vectors[i]! }));
+    // pgvector columns are typed as `string` (the generator has no TS type for `vector`), and
+    // JSON's array syntax is also pgvector's text input syntax, same as match_chunks' query vector.
+    const rows = chunks.map((content, i) => ({
+      project_id: projectId,
+      source_id: sourceId,
+      content,
+      embedding: JSON.stringify(vectors[i]!),
+    }));
     for (let start = 0; start < rows.length; start += CHUNK_INSERT_BATCH_SIZE) {
-      const { error } = await service.from("knowledge_chunks").insert(rows.slice(start, start + CHUNK_INSERT_BATCH_SIZE));
-      if (error) throw error;
+      unwrap(await service.from("knowledge_chunks").insert(rows.slice(start, start + CHUNK_INSERT_BATCH_SIZE)));
     }
     await setSourceStatus(service, sourceId, "ready");
   } catch (error) {

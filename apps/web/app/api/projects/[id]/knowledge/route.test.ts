@@ -45,10 +45,19 @@ function from(table: string) {
   }
   if (table === "knowledge_chunks") {
     return {
-      insert: async (rows: { project_id: string; source_id: string; content: string; embedding: number[] }[]) => {
+      // The real client sends embeddings as pgvector's text form (JSON.stringify'd); parse them
+      // back to number[] for Drizzle, which wants the array itself.
+      insert: async (rows: { project_id: string; source_id: string; content: string; embedding: string }[]) => {
         await db
           .insert(knowledgeChunks)
-          .values(rows.map((r) => ({ projectId: r.project_id, sourceId: r.source_id, content: r.content, embedding: r.embedding })));
+          .values(
+            rows.map((r) => ({
+              projectId: r.project_id,
+              sourceId: r.source_id,
+              content: r.content,
+              embedding: JSON.parse(r.embedding) as number[],
+            })),
+          );
         return { error: null };
       },
     };

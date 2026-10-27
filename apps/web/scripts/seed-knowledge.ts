@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { embedTexts } from "../lib/ai";
+import { unwrap, unwrapRow } from "../lib/supabase/query";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 // Earlier files win: loadEnvFile never overwrites a variable that's already set.
@@ -61,7 +62,7 @@ async function main() {
   }
 
   const service = createServiceClient();
-  const { data: project } = await service.from("projects").select("id, name").eq("public_key", publicKey).maybeSingle();
+  const project = unwrap(await service.from("projects").select("id, name").eq("public_key", publicKey).maybeSingle());
   if (!project) {
     console.error(`No project with public key ${publicKey}`);
     process.exit(1);
@@ -78,15 +79,13 @@ async function main() {
   const embeddings = await embedTexts(chunks);
 
   const title = titleArg ?? basename(filePath);
-  const { data: source, error: insertError } = await service
-    .from("knowledge_sources")
-    .insert({ project_id: project.id, title, type: "text", status: "processing" })
-    .select("id")
-    .single();
-  if (insertError || !source) {
-    console.error("Could not create the source", insertError);
-    process.exit(1);
-  }
+  const source = unwrapRow(
+    await service
+      .from("knowledge_sources")
+      .insert({ project_id: project.id, title, type: "text", status: "processing" })
+      .select("id")
+      .single(),
+  );
 
   try {
     for (let start = 0; start < chunks.length; start += CHUNK_INSERT_BATCH_SIZE) {
@@ -94,12 +93,13 @@ async function main() {
         project_id: project.id,
         source_id: source.id,
         content: chunkContent,
-        embedding: embeddings[start + i]!,
+        // pgvector columns are typed as `string` (the generator has no TS type for `vector`); JSON's
+        // array syntax is also pgvector's text input syntax.
+        embedding: JSON.stringify(embeddings[start + i]!),
       }));
-      const { error } = await service.from("knowledge_chunks").insert(batch);
-      if (error) throw error;
+      unwrap(await service.from("knowledge_chunks").insert(batch));
     }
-    await service.from("knowledge_sources").update({ status: "ready" }).eq("id", source.id);
+    unwrap(await service.from("knowledge_sources").update({ status: "ready" }).eq("id", source.id));
   } catch (error) {
     // Leaves no `ready` source with zero (or partial) chunks: remove it instead.
     await service.from("knowledge_sources").delete().eq("id", source.id);
