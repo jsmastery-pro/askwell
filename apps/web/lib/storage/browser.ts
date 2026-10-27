@@ -13,13 +13,22 @@ function getClient() {
         "Storage is not configured (missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)",
       );
     }
-    client = createClient(url, publishableKey);
+    // Never signs anyone in: this client only ever makes the one signed-upload call below, so
+    // there's no session to persist or refresh.
+    client = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
   }
   return client;
 }
 
 /** Uploads straight to Storage using the one-time signed URL from our upload-url route (SB-T06). */
-export async function uploadKnowledgeFileToSignedUrl(path: string, token: string, file: File): Promise<void> {
-  const { error } = await getClient().storage.from("knowledge").uploadToSignedUrl(path, token, file);
+export async function uploadKnowledgeFileToSignedUrl(
+  path: string,
+  token: string,
+  file: File,
+  contentType?: string,
+): Promise<void> {
+  const { error } = await getClient()
+    .storage.from("knowledge")
+    .uploadToSignedUrl(path, token, file, contentType ? { contentType } : undefined);
   if (error) throw error;
 }

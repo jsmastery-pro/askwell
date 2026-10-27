@@ -27,11 +27,22 @@ describe("uploadKnowledgeFileToSignedUrl", () => {
     storage.uploadToSignedUrl.mockResolvedValue({ data: { path: "projects/p/s" }, error: null });
     const file = new File(["x"], "doc.pdf");
 
+    await (await fresh()).uploadKnowledgeFileToSignedUrl("projects/p/s", "tok", file, "application/pdf");
+
+    expect(createClient).toHaveBeenCalledWith("https://project.supabase.co", "sb_publishable_test", {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    expect(from).toHaveBeenCalledWith("knowledge");
+    expect(storage.uploadToSignedUrl).toHaveBeenCalledWith("projects/p/s", "tok", file, { contentType: "application/pdf" });
+  });
+
+  it("omits the content type option when none is given", async () => {
+    storage.uploadToSignedUrl.mockResolvedValue({ data: {}, error: null });
+    const file = new File(["x"], "doc");
+
     await (await fresh()).uploadKnowledgeFileToSignedUrl("projects/p/s", "tok", file);
 
-    expect(createClient).toHaveBeenCalledWith("https://project.supabase.co", "sb_publishable_test");
-    expect(from).toHaveBeenCalledWith("knowledge");
-    expect(storage.uploadToSignedUrl).toHaveBeenCalledWith("projects/p/s", "tok", file);
+    expect(storage.uploadToSignedUrl).toHaveBeenCalledWith("projects/p/s", "tok", file, undefined);
   });
 
   it("reuses one client across calls", async () => {

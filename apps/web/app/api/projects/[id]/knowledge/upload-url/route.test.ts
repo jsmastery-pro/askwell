@@ -1,6 +1,5 @@
 // @vitest-environment node
-import { accounts, knowledgeSources, projects } from "@askwell/db";
-import { eq } from "drizzle-orm";
+import { accounts, projects } from "@askwell/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, type TestDb } from "../../../../../../lib/widget-config/test-db";
 
@@ -14,8 +13,30 @@ vi.mock("@askwell/db/client", () => ({
 }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
 
-const rpc = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ rpc }) }));
+// A small fake of the two `.from()` chains this route actually uses — not a generic PostgREST
+// stand-in. Each terminal method (maybeSingle/lt/eq) resolves the whole chain directly, since
+// `await` on a plain (non-thenable) return value just resolves to it.
+type Row = Record<string, unknown>;
+const fake = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  accountsResult: { data: null as Row | null, error: null as Row | null },
+  staleResult: { data: [] as Row[], error: null as Row | null },
+  deleteEq: vi.fn(async () => ({ data: null, error: null })),
+}));
+
+function from(table: string) {
+  if (table === "accounts") {
+    return { select: () => ({ eq: () => ({ maybeSingle: async () => fake.accountsResult }) }) };
+  }
+  if (table === "knowledge_sources") {
+    return {
+      select: () => ({ eq: () => ({ eq: () => ({ lt: async () => fake.staleResult }) }) }),
+      delete: () => ({ eq: fake.deleteEq }),
+    };
+  }
+  throw new Error(`unexpected table ${table}`);
+}
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ rpc: fake.rpc, from }) }));
 
 const createKnowledgeUploadUrl = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());
@@ -35,7 +56,7 @@ type ReserveArgs = {
   p_source_limit: number;
   p_source_id: string;
 };
-const reserveArgs = () => rpc.mock.calls[0]![1] as ReserveArgs;
+const reserveArgs = () => fake.rpc.mock.calls[0]![1] as ReserveArgs;
 
 let db: TestDb;
 let close: () => Promise<void>;
@@ -60,8 +81,11 @@ function rpcRow(overrides: Partial<{ id: string; title: string; type: string; st
 
 beforeEach(() => {
   state.userId = null;
-  rpc.mockReset();
-  rpc.mockResolvedValue({ data: rpcRow(), error: null });
+  fake.rpc.mockReset();
+  fake.rpc.mockResolvedValue({ data: rpcRow(), error: null });
+  fake.accountsResult = { data: { plan: "free" }, error: null };
+  fake.staleResult = { data: [], error: null };
+  fake.deleteEq.mockClear();
   createKnowledgeUploadUrl.mockReset();
   createKnowledgeUploadUrl.mockResolvedValue({ path: "projects/p/s", token: "tok" });
   deleteKnowledgeFile.mockReset();
@@ -73,8 +97,8 @@ const as = (userId: string | null) => {
 };
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
-async function seedProject(ownerId: string, plan: "free" | "pro", publicKey: string) {
-  await db.insert(accounts).values({ clerkUserId: ownerId, plan }).onConflictDoNothing();
+async function seedProject(ownerId: string, publicKey: string) {
+  await db.insert(accounts).values({ clerkUserId: ownerId, plan: "free" }).onConflictDoNothing();
   const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
   return project!.id;
 }
@@ -96,7 +120,7 @@ describe("unauthenticated", () => {
 
 describe("tenant isolation", () => {
   it("returns 404 for another owner's project", async () => {
-    const projectId = await seedProject("owner_a", "free", "pk_a1");
+    const projectId = await seedProject("owner_a", "pk_a1");
     as("owner_b");
     const res = await POST(request({ fileName: "a.pdf", size: 100 }), ctx(projectId));
     expect(res.status).toBe(404);
@@ -105,25 +129,25 @@ describe("tenant isolation", () => {
 
 describe("validation", () => {
   it("rejects an unsupported extension with 400, before reserving anything", async () => {
-    const projectId = await seedProject("owner_ext", "free", "pk_ext");
+    const projectId = await seedProject("owner_ext", "pk_ext");
     as("owner_ext");
     const res = await POST(request({ fileName: "virus.exe", size: 100 }), ctx(projectId));
     expect(res.status).toBe(400);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(fake.rpc).not.toHaveBeenCalled();
   });
 
   it("rejects a declared size over the limit with 413, before reserving anything", async () => {
-    const projectId = await seedProject("owner_size", "free", "pk_size");
+    const projectId = await seedProject("owner_size", "pk_size");
     as("owner_size");
     const res = await POST(request({ fileName: "big.pdf", size: 11 * 1024 * 1024 }), ctx(projectId));
     expect(res.status).toBe(413);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(fake.rpc).not.toHaveBeenCalled();
   });
 });
 
 describe("success", () => {
   it("reserves the source, signs an upload URL, and returns both", async () => {
-    const projectId = await seedProject("owner_ok", "free", "pk_ok");
+    const projectId = await seedProject("owner_ok", "pk_ok");
     as("owner_ok");
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000, title: "My title" }), ctx(projectId));
@@ -148,19 +172,34 @@ describe("success", () => {
   });
 
   it("falls back to the file name when no title is given", async () => {
-    const projectId = await seedProject("owner_notitle", "free", "pk_notitle");
+    const projectId = await seedProject("owner_notitle", "pk_notitle");
     as("owner_notitle");
     await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
-    const args = reserveArgs();
-    expect(args.p_title).toBe("doc.pdf");
+    expect(reserveArgs().p_title).toBe("doc.pdf");
+  });
+
+  it("passes the Pro plan's higher source limit", async () => {
+    const projectId = await seedProject("owner_pro", "pk_pro");
+    as("owner_pro");
+    fake.accountsResult = { data: { plan: "pro" }, error: null };
+    await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
+    expect(reserveArgs().p_source_limit).toBe(25);
+  });
+
+  it("defaults to the Free limit when the account row isn't found", async () => {
+    const projectId = await seedProject("owner_noaccount", "pk_noaccount");
+    as("owner_noaccount");
+    fake.accountsResult = { data: null, error: null };
+    await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
+    expect(reserveArgs().p_source_limit).toBe(3);
   });
 });
 
 describe("reserve_knowledge_source refusals", () => {
   it("maps AWLIM to 403 plan_limit", async () => {
-    const projectId = await seedProject("owner_awlim", "free", "pk_awlim");
+    const projectId = await seedProject("owner_awlim", "pk_awlim");
     as("owner_awlim");
-    rpc.mockResolvedValue({ data: null, error: { code: "AWLIM", message: "limit reached" } });
+    fake.rpc.mockResolvedValue({ data: null, error: { code: "AWLIM", message: "limit reached" } });
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
     const body = await res.json();
@@ -170,19 +209,19 @@ describe("reserve_knowledge_source refusals", () => {
   });
 
   it("maps AWNOP to 404", async () => {
-    const projectId = await seedProject("owner_awnop", "free", "pk_awnop");
+    const projectId = await seedProject("owner_awnop", "pk_awnop");
     as("owner_awnop");
-    rpc.mockResolvedValue({ data: null, error: { code: "AWNOP", message: "not found" } });
+    fake.rpc.mockResolvedValue({ data: null, error: { code: "AWNOP", message: "not found" } });
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
     expect(res.status).toBe(404);
   });
 
   it("maps an unexpected error to 500", async () => {
-    const projectId = await seedProject("owner_unexpected", "free", "pk_unexpected");
+    const projectId = await seedProject("owner_unexpected", "pk_unexpected");
     as("owner_unexpected");
     vi.spyOn(console, "error").mockImplementation(() => {});
-    rpc.mockResolvedValue({ data: null, error: { code: "XXXXX", message: "boom" } });
+    fake.rpc.mockResolvedValue({ data: null, error: { code: "XXXXX", message: "boom" } });
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
     expect(res.status).toBe(500);
@@ -191,49 +230,50 @@ describe("reserve_knowledge_source refusals", () => {
 
 describe("signing failure", () => {
   it("frees the reserved slot with 500 when signing the upload URL fails", async () => {
-    const projectId = await seedProject("owner_signfail", "free", "pk_signfail");
+    const projectId = await seedProject("owner_signfail", "pk_signfail");
     as("owner_signfail");
     vi.spyOn(console, "error").mockImplementation(() => {});
     createKnowledgeUploadUrl.mockRejectedValue(new Error("storage down"));
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
     expect(res.status).toBe(500);
-
-    const args = reserveArgs();
-    const rows = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, args.p_source_id));
-    expect(rows).toHaveLength(0);
+    expect(fake.deleteEq).toHaveBeenCalledWith("id", reserveArgs().p_source_id);
   });
 });
 
 describe("abandoned reservations", () => {
-  it("reclaims a project's own stale processing reservation before counting against the limit", async () => {
-    const projectId = await seedProject("owner_stale", "free", "pk_stale");
+  it("reclaims a project's own stale processing reservations before counting against the limit", async () => {
+    const projectId = await seedProject("owner_stale", "pk_stale");
     as("owner_stale");
-    const old = new Date(Date.now() - 1000 * 60 * 60 * 3); // 3h ago, past the 2h reclaim threshold
-    const [stale] = await db
-      .insert(knowledgeSources)
-      .values({ projectId, title: "abandoned", type: "pdf", status: "processing", storageKey: "projects/p/old", createdAt: old })
-      .returning();
+    fake.staleResult = {
+      data: [{ id: "stale-1", storage_key: "projects/p/old" }],
+      error: null,
+    };
 
     const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
     expect(res.status).toBe(201);
 
-    const remaining = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, stale!.id));
-    expect(remaining).toHaveLength(0);
+    expect(fake.deleteEq).toHaveBeenCalledWith("id", "stale-1");
     expect(deleteKnowledgeFile).toHaveBeenCalledWith("projects/p/old");
   });
 
-  it("leaves a recent processing reservation alone", async () => {
-    const projectId = await seedProject("owner_recent", "free", "pk_recent");
+  it("does nothing when there are no stale reservations", async () => {
+    const projectId = await seedProject("owner_recent", "pk_recent");
     as("owner_recent");
-    const [recent] = await db
-      .insert(knowledgeSources)
-      .values({ projectId, title: "in flight", type: "pdf", status: "processing", storageKey: "projects/p/recent" })
-      .returning();
 
     await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
 
-    const stillThere = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, recent!.id));
-    expect(stillThere).toHaveLength(1);
+    expect(fake.deleteEq).not.toHaveBeenCalled();
+    expect(deleteKnowledgeFile).not.toHaveBeenCalled();
+  });
+
+  it("looking up stale reservations failing doesn't block the new reservation", async () => {
+    const projectId = await seedProject("owner_lookupfail", "pk_lookupfail");
+    as("owner_lookupfail");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fake.staleResult = { data: [], error: { message: "db down" } };
+
+    const res = await POST(request({ fileName: "doc.pdf", size: 1000 }), ctx(projectId));
+    expect(res.status).toBe(201);
   });
 });

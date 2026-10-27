@@ -1,9 +1,11 @@
-import type {
-  AddKnowledgeResponse,
-  AddTextKnowledgeRequest,
-  ApiError,
-  DeleteKnowledgeResponse,
-  RequestKnowledgeUploadResponse,
+import {
+  KNOWLEDGE_FILE_TYPES,
+  KNOWLEDGE_MIME_TYPES,
+  type AddKnowledgeResponse,
+  type AddTextKnowledgeRequest,
+  type ApiError,
+  type DeleteKnowledgeResponse,
+  type RequestKnowledgeUploadResponse,
 } from "@askwell/shared";
 import { uploadKnowledgeFileToSignedUrl } from "../storage/browser";
 
@@ -14,6 +16,16 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new Error((data as ApiError | null)?.error?.message ?? "Request failed.");
   return data as T;
+}
+
+// A browser's own File.type guess is unreliable for these (often "" or text/x-markdown for
+// .md), and the bucket's allowed_mime_types would then refuse the upload — set it ourselves
+// from the extension, the same way the server resolves the source type.
+function mimeTypeFor(fileName: string): string | undefined {
+  const dot = fileName.lastIndexOf(".");
+  const extension = dot > 0 ? fileName.slice(dot + 1).toLowerCase() : "";
+  const type = KNOWLEDGE_FILE_TYPES[extension as keyof typeof KNOWLEDGE_FILE_TYPES];
+  return type ? KNOWLEDGE_MIME_TYPES[type] : undefined;
 }
 
 export async function addTextKnowledge(
@@ -45,7 +57,13 @@ export async function addFileKnowledge(
     },
   );
 
-  await uploadKnowledgeFileToSignedUrl(path, token, file);
+  try {
+    await uploadKnowledgeFileToSignedUrl(path, token, file, mimeTypeFor(file.name));
+  } catch (error) {
+    // Free the slot right away rather than waiting for the 2h abandoned-reservation reclaim.
+    await deleteKnowledgeSource(source.id).catch(() => undefined);
+    throw error;
+  }
 
   return send(`/api/projects/${projectId}/knowledge/finalize`, {
     method: "POST",

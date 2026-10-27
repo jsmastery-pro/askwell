@@ -61,7 +61,7 @@ describe("addFileKnowledge", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fileName: "doc.pdf", size: file.size, title: "My title" }),
     });
-    expect(uploadKnowledgeFileToSignedUrl).toHaveBeenCalledExactlyOnceWith("projects/p1/s2", "tok", file);
+    expect(uploadKnowledgeFileToSignedUrl).toHaveBeenCalledExactlyOnceWith("projects/p1/s2", "tok", file, "application/pdf");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/projects/p1/knowledge/finalize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -79,12 +79,25 @@ describe("addFileKnowledge", () => {
     expect(body.title).toBeUndefined();
   });
 
-  it("throws and never finalizes when the signed upload itself fails", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }));
+  it("throws, never finalizes, and frees the slot right away when the signed upload itself fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
     uploadKnowledgeFileToSignedUrl.mockRejectedValue(new Error("network error"));
 
     await expect(addFileKnowledge("p1", new File(["x"], "x.txt"))).rejects.toThrow("network error");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/knowledge/s2", { method: "DELETE" });
+  });
+
+  it("still throws the original error even if freeing the slot also fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }))
+      .mockResolvedValueOnce(jsonResponse({ error: { code: "not_found", message: "gone" } }, false));
+    uploadKnowledgeFileToSignedUrl.mockRejectedValue(new Error("network error"));
+
+    await expect(addFileKnowledge("p1", new File(["x"], "x.txt"))).rejects.toThrow("network error");
   });
 
   it("throws the server's error message when requesting the upload URL fails", async () => {
