@@ -1,6 +1,6 @@
 "use client";
 
-import { PLAN_LIMITS, type KnowledgeSource, type Plan } from "@askwell/shared";
+import { MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS, type KnowledgeSource, type Plan } from "@askwell/shared";
 import Link from "next/link";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "../../lib/data/knowledge-actions";
@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<KnowledgeSource["type"], string> = {
 };
 
 const isFile = (source: KnowledgeSource) => source.type !== "text";
+const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 
 type Props = { projectId: string; initialSources: KnowledgeSource[]; sourcesLimit: number; plan: Plan };
 
@@ -175,7 +176,9 @@ export function KnowledgeManager({ projectId, initialSources, sourcesLimit, plan
               {uploading ? "Uploading…" : atLimit ? "Source limit reached" : "Upload a file"}
             </span>
             <span id="upload-help" className="mt-1 text-sm text-muted">
-              {atLimit ? "Delete a source to add another." : "Drop a file here or choose one. PDF, Markdown or text, up to 4 MB."}
+              {atLimit
+                ? "Delete a source to add another."
+                : `Drop a file here or choose one. PDF, Markdown or text, up to ${MAX_FILE_MB} MB.`}
             </span>
           </label>
           {atLimit && plan === "free" && (

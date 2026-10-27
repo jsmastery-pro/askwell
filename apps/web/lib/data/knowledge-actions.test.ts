@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } from "./knowledge-actions";
+
+const uploadKnowledgeFileToSignedUrl = vi.hoisted(() => vi.fn());
+vi.mock("../storage/browser", () => ({ uploadKnowledgeFileToSignedUrl }));
+
+const { addFileKnowledge, addTextKnowledge, deleteKnowledgeSource } = await import("./knowledge-actions");
 
 const fetchMock = vi.hoisted(() => vi.fn());
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
+  uploadKnowledgeFileToSignedUrl.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   fetchMock.mockReset();
+  uploadKnowledgeFileToSignedUrl.mockReset();
   vi.unstubAllGlobals();
 });
 
@@ -38,27 +44,55 @@ describe("addTextKnowledge", () => {
 });
 
 describe("addFileKnowledge", () => {
-  it("POSTs a multipart form with the file and optional title", async () => {
-    const source = { id: "s2", title: "doc.pdf", type: "pdf", status: "processing", createdAt: "2026-01-01T00:00:00.000Z" };
-    fetchMock.mockResolvedValue(jsonResponse({ source }));
+  const reservedSource = { id: "s2", title: "doc.pdf", type: "pdf", status: "processing", createdAt: "2026-01-01T00:00:00.000Z" };
+  const finalSource = { ...reservedSource, status: "processing" };
+
+  it("requests an upload URL, uploads to it, then finalizes", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }))
+      .mockResolvedValueOnce(jsonResponse({ source: finalSource }));
     const file = new File(["%PDF"], "doc.pdf");
 
-    await addFileKnowledge("p1", file, "My title");
+    const result = await addFileKnowledge("p1", file, "My title");
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("/api/projects/p1/knowledge");
-    expect(init.method).toBe("POST");
-    const form = init.body as FormData;
-    expect(form.get("file")).toBe(file);
-    expect(form.get("title")).toBe("My title");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/projects/p1/knowledge/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: "doc.pdf", size: file.size, title: "My title" }),
+    });
+    expect(uploadKnowledgeFileToSignedUrl).toHaveBeenCalledExactlyOnceWith("projects/p1/s2", "tok", file);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/projects/p1/knowledge/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceId: "s2" }),
+    });
+    expect(result).toEqual({ source: finalSource });
   });
 
   it("omits the title field when none is given", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ source: {} }));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }))
+      .mockResolvedValueOnce(jsonResponse({ source: finalSource }));
     await addFileKnowledge("p1", new File(["x"], "x.txt"));
-    const form = fetchMock.mock.calls[0]![1].body as FormData;
-    expect(form.get("title")).toBeNull();
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.title).toBeUndefined();
+  });
+
+  it("throws and never finalizes when the signed upload itself fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ source: reservedSource, path: "projects/p1/s2", token: "tok" }));
+    uploadKnowledgeFileToSignedUrl.mockRejectedValue(new Error("network error"));
+
+    await expect(addFileKnowledge("p1", new File(["x"], "x.txt"))).rejects.toThrow("network error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws the server's error message when requesting the upload URL fails", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: { code: "plan_limit", message: "Your plan allows 3 sources." } }, false),
+    );
+    await expect(addFileKnowledge("p1", new File(["x"], "x.txt"))).rejects.toThrow("Your plan allows 3 sources.");
+    expect(uploadKnowledgeFileToSignedUrl).not.toHaveBeenCalled();
   });
 });
 

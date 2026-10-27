@@ -1,23 +1,11 @@
 import { accounts, projects } from "@askwell/db";
 import { db as defaultDb } from "@askwell/db/client";
 import { getOwnedProject } from "@askwell/db/queries";
-import {
-  ERROR_CODES,
-  KNOWLEDGE_FILE_TYPES,
-  MAX_KNOWLEDGE_FILE_BYTES,
-  PLAN_LIMITS,
-  addFileKnowledgeFieldsSchema,
-  addTextKnowledgeRequestSchema,
-  type AddKnowledgeResponse,
-  type Plan,
-} from "@askwell/shared";
+import { ERROR_CODES, PLAN_LIMITS, addTextKnowledgeRequestSchema, MAX_KNOWLEDGE_FILE_BYTES, type AddKnowledgeResponse, type Plan } from "@askwell/shared";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 import { runAfterResponse } from "../../../../../lib/knowledge/background";
-import { extractFileText, hasPdfMagicBytes } from "../../../../../lib/knowledge/extract";
 import {
   countProjectKnowledgeSources,
-  deleteKnowledgeSource,
   insertKnowledgeSource,
   processKnowledgeSource,
   toKnowledgeSource,
@@ -26,19 +14,16 @@ import {
 } from "../../../../../lib/knowledge";
 import { captureServerEvent } from "../../../../../lib/posthog/server";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../lib/projects/http";
-import { knowledgeFileKey, uploadKnowledgeFile } from "../../../../../lib/storage";
 
 export const dynamic = "force-dynamic";
-// Covers the request plus its after() ingest (extract, chunk, embed) for a file up to 4 MB.
-// 300s is Hobby's current default and max with Fluid Compute (on by default for new Vercel
-// projects); without Fluid Compute, Hobby's max is 60s instead — confirm which applies once
-// MV-T01's project exists, and lower this if the actual ingest time comes in well under it.
+// Covers the request plus its after() ingest (extract, chunk, embed) for pasted text up to
+// MAX_KNOWLEDGE_FILE_BYTES. A file now goes through upload-url + finalize instead (SB-T06).
 export const maxDuration = 300;
 
 type Context = { params: Promise<{ id: string }> };
 
 const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
-// MAX_KNOWLEDGE_FILE_BYTES plus room for multipart boundaries and the title field.
+// MAX_KNOWLEDGE_FILE_BYTES plus room for JSON overhead and the title field.
 const MAX_REQUEST_BYTES = MAX_KNOWLEDGE_FILE_BYTES + 64 * 1024;
 
 async function getOwnerPlan(ownerId: string): Promise<Plan> {
@@ -69,7 +54,6 @@ function sourceLimitReached(limit: number) {
   );
 }
 
-// The one success path for both pasted text and files.
 function created(ownerId: string, source: KnowledgeSourceRow) {
   captureServerEvent(ownerId, "knowledge_added", { project_id: source.projectId, type: source.type });
   return Response.json({ source: toKnowledgeSource(source) } satisfies AddKnowledgeResponse, { status: 201 });
@@ -91,62 +75,6 @@ async function handleText(projectId: string, ownerId: string, request: Request) 
   return created(ownerId, source);
 }
 
-async function handleFile(projectId: string, ownerId: string, request: Request) {
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return invalidInput("Invalid form data.");
-  }
-
-  const file = form.get("file");
-  if (!(file instanceof File)) return invalidInput("A file is required.");
-
-  const titleField = form.get("title");
-  const fieldsParsed = addFileKnowledgeFieldsSchema.safeParse({
-    title: typeof titleField === "string" && titleField ? titleField : undefined,
-  });
-  if (!fieldsParsed.success) return invalidInput("Invalid title.");
-
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const type = KNOWLEDGE_FILE_TYPES[extension as keyof typeof KNOWLEDGE_FILE_TYPES];
-  if (!type) return invalidInput("Only PDF, Markdown, and TXT files are supported.");
-  // A file can exceed the limit while the whole multipart request still stays under
-  // MAX_REQUEST_BYTES's overhead allowance, so the early Content-Length check above (413) isn't
-  // guaranteed to catch it — this one must also be 413, not 400, for the same oversized-payload reason.
-  if (file.size > MAX_KNOWLEDGE_FILE_BYTES) {
-    return errorResponse(ERROR_CODES.invalidInput, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  if (type === "pdf" && !hasPdfMagicBytes(buffer)) return invalidInput("The file is not a valid PDF.");
-
-  const title = fieldsParsed.data.title?.trim() || file.name;
-  const sourceId = randomUUID();
-  const storageKey = knowledgeFileKey(projectId, sourceId);
-
-  const reservation = await reserveSource(ownerId, { id: sourceId, projectId, title, type, storageKey });
-  if (!reservation.ok) return sourceLimitReached(reservation.limit);
-  const { source } = reservation;
-
-  try {
-    await uploadKnowledgeFile(storageKey, buffer, file.type || "application/octet-stream");
-  } catch (error) {
-    console.error(`Knowledge file upload failed for source ${source.id}`, error);
-    // Never reached storage: free the source slot rather than leaving a row with no file. If that
-    // fails too, the row stays and the owner can delete it from the Knowledge page to free it.
-    try {
-      await deleteKnowledgeSource(source.id);
-    } catch (cleanupError) {
-      console.error(`Couldn't free the slot of failed upload ${source.id}`, cleanupError);
-    }
-    return errorResponse(ERROR_CODES.internal, "Could not store the file.", 500);
-  }
-
-  runAfterResponse(() => processKnowledgeSource(source.id, projectId, () => extractFileText(type, buffer)));
-  return created(ownerId, source);
-}
-
 export async function POST(request: Request, { params }: Context) {
   const ownerId = await getOwnerId();
   if (!ownerId) return unauthorized();
@@ -155,14 +83,14 @@ export async function POST(request: Request, { params }: Context) {
   if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
 
   // Before reading anything: a huge body is refused without being buffered in memory (§9 File upload).
-  // Without the header (chunked), the size checks after reading still apply.
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > MAX_REQUEST_BYTES) {
-    return errorResponse(ERROR_CODES.invalidInput, `The upload is too large. Max ${MAX_FILE_MB} MB.`, 413);
+    return errorResponse(ERROR_CODES.invalidInput, `The pasted text is too large. Max ${MAX_FILE_MB} MB.`, 413);
   }
 
   const contentType = request.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return handleText(projectId, ownerId, request);
-  if (contentType.includes("multipart/form-data")) return handleFile(projectId, ownerId, request);
-  return invalidInput("Send JSON for pasted text or multipart form data for a file.");
+  if (!contentType.includes("application/json")) {
+    return invalidInput("Send JSON to add pasted text. Upload a file through the knowledge upload flow.");
+  }
+  return handleText(projectId, ownerId, request);
 }
