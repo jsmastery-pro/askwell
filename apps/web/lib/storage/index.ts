@@ -1,61 +1,36 @@
-// Server-only: credentials never ship to the client.
+// Server-only: the service key never ships to the client (SB-T06: supabase-js Storage, not the
+// AWS SDK — the `knowledge` bucket and its limits are set in supabase/migrations).
 import "server-only";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createServiceClient } from "../supabase/service";
 
-let client: S3Client | undefined;
-
-// Supabase Storage speaks the S3 protocol; these are the standard AWS SDK env names, with
-// values from the project's Storage → S3 access keys settings.
-const ENV = {
-  endpoint: "AWS_ENDPOINT_URL_S3",
-  region: "AWS_REGION",
-  accessKeyId: "AWS_ACCESS_KEY_ID",
-  secretAccessKey: "AWS_SECRET_ACCESS_KEY",
-  bucket: "BUCKET_NAME",
-} as const;
-
-function getClient(): S3Client {
-  if (!client) {
-    const endpoint = process.env[ENV.endpoint];
-    const region = process.env[ENV.region];
-    const accessKeyId = process.env[ENV.accessKeyId];
-    const secretAccessKey = process.env[ENV.secretAccessKey];
-    if (!endpoint || !region || !accessKeyId || !secretAccessKey) {
-      const missing = Object.values(ENV).filter((name) => name !== ENV.bucket && !process.env[name]);
-      throw new Error(`Storage is not configured (missing ${missing.join(", ")})`);
-    }
-    // The endpoint is required: without it the SDK talks to real AWS. forcePathStyle: Supabase's
-    // S3-compatible endpoint requires path-style requests (bucket in the path, not a subdomain).
-    client = new S3Client({ endpoint, region, credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true });
-  }
-  return client;
-}
-
-function bucket(): string {
-  const value = process.env[ENV.bucket];
-  if (!value) throw new Error(`${ENV.bucket} is not set`);
-  return value;
-}
+const BUCKET = "knowledge";
 
 /** Private key for a knowledge file. Never a public URL (project.md §9). */
 export function knowledgeFileKey(projectId: string, sourceId: string): string {
   return `projects/${projectId}/${sourceId}`;
 }
 
-export async function uploadKnowledgeFile(key: string, body: Buffer, contentType: string): Promise<void> {
-  await getClient().send(
-    new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }),
-  );
+/** A one-time signed URL; the browser uploads straight to Storage with it, bypassing our server. */
+export async function createKnowledgeUploadUrl(key: string): Promise<{ path: string; token: string }> {
+  const { data, error } = await createServiceClient().storage.from(BUCKET).createSignedUploadUrl(key);
+  if (error) throw error;
+  return { path: data.path, token: data.token };
 }
 
+/** The uploaded object's bytes, for finalize's real-size and PDF-magic-byte checks. */
 export async function readKnowledgeFile(key: string): Promise<Buffer> {
-  const response = await getClient().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
-  const bytes = await response.Body?.transformToByteArray();
-  if (!bytes) throw new Error(`Empty storage object for key ${key}`);
-  return Buffer.from(bytes);
+  const { data, error } = await createServiceClient().storage.from(BUCKET).download(key);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
 }
 
-/** Used when a source is deleted (P3-T03). Caller decides how to handle a failure. */
+/** Used when a source is deleted, or an upload is refused or abandoned. */
 export async function deleteKnowledgeFile(key: string): Promise<void> {
-  await getClient().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+  await deleteKnowledgeFiles([key]);
+}
+
+/** Used when a project is deleted: removes every file its sources reserved, in one request. */
+export async function deleteKnowledgeFiles(keys: string[]): Promise<void> {
+  const { error } = await createServiceClient().storage.from(BUCKET).remove(keys);
+  if (error) throw error;
 }

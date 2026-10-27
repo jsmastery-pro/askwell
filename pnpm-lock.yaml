@@ -241,9 +241,6 @@ importers:
       '@askwell/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@aws-sdk/client-s3':
-        specifier: ^3.1152.0
-        version: 3.1152.0
       '@clerk/nextjs':
         specifier: ^7.9.11
         version: 7.9.11(next@16.3.4(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -341,13 +338,13 @@ importers:
         version: 10.12.0(jiti@2.7.0)
       jsdom:
         specifier: 30.0.1
-        version: 30.0.1
+        version: 30.0.1(@noble/hashes@1.8.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 5.0.3(@types/node@26.6.4)(jsdom@30.0.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/db:
     dependencies:
@@ -400,7 +397,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 5.0.3(@types/node@26.6.4)(jsdom@30.0.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
 packages:
 
@@ -482,14 +479,6 @@ packages:
     resolution: {integrity: sha512-93Z1N+BQNXysodoicpOIyNh2drHfz/CTf9nnT0FEx72GJcIiwgydD7tGAr78j41LsYn3hlRn+LdGPuBLn1Bl8Q==}
     engines: {node: ^22.13.0 || >=24.0.0}
 
-  '@aws-sdk/checksums@3.1001.3':
-    resolution: {integrity: sha512-CcAkVyEUKGngbEqJdVdSc53Iy52+XzVL5NIcTen2BlK8UByNC1DThVtf5VKSrNzyA+SqyTvs+3S+knVBbOUizQ==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/client-s3@3.1152.0':
-    resolution: {integrity: sha512-oI1+ZaM6pSOwZazu4nAb7rL8ug7LSjg31tDoJqRB9MooRqqWCf/qvkIZqne1mRA3xK3slg6K0RNWXaJYHbWLvg==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/core@3.978.3':
     resolution: {integrity: sha512-nslpzUCTI9b2IQMWSd6mSAXldBexPc8rr0d3dXUutXYFLFaTdsHa2GD7sJdsn3PhyjK0O5K8ypd6zi+RXXPVlg==}
     engines: {node: '>=20.0.0'}
@@ -524,10 +513,6 @@ packages:
 
   '@aws-sdk/credential-provider-web-identity@3.972.80':
     resolution: {integrity: sha512-TJF25Ndwy2HxcVj6oxMgp8qVlJAawlExHYBXqhuC6Zt2m+A7WpdkjBD6QglNbiArlteYljZHEY3R7KKmno6ISA==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/middleware-sdk-s3@3.972.79':
-    resolution: {integrity: sha512-UfgAQosf4IEXldMsyntVuHsJnaQzlH6pmkOr6dQy7CaOYSlGz3mWiW4Di7XfQ/kPJP6xE7oMshz1V0E8RqGdRg==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/nested-clients@3.997.48':
@@ -3335,28 +3320,6 @@ snapshots:
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
 
-  '@aws-sdk/checksums@3.1001.3':
-    dependencies:
-      '@aws-sdk/core': 3.978.3
-      '@aws-sdk/types': 3.974.6
-      '@smithy/core': 3.36.0
-      '@smithy/types': 4.19.0
-      tslib: 2.8.1
-
-  '@aws-sdk/client-s3@3.1152.0':
-    dependencies:
-      '@aws-sdk/checksums': 3.1001.3
-      '@aws-sdk/core': 3.978.3
-      '@aws-sdk/credential-provider-node': 3.972.86
-      '@aws-sdk/middleware-sdk-s3': 3.972.79
-      '@aws-sdk/signature-v4-multi-region': 3.996.48
-      '@aws-sdk/types': 3.974.6
-      '@smithy/core': 3.36.0
-      '@smithy/fetch-http-handler': 5.8.0
-      '@smithy/node-http-handler': 4.12.1
-      '@smithy/types': 4.19.0
-      tslib: 2.8.1
-
   '@aws-sdk/core@3.978.3':
     dependencies:
       '@aws-sdk/types': 3.974.6
@@ -3367,6 +3330,7 @@ snapshots:
       '@smithy/types': 4.19.0
       bowser: 2.14.1
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-env@3.972.74':
     dependencies:
@@ -3375,6 +3339,7 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-http@3.972.76':
     dependencies:
@@ -3385,6 +3350,7 @@ snapshots:
       '@smithy/node-http-handler': 4.12.1
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-ini@3.973.19':
     dependencies:
@@ -3401,6 +3367,7 @@ snapshots:
       '@smithy/credential-provider-imds': 4.5.2
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-login@3.972.81':
     dependencies:
@@ -3410,6 +3377,7 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-node@3.972.86':
     dependencies:
@@ -3424,6 +3392,7 @@ snapshots:
       '@smithy/credential-provider-imds': 4.5.2
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-process@3.972.74':
     dependencies:
@@ -3432,6 +3401,7 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-sso@3.973.18':
     dependencies:
@@ -3442,6 +3412,7 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/credential-provider-web-identity@3.972.80':
     dependencies:
@@ -3451,15 +3422,7 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
-
-  '@aws-sdk/middleware-sdk-s3@3.972.79':
-    dependencies:
-      '@aws-sdk/core': 3.978.3
-      '@aws-sdk/signature-v4-multi-region': 3.996.48
-      '@aws-sdk/types': 3.974.6
-      '@smithy/core': 3.36.0
-      '@smithy/types': 4.19.0
-      tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/nested-clients@3.997.48':
     dependencies:
@@ -3471,6 +3434,7 @@ snapshots:
       '@smithy/node-http-handler': 4.12.1
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/signature-v4-multi-region@3.996.48':
     dependencies:
@@ -3478,6 +3442,7 @@ snapshots:
       '@smithy/signature-v4': 5.7.4
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/token-providers@3.1150.0':
     dependencies:
@@ -3487,18 +3452,22 @@ snapshots:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/types@3.974.6':
     dependencies:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/xml-builder@3.972.41':
     dependencies:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
-  '@aws/lambda-invoke-store@0.3.0': {}
+  '@aws/lambda-invoke-store@0.3.0':
+    optional: true
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -3886,8 +3855,6 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exodus/bytes@1.16.0': {}
-
   '@exodus/bytes@1.16.0(@noble/hashes@1.8.0)':
     optionalDependencies:
       '@noble/hashes': 1.8.0
@@ -4218,34 +4185,40 @@ snapshots:
     dependencies:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@smithy/credential-provider-imds@4.5.2':
     dependencies:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@smithy/fetch-http-handler@5.8.0':
     dependencies:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@smithy/node-http-handler@4.12.1':
     dependencies:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@smithy/signature-v4@5.7.4':
     dependencies:
       '@smithy/core': 3.36.0
       '@smithy/types': 4.19.0
       tslib: 2.8.1
+    optional: true
 
   '@smithy/types@4.19.0':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@stablelib/base64@1.0.1': {}
 
@@ -4621,7 +4594,8 @@ snapshots:
     dependencies:
       require-from-string: 2.0.2
 
-  bowser@2.14.1: {}
+  bowser@2.14.1:
+    optional: true
 
   brace-expansion@5.0.12:
     dependencies:
@@ -4657,13 +4631,6 @@ snapshots:
       source-map-js: 1.2.2
 
   csstype@3.2.3: {}
-
-  data-urls@7.0.0:
-    dependencies:
-      whatwg-mimetype: 5.0.0
-      whatwg-url: 16.0.1
-    transitivePeerDependencies:
-      - '@noble/hashes'
 
   data-urls@7.0.0(@noble/hashes@1.8.0):
     dependencies:
@@ -4930,12 +4897,6 @@ snapshots:
 
   hookified@2.2.0: {}
 
-  html-encoding-sniffer@6.0.0:
-    dependencies:
-      '@exodus/bytes': 1.16.0
-    transitivePeerDependencies:
-      - '@noble/hashes'
-
   html-encoding-sniffer@6.0.0(@noble/hashes@1.8.0):
     dependencies:
       '@exodus/bytes': 1.16.0(@noble/hashes@1.8.0)
@@ -4967,32 +4928,6 @@ snapshots:
   js-cookie@3.0.8: {}
 
   js-tokens@4.0.0: {}
-
-  jsdom@30.0.1:
-    dependencies:
-      '@asamuzakjp/css-color': 6.0.7
-      '@asamuzakjp/dom-selector': 8.3.2
-      '@bramus/specificity': 2.4.3
-      '@csstools/css-syntax-patches-for-csstree': 1.1.15(css-tree@3.2.1)
-      '@exodus/bytes': 1.16.0
-      css-tree: 3.2.1
-      data-urls: 7.0.0
-      decimal.js: 10.6.0
-      html-encoding-sniffer: 6.0.0
-      is-potential-custom-element-name: 1.0.1
-      lru-cache: 11.5.3
-      parse5: 8.0.1
-      saxes: 6.0.0
-      symbol-tree: 3.2.4
-      tough-cookie: 6.0.2
-      undici: 8.11.2
-      w3c-xmlserializer: 5.0.0
-      webidl-conversions: 8.0.1
-      whatwg-mimetype: 5.0.0
-      whatwg-url: 17.2.0
-      xml-name-validator: 5.0.0
-    transitivePeerDependencies:
-      - '@noble/hashes'
 
   jsdom@30.0.1(@noble/hashes@1.8.0):
     dependencies:
@@ -5648,7 +5583,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.3(@types/node@26.6.4)(jsdom@30.0.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)):
+  vitest@5.0.3(@types/node@26.6.4)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.3(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -5666,7 +5601,7 @@ snapshots:
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.6.4
-      jsdom: 30.0.1
+      jsdom: 30.0.1(@noble/hashes@1.8.0)
     transitivePeerDependencies:
       - msw
 
@@ -5682,26 +5617,10 @@ snapshots:
 
   whatwg-mimetype@5.0.0: {}
 
-  whatwg-url@16.0.1:
-    dependencies:
-      '@exodus/bytes': 1.16.0
-      tr46: 6.0.0
-      webidl-conversions: 8.0.1
-    transitivePeerDependencies:
-      - '@noble/hashes'
-
   whatwg-url@16.0.1(@noble/hashes@1.8.0):
     dependencies:
       '@exodus/bytes': 1.16.0(@noble/hashes@1.8.0)
       tr46: 6.0.0
-      webidl-conversions: 8.0.1
-    transitivePeerDependencies:
-      - '@noble/hashes'
-
-  whatwg-url@17.2.0:
-    dependencies:
-      '@exodus/bytes': 1.16.0
-      tr46: 7.0.0
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'

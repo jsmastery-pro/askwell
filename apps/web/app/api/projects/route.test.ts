@@ -14,6 +14,11 @@ vi.mock("../../../lib/supabase/owner", () => ({ createOwnerClient: () => state.o
 vi.mock("../../../lib/supabase/service", () => ({ createServiceClient: () => state.service }));
 vi.mock("../../../lib/posthog/server", () => ({ captureServerEvent: vi.fn() }));
 
+// deleteProject's Storage cleanup is lib/storage's job (which bucket, which client): mocked
+// whole, so this test never depends on how it reaches Storage (SB-T06).
+const deleteKnowledgeFiles = vi.hoisted(() => vi.fn());
+vi.mock("../../../lib/storage", () => ({ deleteKnowledgeFiles }));
+
 const collection = await import("./route");
 const item = await import("./[id]/route");
 
@@ -46,7 +51,8 @@ beforeEach(() => {
   state.userId = null;
   state.owner = undefined;
   state.service = undefined;
-  vi.stubEnv("BUCKET_NAME", "askwell-test");
+  deleteKnowledgeFiles.mockReset();
+  deleteKnowledgeFiles.mockResolvedValue(undefined);
 });
 
 const jsonRequest = (method: string, body?: unknown) =>
@@ -166,14 +172,14 @@ describe("DELETE /api/projects/:id", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(argsOf(callsTo(owner, "projects")[0], "delete")).toEqual([]);
-    expect(argsOf(callsTo(service, "askwell-test")[0], "remove")).toEqual([["projects/p/a"]]);
+    expect(deleteKnowledgeFiles).toHaveBeenCalledWith(["projects/p/a"]);
   });
 
   it("returns 404 for another owner's project, removing no files", async () => {
     signIn("owner_b", { owner: { from: { knowledge_sources: { data: [] }, projects: { data: [] } } } });
 
     expect((await item.DELETE(jsonRequest("DELETE"), ctx(PROJECT_ID))).status).toBe(404);
-    expect(service.calls).toEqual([]);
+    expect(deleteKnowledgeFiles).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a malformed id without querying", async () => {
@@ -181,6 +187,7 @@ describe("DELETE /api/projects/:id", () => {
 
     expect((await item.DELETE(jsonRequest("DELETE"), ctx("not-a-uuid"))).status).toBe(404);
     expect((await item.PATCH(jsonRequest("PATCH", { name: "X" }), ctx("not-a-uuid"))).status).toBe(404);
-    expect([...owner.calls, ...service.calls]).toEqual([]);
+    expect(owner.calls).toEqual([]);
+    expect(deleteKnowledgeFiles).not.toHaveBeenCalled();
   });
 });

@@ -8,9 +8,10 @@ const MIGRATIONS_DIR = fileURLToPath(new URL("../../supabase/migrations", import
 
 /**
  * The parts of a Supabase database that supabase/migrations relies on, recreated on pglite: the
- * API roles, the `auth` and `extensions` schemas, `auth.jwt()` as Supabase defines it, and
- * optionally the default privileges Supabase gives its API roles on everything new in `public` (so
- * a migration that forgets to revoke, or to grant, something is caught here as on Supabase).
+ * API roles, the `auth` and `extensions` schemas, `auth.jwt()` as Supabase defines it, a minimal
+ * `storage.buckets` (just the columns a bucket-creating migration needs), and optionally the
+ * default privileges Supabase gives its API roles on everything new in `public` (so a migration
+ * that forgets to revoke, or to grant, something is caught here as on Supabase).
  */
 const SUPABASE_STUBS = `
   CREATE ROLE anon NOLOGIN NOINHERIT;
@@ -19,7 +20,8 @@ const SUPABASE_STUBS = `
 
   CREATE SCHEMA auth;
   CREATE SCHEMA extensions;
-  GRANT USAGE ON SCHEMA public, auth, extensions TO anon, authenticated, service_role;
+  CREATE SCHEMA storage;
+  GRANT USAGE ON SCHEMA public, auth, extensions, storage TO anon, authenticated, service_role;
 
   CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
     SELECT coalesce(
@@ -28,6 +30,14 @@ const SUPABASE_STUBS = `
     )::jsonb
   $$;
   GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
+
+  CREATE TABLE storage.buckets (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    public boolean NOT NULL DEFAULT false,
+    file_size_limit bigint,
+    allowed_mime_types text[]
+  );
 `;
 
 // Supabase's automatic grants on new objects in `public`: on for existing projects, being turned

@@ -79,7 +79,7 @@ describe("KnowledgeManager", () => {
 
     await pick(container, sized("huge.pdf", MAX_KNOWLEDGE_FILE_BYTES + 5 * 1024 * 1024));
 
-    expect(screen.getByRole("alert").textContent).toBe("This file is 9.0 MB. Files can be up to 4 MB.");
+    expect(screen.getByRole("alert").textContent).toBe("This file is 15.0 MB. Files can be up to 10 MB.");
     expect(addFileKnowledge).not.toHaveBeenCalled();
   });
 
@@ -153,6 +153,11 @@ describe("KnowledgeManager", () => {
     renderManager([source({ title: "Scan.pdf", status: "failed" })]);
     expect(within(row("Scan.pdf")).getByText(/couldn't read this file/)).toBeTruthy();
     expect(within(row("Scan.pdf")).queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("shows an uploading source the same as processing (SB-T06)", () => {
+    renderManager([source({ title: "Still-uploading.pdf", status: "uploading" })]);
+    expect(within(row("Still-uploading.pdf")).getByText("Processing")).toBeTruthy();
   });
 
   it("deletes after confirming, and keeps the row when cancelled", async () => {

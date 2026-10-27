@@ -1,4 +1,13 @@
-import type { AddKnowledgeResponse, AddTextKnowledgeRequest, ApiError, DeleteKnowledgeResponse } from "@askwell/shared";
+import {
+  KNOWLEDGE_FILE_TYPES,
+  KNOWLEDGE_MIME_TYPES,
+  type AddKnowledgeResponse,
+  type AddTextKnowledgeRequest,
+  type ApiError,
+  type DeleteKnowledgeResponse,
+  type RequestKnowledgeUploadResponse,
+} from "@askwell/shared";
+import { uploadKnowledgeFileToSignedUrl } from "../storage/browser";
 
 // Client-callable writes. No database imports, so client components can use them.
 
@@ -7,6 +16,16 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new Error((data as ApiError | null)?.error?.message ?? "Request failed.");
   return data as T;
+}
+
+// A browser's own File.type guess is unreliable for these (often "" or text/x-markdown for
+// .md), and the bucket's allowed_mime_types would then refuse the upload — set it ourselves
+// from the extension, the same way the server resolves the source type.
+function mimeTypeFor(fileName: string): string | undefined {
+  const dot = fileName.lastIndexOf(".");
+  const extension = dot > 0 ? fileName.slice(dot + 1).toLowerCase() : "";
+  const type = KNOWLEDGE_FILE_TYPES[extension as keyof typeof KNOWLEDGE_FILE_TYPES];
+  return type ? KNOWLEDGE_MIME_TYPES[type] : undefined;
 }
 
 export async function addTextKnowledge(
@@ -20,15 +39,37 @@ export async function addTextKnowledge(
   });
 }
 
+// SB-T06: straight to Storage with a signed URL, not through our server, so a file is no longer
+// bounded by Vercel's function body limit. Reserve a source and get a one-time signed upload URL,
+// PUT the file straight to Storage with it, then finalize (real size + PDF magic bytes, then
+// processing starts).
 export async function addFileKnowledge(
   projectId: string,
   file: File,
   title?: string,
 ): Promise<AddKnowledgeResponse> {
-  const form = new FormData();
-  form.set("file", file);
-  if (title) form.set("title", title);
-  return send(`/api/projects/${projectId}/knowledge`, { method: "POST", body: form });
+  const { source, path, token } = await send<RequestKnowledgeUploadResponse>(
+    `/api/projects/${projectId}/knowledge/upload-url`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: file.name, size: file.size, title }),
+    },
+  );
+
+  try {
+    await uploadKnowledgeFileToSignedUrl(path, token, file, mimeTypeFor(file.name));
+  } catch (error) {
+    // Free the slot right away rather than waiting for the 2h abandoned-reservation reclaim.
+    await deleteKnowledgeSource(source.id).catch(() => undefined);
+    throw error;
+  }
+
+  return send(`/api/projects/${projectId}/knowledge/finalize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sourceId: source.id }),
+  });
 }
 
 export async function deleteKnowledgeSource(sourceId: string): Promise<DeleteKnowledgeResponse> {

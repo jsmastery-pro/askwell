@@ -16,7 +16,6 @@
     "@arcjet/next": "^1.14.1",
     "@askwell/db": "workspace:*",
     "@askwell/shared": "workspace:*",
-    "@aws-sdk/client-s3": "^3.1152.0",
     "@clerk/nextjs": "^7.9.11",
     "@supabase/supabase-js": "^2.118.0",
     "drizzle-orm": "catalog:",

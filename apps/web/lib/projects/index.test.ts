@@ -22,6 +22,11 @@ vi.mock("../supabase/service", () => ({
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../posthog/server", () => ({ captureServerEvent }));
 
+// deleteProject's Storage cleanup is lib/storage's job (which bucket, which client): mocked
+// whole, so this test never depends on how it reaches Storage.
+const deleteKnowledgeFiles = vi.hoisted(() => vi.fn());
+vi.mock("../storage", () => ({ deleteKnowledgeFiles }));
+
 const { createProject, deleteProject, generatePublicKey, getOwnedProject, listProjects, renameProject, toProject } =
   await import("./index");
 
@@ -51,7 +56,8 @@ function createClients(plan: "free" | "pro" | null, service: FakeHandlers = {}) 
 }
 
 beforeEach(() => {
-  vi.stubEnv("BUCKET_NAME", "askwell-test");
+  deleteKnowledgeFiles.mockReset();
+  deleteKnowledgeFiles.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -214,12 +220,8 @@ describe("renameProject", () => {
 });
 
 describe("deleteProject", () => {
-  /** Owner and service fakes that log the row delete and the Storage remove, in order. */
-  function deleteClients({
-    keys = ["projects/p/a", "projects/p/b"],
-    deleted = [{ id: PROJECT_ID }],
-    removeError = null as { code: string; message: string } | null,
-  } = {}) {
+  /** An owner fake that logs the file-key read and the row delete, in order. */
+  function deleteClients({ keys = ["projects/p/a", "projects/p/b"], deleted = [{ id: PROJECT_ID }] } = {}) {
     const order: string[] = [];
     const owner = fakeSupabase({
       from: {
@@ -233,61 +235,43 @@ describe("deleteProject", () => {
         },
       },
     });
-    const service = fakeSupabase({
-      storage: {
-        "askwell-test": () => {
-          order.push("remove files");
-          return { data: [], error: removeError };
-        },
-      },
-    });
-    return { owner, service, order };
+    return { owner, order };
   }
 
   it("reads the file keys, deletes the row with the owner client, then removes the files", async () => {
-    const { owner, service, order } = deleteClients();
+    const { owner, order } = deleteClients();
 
-    expect(await deleteProject(PROJECT_ID, { owner, service })).toBe(true);
+    expect(await deleteProject(PROJECT_ID, owner)).toBe(true);
 
-    expect(order).toEqual(["read keys", "delete row", "remove files"]);
+    expect(order).toEqual(["read keys", "delete row"]);
     const [sources] = callsTo(owner, "knowledge_sources");
     expect(argsOf(sources, "eq")).toEqual(["project_id", PROJECT_ID]);
     expect(argsOf(sources, "not")).toEqual(["storage_key", "is", null]);
     expect(argsOf(callsTo(owner, "projects")[0], "eq")).toEqual(["id", PROJECT_ID]);
-    expect(argsOf(callsTo(service, "askwell-test")[0], "remove")).toEqual([["projects/p/a", "projects/p/b"]]);
-    expect(callsTo(service, "projects")).toEqual([]);
+    expect(deleteKnowledgeFiles).toHaveBeenCalledWith(["projects/p/a", "projects/p/b"]);
   });
 
   it("returns false and removes nothing when RLS hides the project", async () => {
-    const { owner, service, order } = deleteClients({ deleted: [] });
+    const { owner, order } = deleteClients({ deleted: [] });
 
-    expect(await deleteProject(PROJECT_ID, { owner, service })).toBe(false);
+    expect(await deleteProject(PROJECT_ID, owner)).toBe(false);
     expect(order).toEqual(["read keys", "delete row"]);
-    expect(service.calls).toEqual([]);
+    expect(deleteKnowledgeFiles).not.toHaveBeenCalled();
   });
 
   it("skips Storage for a project with no files", async () => {
-    const { owner, service } = deleteClients({ keys: [] });
+    const { owner } = deleteClients({ keys: [] });
 
-    expect(await deleteProject(PROJECT_ID, { owner, service })).toBe(true);
-    expect(service.calls).toEqual([]);
+    expect(await deleteProject(PROJECT_ID, owner)).toBe(true);
+    expect(deleteKnowledgeFiles).not.toHaveBeenCalled();
   });
 
   it("still succeeds when removing the files fails, logging the orphans", async () => {
-    const { owner, service } = deleteClients({ removeError: { code: "500", message: "storage down" } });
+    const { owner } = deleteClients();
+    deleteKnowledgeFiles.mockRejectedValueOnce(new Error("storage down"));
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(await deleteProject(PROJECT_ID, { owner, service })).toBe(true);
-    expect(logged).toHaveBeenCalledOnce();
-  });
-
-  it("still succeeds without BUCKET_NAME, logging instead of removing", async () => {
-    vi.stubEnv("BUCKET_NAME", "");
-    const { owner, service } = deleteClients();
-    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    expect(await deleteProject(PROJECT_ID, { owner, service })).toBe(true);
-    expect(service.calls).toEqual([]);
+    expect(await deleteProject(PROJECT_ID, owner)).toBe(true);
     expect(logged).toHaveBeenCalledOnce();
   });
 });
@@ -297,11 +281,11 @@ describe("malformed project IDs", () => {
     "%s reads as not found without querying",
     async (id) => {
       const owner = fakeSupabase();
-      const service = fakeSupabase();
       expect(await getOwnedProject(id, owner)).toBeNull();
       expect(await renameProject(id, "X", owner)).toBeNull();
-      expect(await deleteProject(id, { owner, service })).toBe(false);
-      expect([...owner.calls, ...service.calls]).toEqual([]);
+      expect(await deleteProject(id, owner)).toBe(false);
+      expect(owner.calls).toEqual([]);
+      expect(deleteKnowledgeFiles).not.toHaveBeenCalled();
     },
   );
 });

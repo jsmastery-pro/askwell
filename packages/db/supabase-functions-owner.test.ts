@@ -133,16 +133,19 @@ describe.each([
   });
 
   describe("reserve_knowledge_source", () => {
-    it("inserts the source as processing, with the server's ID and storage key", async () => {
+    // SB-T06: a file reservation starts `uploading` — the browser hasn't PUT the object yet —
+    // and only becomes `processing` once finalize atomically claims it (below). Pasted text has
+    // no upload step, so it starts `processing` directly.
+    it("inserts a file reservation as uploading, with the server's ID and storage key", async () => {
       await actAsServiceRole(db);
       const key = `projects/${PROJECT_A}/${SOURCE_ID}`;
       const { rows } = await db.query<SourceRow>(RESERVE_SOURCE_WITH_ID, [PROJECT_A, "Guide", "pdf", key, 3, SOURCE_ID]);
       expect(rows).toEqual([
-        expect.objectContaining({ id: SOURCE_ID, project_id: PROJECT_A, title: "Guide", type: "pdf", storage_key: key, status: "processing" }),
+        expect.objectContaining({ id: SOURCE_ID, project_id: PROJECT_A, title: "Guide", type: "pdf", storage_key: key, status: "uploading" }),
       ]);
     });
 
-    it("generates the ID for pasted text", async () => {
+    it("inserts a pasted-text reservation as processing, generating the ID", async () => {
       await actAsServiceRole(db);
       const { rows } = await db.query<SourceRow>(RESERVE_SOURCE, [PROJECT_A, "FAQ", "text", null, 3]);
       expect(rows[0]).toMatchObject({ project_id: PROJECT_A, type: "text", storage_key: null, status: "processing" });
@@ -181,6 +184,35 @@ describe.each([
         expect((await refused(db, RESERVE_SOURCE, [PROJECT_A, "x", "text", null, limit])).code).toBe("22023");
       }
       expect(await count(db, "knowledge_sources")).toBe(0);
+    });
+  });
+
+  // SB-T06 review (MUST FIX): finalize claims a source with this exact conditional UPDATE, so two
+  // calls for the same source — concurrent or retried — can't both start ingest and double the
+  // OpenAI bill. Not a function; the route runs it directly through the service client, so these
+  // tests exercise the SQL itself rather than an RPC.
+  describe("finalize's atomic claim (uploading -> processing, once)", () => {
+    const CLAIM = `UPDATE knowledge_sources SET status = 'processing'
+                   WHERE id = $1 AND project_id = $2 AND status = 'uploading'
+                   RETURNING *`;
+
+    it("claims an uploading file reservation exactly once; a second finalize finds nothing to claim", async () => {
+      await actAsServiceRole(db);
+      const key = `projects/${PROJECT_A}/${SOURCE_ID}`;
+      await db.query(RESERVE_SOURCE_WITH_ID, [PROJECT_A, "Guide", "pdf", key, 3, SOURCE_ID]);
+
+      const first = await db.query<SourceRow>(CLAIM, [SOURCE_ID, PROJECT_A]);
+      expect(first.rows).toEqual([expect.objectContaining({ id: SOURCE_ID, status: "processing" })]);
+
+      const second = await db.query<SourceRow>(CLAIM, [SOURCE_ID, PROJECT_A]);
+      expect(second.rows).toEqual([]);
+    });
+
+    it("never claims a pasted-text reservation (it's already processing, not uploading)", async () => {
+      await actAsServiceRole(db);
+      const { rows } = await db.query<SourceRow>(RESERVE_SOURCE, [PROJECT_A, "FAQ", "text", null, 3]);
+      const { rows: claimed } = await db.query<SourceRow>(CLAIM, [rows[0]!.id, PROJECT_A]);
+      expect(claimed).toEqual([]);
     });
   });
 
@@ -239,5 +271,23 @@ describe.each([
         { proname: "reserve_knowledge_source", prosecdef: false, proconfig: ['search_path=""'] },
       ]);
     });
+  });
+});
+
+// SB-T06: the bucket itself isn't affected by the Data API exposure setting, so this runs once
+// against its own database rather than inside the describe.each above.
+describe("knowledge bucket (SB-T06)", () => {
+  it("is private, with a 10 MB limit and exactly the three allowed MIME types", async () => {
+    const db = await createSupabaseTestDb();
+    try {
+      const { rows } = await db.query<{ public: boolean; file_size_limit: number; allowed_mime_types: string[] }>(
+        "SELECT public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'knowledge'",
+      );
+      expect(rows).toEqual([
+        { public: false, file_size_limit: 10485760, allowed_mime_types: ["application/pdf", "text/markdown", "text/plain"] },
+      ]);
+    } finally {
+      await db.close();
+    }
   });
 });

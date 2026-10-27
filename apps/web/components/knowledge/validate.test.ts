@@ -16,7 +16,7 @@ describe("checkFile", () => {
 
   it("rejects a file over the size limit and says how big it is", () => {
     expect(checkFile({ name: "big.pdf", size: MAX_KNOWLEDGE_FILE_BYTES + 1 })).toBe(
-      "This file is 4.0 MB. Files can be up to 4 MB.",
+      "This file is 10.0 MB. Files can be up to 10 MB.",
     );
     expect(checkFile({ name: "huge.pdf", size: 24 * 1024 * 1024 })).toMatch(/24\.0 MB/);
   });
