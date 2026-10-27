@@ -9,6 +9,14 @@
 | project.md | §6.3, §6.7, §6.8, §6.12, §9 |
 
 ## Steps
+**Before step 0 (needs SB-T01's MCP):** put dev on the Supabase migrations, through the Supabase MCP (dev project only):
+- drop the old Drizzle tables, enums and the `drizzle` schema in dev (throwaway data; tell the product owner first, it signs everyone out of their test projects)
+- apply every file in `supabase/migrations`, in order, all merged to `main` (never an unmerged one)
+- run SB-T02's checks as SQL against dev (A can't see B, `anon` gets nothing, no direct project insert, `authenticated` can't execute the SB-T03/SB-T11 functions) and paste the results in the PR
+- from then on, never run `pnpm db:migrate` against dev
+
+You can write steps 1–4 before this, with an untyped client; the PR opens once the types are in.
+
 0. **Types:** `packages/db/types.ts` generated from the **dev project** (`supabase gen types typescript --project-id pasgozggqtprenfgtghb`, or the MCP), plus a `pnpm db:types` script. Never `--local`. The clients below are typed with it.
 1. **`lib/supabase`:**
    - `createOwnerClient()`: server-side, sends the signed-in Clerk session token (`accessToken: async () => (await auth()).getToken()`), so RLS applies.
