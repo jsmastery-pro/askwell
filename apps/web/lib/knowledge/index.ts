@@ -1,94 +1,30 @@
 import "server-only";
-import { knowledgeChunks, knowledgeSources } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
-import { SOURCE_TYPES, type KnowledgeSource } from "@askwell/shared";
-import { count, desc, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { createServiceClient } from "../supabase/service";
+import { unwrap } from "../supabase/query";
 import { embedTexts } from "../ai";
 import { chunkText } from "./chunk";
 
-export type SourceType = (typeof SOURCE_TYPES)[number];
-export type KnowledgeSourceRow = typeof knowledgeSources.$inferSelect;
-
-// Same shape check as getOwnedProject in packages/db: a malformed id would make Postgres
-// throw on the uuid cast, so callers treat it as "not found" instead.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function toKnowledgeSource(row: KnowledgeSourceRow): KnowledgeSource {
-  return {
-    id: row.id,
-    title: row.title,
-    type: row.type,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-/** A project's sources, newest first. The caller is trusted to have already checked ownership. */
-export async function listProjectKnowledgeSources(
-  projectId: string,
-  database: Database = defaultDb,
-): Promise<KnowledgeSourceRow[]> {
-  return database
-    .select()
-    .from(knowledgeSources)
-    .where(eq(knowledgeSources.projectId, projectId))
-    .orderBy(desc(knowledgeSources.createdAt));
-}
-
-/** A single source by id, or `null` if it doesn't exist. Doesn't check ownership. */
-export async function getKnowledgeSourceById(
-  sourceId: string,
-  database: Database = defaultDb,
-): Promise<KnowledgeSourceRow | null> {
-  if (!UUID_RE.test(sourceId)) return null;
-  const [row] = await database.select().from(knowledgeSources).where(eq(knowledgeSources.id, sourceId)).limit(1);
-  return row ?? null;
-}
-
-/** Every source counts toward the plan limit: uploaded files and pasted text alike (§5, §6.4). */
-export async function countProjectKnowledgeSources(projectId: string, database: Database = defaultDb): Promise<number> {
-  const [row] = await database
-    .select({ n: count() })
-    .from(knowledgeSources)
-    .where(eq(knowledgeSources.projectId, projectId));
-  return row?.n ?? 0;
-}
-
-export type NewSource = { id?: string; projectId: string; title: string; type: SourceType; storageKey: string | null };
+type ServiceClient = ReturnType<typeof createServiceClient>;
 
 /**
- * Inserts a `processing` source. Pass `id` when the caller needs the id before inserting
- * (e.g. to derive the file's storage key up front and persist it in the same write).
+ * Deletes a source row. Its chunks cascade (FK `onDelete: "cascade"`). Row only — never the
+ * storage object (SB-T07): every caller (the knowledge-delete route, finalize's refusal cleanup,
+ * upload-url's abandoned-reservation reclaim) already removes the object itself, in whichever
+ * order its own error-handling needs, so this never double-deletes it.
  */
-export async function insertKnowledgeSource(
-  input: NewSource,
-  database: Database = defaultDb,
-): Promise<KnowledgeSourceRow> {
-  const [row] = await database
-    .insert(knowledgeSources)
-    .values({ ...input, id: input.id ?? randomUUID() })
-    .returning();
-  return row!;
+export async function deleteKnowledgeSource(sourceId: string, service: ServiceClient = createServiceClient()): Promise<void> {
+  unwrap(await service.from("knowledge_sources").delete().eq("id", sourceId));
 }
 
-async function setSourceStatus(
-  sourceId: string,
-  status: "ready" | "failed",
-  database: Database,
-): Promise<void> {
-  await database.update(knowledgeSources).set({ status }).where(eq(knowledgeSources.id, sourceId));
+async function setSourceStatus(service: ServiceClient, sourceId: string, status: "ready" | "failed"): Promise<void> {
+  unwrap(await service.from("knowledge_sources").update({ status }).eq("id", sourceId));
 }
 
-/**
- * Deletes a source row. Its chunks cascade (FK `onDelete: "cascade"`). Used both to free a
- * file slot when an upload never reached storage, and for a real owner-requested delete —
- * callers handle the storage object themselves first in the latter case.
- */
-export async function deleteKnowledgeSource(sourceId: string, database: Database = defaultDb): Promise<void> {
-  await database.delete(knowledgeSources).where(eq(knowledgeSources.id, sourceId));
-}
+// One insert per batch, not per row, and not one insert for the whole file either: a 10 MB PDF
+// can produce thousands of chunks, and a single request for all of them risks the route's own
+// maxDuration (300s) and PostgREST's request size limit. 200 keeps each request a few MB
+// (content text + a 1536-dim embedding per row) and the round-trip count low.
+const CHUNK_INSERT_BATCH_SIZE = 200;
 
 /**
  * Gets the source's text, chunks it, embeds it, and stores the chunks, then marks the source
@@ -99,7 +35,7 @@ export async function processKnowledgeSource(
   sourceId: string,
   projectId: string,
   getText: () => Promise<string> | string,
-  database: Database = defaultDb,
+  service: ServiceClient = createServiceClient(),
 ): Promise<void> {
   try {
     const text = await getText();
@@ -107,12 +43,29 @@ export async function processKnowledgeSource(
     if (chunks.length === 0) throw new Error("No extractable text");
 
     const vectors = await embedTexts(chunks);
-    await database
-      .insert(knowledgeChunks)
-      .values(chunks.map((content, i) => ({ projectId, sourceId, content, embedding: vectors[i]! })));
-    await setSourceStatus(sourceId, "ready", database);
+    // pgvector columns are typed as `string` (the generator has no TS type for `vector`), and
+    // JSON's array syntax is also pgvector's text input syntax, same as match_chunks' query vector.
+    const rows = chunks.map((content, i) => ({
+      project_id: projectId,
+      source_id: sourceId,
+      content,
+      embedding: JSON.stringify(vectors[i]!),
+    }));
+    for (let start = 0; start < rows.length; start += CHUNK_INSERT_BATCH_SIZE) {
+      unwrap(await service.from("knowledge_chunks").insert(rows.slice(start, start + CHUNK_INSERT_BATCH_SIZE)));
+    }
+    await setSourceStatus(service, sourceId, "ready");
   } catch (error) {
     console.error(`Knowledge ingest failed for source ${sourceId}`, error);
-    await setSourceStatus(sourceId, "failed", database);
+    // This runs after the response has already been sent (runAfterResponse/after()): a failure
+    // here must never throw, or it becomes an unhandled rejection with no one left to catch it.
+    try {
+      await setSourceStatus(service, sourceId, "failed");
+      // A later batch can fail after earlier ones already landed: delete them too, so a `failed`
+      // source never keeps orphaned chunks no code path uses (match_chunks only reads `ready`).
+      unwrap(await service.from("knowledge_chunks").delete().eq("source_id", sourceId));
+    } catch (cleanupError) {
+      console.error(`Could not mark source ${sourceId} failed`, cleanupError);
+    }
   }
 }

@@ -5,17 +5,16 @@
 // Usage:
 //   pnpm seed-knowledge <publicKey> <path-to-text-file> [title]
 //
-// Reads DATABASE_URL (the dev Supabase project's transaction pooler) and OPENAI_API_KEY from
-// .env.local / .env, checking this app's own directory first and the repo root second (where
-// this monorepo's secrets actually live). DATABASE_CA_CERT, if set, verifies the server's TLS
-// certificate. The dev project is shared by everyone, so seeded rows are visible to the team.
+// Reads the Supabase service-role env vars and OPENAI_API_KEY from .env.local / .env, checking
+// this app's own directory first and the repo root second (where this monorepo's secrets
+// actually live). The dev project is shared by everyone, so seeded rows are visible to the team.
 
 import { CHUNKING } from "@askwell/shared";
-import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { embedTexts } from "../lib/ai";
+import { unwrap, unwrapRow } from "../lib/supabase/query";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 // Earlier files win: loadEnvFile never overwrites a variable that's already set.
@@ -27,11 +26,9 @@ for (const file of [".env.local", ".env", join(repoRoot, ".env.local"), join(rep
   }
 }
 
-// Imported dynamically, after the env-loading loop above: @askwell/db/client reads
-// DATABASE_URL at module load (to construct its pg Pool), so a static import would run
-// before .env.local/.env are loaded and could capture an empty connection string.
-const { knowledgeChunks, knowledgeSources, projects } = await import("@askwell/db");
-const { db } = await import("@askwell/db/client");
+// Dynamic, after the env-loading loop above, same reason @askwell/db/client used to need it:
+// the service client reads its env vars at construction, which a static import could beat.
+const { createServiceClient } = await import("../lib/supabase/service");
 
 // No real tokenizer here — this is a seeding tool, not the ingest pipeline (P3-T02 owns that).
 // ~0.75 words per token is a common rough approximation for English text.
@@ -52,6 +49,11 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
+// Same reasoning as lib/knowledge's ingest: one insert per batch, not one for the whole file —
+// a large seed file can produce many chunks, and a single request for all of them risks
+// PostgREST's request size limit.
+const CHUNK_INSERT_BATCH_SIZE = 200;
+
 async function main() {
   const [publicKey, filePath, titleArg] = process.argv.slice(2);
   if (!publicKey || !filePath) {
@@ -59,7 +61,8 @@ async function main() {
     process.exit(1);
   }
 
-  const [project] = await db.select().from(projects).where(eq(projects.publicKey, publicKey)).limit(1);
+  const service = createServiceClient();
+  const project = unwrap(await service.from("projects").select("id, name").eq("public_key", publicKey).maybeSingle());
   if (!project) {
     console.error(`No project with public key ${publicKey}`);
     process.exit(1);
@@ -72,28 +75,39 @@ async function main() {
     process.exit(1);
   }
 
-  // Embed before writing anything, then insert the source and its chunks in one transaction —
-  // otherwise a failure partway through could leave a `ready` source with zero chunks.
+  // Embed before writing anything, so a failed embedding call leaves no partial source behind.
   const embeddings = await embedTexts(chunks);
 
   const title = titleArg ?? basename(filePath);
-  const sourceId = await db.transaction(async (tx) => {
-    const [source] = await tx
-      .insert(knowledgeSources)
-      .values({ projectId: project.id, title, type: "text", status: "ready" })
-      .returning();
-    await tx.insert(knowledgeChunks).values(
-      chunks.map((chunkContent, i) => ({
-        projectId: project.id,
-        sourceId: source!.id,
-        content: chunkContent,
-        embedding: embeddings[i]!,
-      })),
-    );
-    return source!.id;
-  });
+  const source = unwrapRow(
+    await service
+      .from("knowledge_sources")
+      .insert({ project_id: project.id, title, type: "text", status: "processing" })
+      .select("id")
+      .single(),
+  );
 
-  console.log(`Seeded ${chunks.length} chunks for "${project.name}" from ${filePath} (source ${sourceId})`);
+  try {
+    for (let start = 0; start < chunks.length; start += CHUNK_INSERT_BATCH_SIZE) {
+      const batch = chunks.slice(start, start + CHUNK_INSERT_BATCH_SIZE).map((chunkContent, i) => ({
+        project_id: project.id,
+        source_id: source.id,
+        content: chunkContent,
+        // pgvector columns are typed as `string` (the generator has no TS type for `vector`); JSON's
+        // array syntax is also pgvector's text input syntax.
+        embedding: JSON.stringify(embeddings[start + i]!),
+      }));
+      unwrap(await service.from("knowledge_chunks").insert(batch));
+    }
+    unwrap(await service.from("knowledge_sources").update({ status: "ready" }).eq("id", source.id));
+  } catch (error) {
+    // Leaves no `ready` source with zero (or partial) chunks: remove it instead.
+    const { error: deleteError } = await service.from("knowledge_sources").delete().eq("id", source.id);
+    if (deleteError) console.error(`Could not remove the failed source ${source.id}; it's stuck processing`, deleteError);
+    throw error;
+  }
+
+  console.log(`Seeded ${chunks.length} chunks for "${project.name}" from ${filePath} (source ${source.id})`);
   process.exit(0);
 }
 
