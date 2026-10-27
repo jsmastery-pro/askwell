@@ -5,7 +5,7 @@
 | Owner | Alice |
 | Track | Supabase-native |
 | Needs first | SB-T03 (`reserve_knowledge_source`); SB-T04's `createServiceClient()` (see Notes) |
-| Files allowed | `supabase/migrations/**` (new migration: bucket + storage policies), `apps/web/lib/storage/**`, `apps/web/app/api/projects/[id]/knowledge/**` (new upload-URL and finalize routes), `apps/web/components/knowledge/**`, `apps/web/lib/data/knowledge-actions.ts` and its test (the client's upload calls), `packages/shared/src/knowledge.ts` (back to 10 MB), `apps/web/components/landing/Hero.tsx` and `docs/askwell-knowledge.md` (size wording), co-located tests |
+| Files allowed | `supabase/migrations/**` (new migration: bucket + storage policies), `apps/web/lib/storage/**`, `apps/web/app/api/projects/[id]/knowledge/**` (new upload-URL and finalize routes), `apps/web/components/knowledge/**`, `apps/web/lib/data/knowledge-actions.ts` and its test (the client's upload calls), `packages/db/supabase-functions-owner.test.ts` (status only), `packages/shared/src/knowledge.ts` (back to 10 MB), `apps/web/components/landing/Hero.tsx` and `docs/askwell-knowledge.md` (size wording), co-located tests |
 | project.md | §6.4, §9 File upload |
 
 ## Why
@@ -33,3 +33,9 @@ Product owner, 2026-10-27: uploads go straight from the browser to Supabase Stor
 - CodeRabbit is required (file upload, `packages/shared`).
 - Bob is building `apps/web/lib/supabase/` in SB-T04. Import the service client as `createServiceClient()` from `@/lib/supabase/service`, and don't edit that folder. Until SB-T04 merges, mock it in tests and rebase when it lands; the PR opens after SB-T04 merges.
 - No local Supabase stack. The bucket and its limits are checked on dev after merge.
+- **Decided 2026-10-27 (product owner): new source status `uploading`.** Without it, finalize can run again and again on one source while it's `processing`, and each run re-embeds the file on our OpenAI key. So:
+  - an additive migration: `ALTER TYPE public.source_status ADD VALUE 'uploading'`, and `CREATE OR REPLACE` `reserve_knowledge_source` (same signature) inserting `uploading` when `p_storage_key` is set, `processing` for pasted text
+  - finalize claims the source atomically: `processing` only from `uploading`, once
+  - abandoned-upload cleanup deletes only `uploading` rows older than 2 hours
+  - `SOURCE_STATUSES` in `packages/shared` gets `uploading`; the UI shows it like `processing`
+  - extra files: `packages/db/supabase-functions-owner.test.ts` (its expected status) and the shared status list
