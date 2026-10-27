@@ -261,7 +261,7 @@ Lane B (Customize) added once a developer is free for it.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
-| SB-T01 | Clerk ↔ Supabase, Data API on, keys, MCP (dev only), agent skills | Product owner | — | todo | — |
+| SB-T01 | Clerk ↔ Supabase, Data API on, keys, MCP (dev only), agent skills | Product owner | — | in progress | — (Clerk ↔ Supabase connected in dev 2026-10-27) |
 | SB-T10 | Spike: local Supabase + MCP inside the sandboxes | Alice | — | done | — (local stack runs, but we don't use it: the image pull fills the product owner's disk. The MCP check moves to SB-T01.) |
 | SB-T02 | Supabase schema and RLS policies | Bob | — | done | #92 |
 | SB-T03 | Postgres functions: project and knowledge limits (`rpc()`) | Bob | SB-T02 | done | #93 |
