@@ -12,7 +12,12 @@ vi.mock("../ai", () => ({ embedTexts }));
 // deleteKnowledgeSource and processKnowledgeSource run through the service client (SB-T07). This
 // fake proxies straight through to the same pglite db this file's own Drizzle asserts read and
 // write, so a row they touch is visible here, and vice versa.
-const fake = vi.hoisted(() => ({ failedUpdateError: null as { message: string } | null }));
+const fake = vi.hoisted(() => ({
+  failedUpdateError: null as { message: string } | null,
+  // 1-based chunk-insert call to fail (no rows inserted that call), to test a later batch failing.
+  failChunkBatch: null as number | null,
+  chunkInsertCalls: 0,
+}));
 
 function from(table: string) {
   if (table === "knowledge_sources") {
@@ -37,6 +42,8 @@ function from(table: string) {
       // The real client sends embeddings as pgvector's text form (JSON.stringify'd); parse them
       // back to number[] for Drizzle, which wants the array itself.
       insert: async (rows: { project_id: string; source_id: string; content: string; embedding: string }[]) => {
+        fake.chunkInsertCalls += 1;
+        if (fake.failChunkBatch === fake.chunkInsertCalls) return { error: { message: "insert failed" } };
         await db
           .insert(knowledgeChunks)
           .values(
@@ -49,6 +56,12 @@ function from(table: string) {
           );
         return { error: null };
       },
+      delete: () => ({
+        eq: async (_c: string, sourceId: string) => {
+          await db.delete(knowledgeChunks).where(eq(knowledgeChunks.sourceId, sourceId));
+          return { error: null };
+        },
+      }),
     };
   }
   throw new Error(`unexpected table ${table}`);
@@ -84,6 +97,8 @@ afterAll(() => close());
 afterEach(() => {
   embedTexts.mockReset();
   fake.failedUpdateError = null;
+  fake.failChunkBatch = null;
+  fake.chunkInsertCalls = 0;
 });
 
 describe("processKnowledgeSource", () => {
@@ -143,6 +158,22 @@ describe("processKnowledgeSource", () => {
 
     const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
     expect(row?.status).toBe("failed");
+  });
+
+  it("deletes already-inserted chunks when a later batch fails", async () => {
+    const source = await insertSource({ title: "Partial" });
+    // Over 200 chunks (CHUNK_INSERT_BATCH_SIZE): more than one insert call, so the second can fail
+    // after the first already landed some rows.
+    const words = Array.from({ length: 450 * 600 }, (_, i) => `word${i}`).join(" ");
+    embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
+    fake.failChunkBatch = 2;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await processKnowledgeSource(source.id, projectId, () => words);
+
+    const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
+    expect(row?.status).toBe("failed");
+    expect(await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id))).toHaveLength(0);
   });
 
   it("never throws when marking the source failed itself fails", async () => {

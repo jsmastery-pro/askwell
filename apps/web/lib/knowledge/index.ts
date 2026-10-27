@@ -61,8 +61,11 @@ export async function processKnowledgeSource(
     // here must never throw, or it becomes an unhandled rejection with no one left to catch it.
     try {
       await setSourceStatus(service, sourceId, "failed");
-    } catch (statusError) {
-      console.error(`Could not mark source ${sourceId} failed`, statusError);
+      // A later batch can fail after earlier ones already landed: delete them too, so a `failed`
+      // source never keeps orphaned chunks no code path uses (match_chunks only reads `ready`).
+      unwrap(await service.from("knowledge_chunks").delete().eq("source_id", sourceId));
+    } catch (cleanupError) {
+      console.error(`Could not mark source ${sourceId} failed`, cleanupError);
     }
   }
 }
