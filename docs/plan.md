@@ -273,3 +273,4 @@ Lane B (Customize) added once a developer is free for it.
 | SB-T08 | Remove Drizzle, pg, S3 SDK, old env (pglite stays for tests) | Bob | SB-T04…T07 | done | #99 |
 | SB-T09 | Spec rewrite + RLS / function-grant security audit | John | alongside; audit after SB-T08 | done | #100 (docs); audit in `docs/security-review.md`: no high or medium; S1 → SB-T13, S2 → product owner |
 | SB-T13 | Revoke EXECUTE on `rls_auto_enable()` (audit S1) | Bob | SB-T09 audit | in progress | — |
+| SB-T14 | End-to-end check on a preview (API + browser) | Alice + product owner | SB-T04…T08, Vercel Preview env | in progress | — |
