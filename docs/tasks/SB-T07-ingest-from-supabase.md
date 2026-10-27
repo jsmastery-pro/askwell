@@ -21,3 +21,4 @@
 
 ## Notes
 - CodeRabbit is required (chat/RAG).
+- **Split with SB-T04 (decided 2026-10-27, John):** owner reads stay on the owner client (RLS). `listProjectKnowledgeSources` and `countProjectKnowledgeSources` are left as they are: SB-T04 stops calling them, and SB-T08 deletes them. `getKnowledgeSourceById`, `processKnowledgeSource` and `deleteKnowledgeSource` move to the service client with the same signatures; callers check ownership first. The pasted-text route reserves through `rpc("reserve_knowledge_source")` (done in SB-T06).
