@@ -1,21 +1,21 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { CustomizeForm } from "../../../../../components/customize/CustomizeForm";
 import { getWidgetConfig } from "../../../../../lib/data/config";
+import { getOwnedProject } from "../../../../../lib/projects";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomizePage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const { id } = await params;
   // Ownership first, before any data call (docs/ui-track.md).
-  const project = await getOwnedProject(id, userId);
+  const project = await getOwnedProject(id);
   if (!project) notFound();
 
   // Real: the stored config with the owner's plan applied, both read on the server (§9).
-  const widget = await getWidgetConfig(userId, project.id);
+  const widget = await getWidgetConfig(project.id);
   if (!widget) notFound();
 
   return (

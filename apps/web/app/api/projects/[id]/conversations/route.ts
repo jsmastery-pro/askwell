@@ -1,6 +1,6 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import type { ListConversationsResponse } from "@askwell/shared";
 import { listProjectConversations } from "../../../../../lib/conversations";
+import { getOwnedProject } from "../../../../../lib/projects";
 import { getOwnerId, projectNotFound, unauthorized } from "../../../../../lib/projects/http";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: Context) {
   if (!ownerId) return unauthorized();
 
   const { id: projectId } = await params;
-  if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
+  if (!(await getOwnedProject(projectId))) return projectNotFound();
 
   const conversations = await listProjectConversations(projectId);
   return Response.json({ conversations } satisfies ListConversationsResponse);

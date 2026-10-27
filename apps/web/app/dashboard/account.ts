@@ -1,16 +1,20 @@
-import { accounts } from "@askwell/db";
-import { db } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
+import "server-only";
 import { captureServerEvent } from "../../lib/posthog/server";
+import { unwrap } from "../../lib/supabase/query";
+import { createServiceClient, type ServiceClient } from "../../lib/supabase/service";
 
-/** Creates the account row on first sign-in. True only when this call actually created it. */
-export async function ensureAccount(clerkUserId: string, database: Database = db): Promise<boolean> {
-  const inserted = await database
-    .insert(accounts)
-    .values({ clerkUserId, plan: "free" })
-    .onConflictDoNothing({ target: accounts.clerkUserId })
-    .returning({ clerkUserId: accounts.clerkUserId });
-  const created = inserted.length > 0;
+/**
+ * Creates the account row on first sign-in. True only when this call actually created it.
+ * Owners can't insert their own account (the plan lives on it), so this uses the service client.
+ */
+export async function ensureAccount(clerkUserId: string, service: ServiceClient = createServiceClient()): Promise<boolean> {
+  const inserted = unwrap(
+    await service
+      .from("accounts")
+      .upsert({ clerk_user_id: clerkUserId, plan: "free" }, { onConflict: "clerk_user_id", ignoreDuplicates: true })
+      .select("clerk_user_id"),
+  );
+  const created = (inserted?.length ?? 0) > 0;
   if (created) captureServerEvent(clerkUserId, "signed_up");
   return created;
 }

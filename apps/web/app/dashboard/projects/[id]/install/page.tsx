@@ -1,4 +1,3 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -7,6 +6,7 @@ import { CopyButton } from "../../../../../components/projects/CopyButton";
 import { buildInstallSnippet, resolveAppUrl } from "../../../../../components/projects/snippet";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
 import { FOCUS_ON_INK } from "../../../../../components/ui/styles";
+import { getOwnedProject } from "../../../../../lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +17,13 @@ const STEPS = [
 ];
 
 export default async function InstallPage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const { id } = await params;
   // Not found and not owned look the same (§9).
-  const project = await getOwnedProject(id, userId);
+  const project = await getOwnedProject(id);
   if (!project) notFound();
 
-  const snippet = buildInstallSnippet(resolveAppUrl(await headers()), project.publicKey);
+  const snippet = buildInstallSnippet(resolveAppUrl(await headers()), project.public_key);
 
   return (
     <div className="max-w-3xl">

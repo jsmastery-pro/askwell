@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 // The dashboard's home: every project with its usage this month.
 export default async function ProjectsPage() {
-  const { userId } = await auth.protect();
-  const [rows, plan] = await Promise.all([listProjects(userId), getAccountPlan(userId)]);
+  await auth.protect();
+  const [rows, plan] = await Promise.all([listProjects(), getAccountPlan()]);
   const limits = PLAN_LIMITS[plan];
 
   return (
@@ -22,7 +22,7 @@ export default async function ProjectsPage() {
         plan={plan}
         limit={limits.projects}
         messagesLimit={limits.messagesPerMonth}
-        resetsAt={Object.fromEntries(rows.map((row) => [row.id, addOneMonth(row.periodStart).toISOString()]))}
+        resetsAt={Object.fromEntries(rows.map((row) => [row.id, addOneMonth(new Date(row.period_start)).toISOString()]))}
         now={new Date().toISOString()}
       />
     </div>

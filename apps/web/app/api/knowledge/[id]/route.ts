@@ -1,6 +1,6 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import { ERROR_CODES, type DeleteKnowledgeResponse } from "@askwell/shared";
-import { deleteKnowledgeSource, getKnowledgeSourceById } from "../../../../lib/knowledge";
+import { getOwnedKnowledgeSource } from "../../../../lib/data/knowledge";
+import { deleteKnowledgeSource } from "../../../../lib/knowledge";
 import { errorResponse, getOwnerId, unauthorized } from "../../../../lib/projects/http";
 import { deleteKnowledgeFile } from "../../../../lib/storage";
 
@@ -16,18 +16,18 @@ export async function DELETE(_request: Request, { params }: Context) {
   if (!ownerId) return unauthorized();
 
   const { id } = await params;
-  const source = await getKnowledgeSourceById(id);
+  // Ownership: RLS hides another owner's source from the owner client, so it reads as not found.
+  const source = await getOwnedKnowledgeSource(id);
   if (!source) return sourceNotFound();
-  if (!(await getOwnedProject(source.projectId, ownerId))) return sourceNotFound();
 
   // The row goes first: if this throws, the storage object is untouched and the delete can be
   // retried. Once the row is gone, a storage failure only orphans the file, never the reverse
   // (P3-T03 notes: "orphan files are better than orphan chunks").
   await deleteKnowledgeSource(source.id);
 
-  if (source.storageKey) {
+  if (source.storage_key) {
     try {
-      await deleteKnowledgeFile(source.storageKey);
+      await deleteKnowledgeFile(source.storage_key);
     } catch (error) {
       console.error(`Could not delete storage object for knowledge source ${source.id}`, error);
     }
