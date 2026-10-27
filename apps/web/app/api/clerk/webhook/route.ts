@@ -1,5 +1,5 @@
 import type { Plan } from "@askwell/shared";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createServiceClient } from "../../../../lib/supabase/service";
 import { clerkClient } from "@clerk/nextjs/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import type { NextRequest } from "next/server";

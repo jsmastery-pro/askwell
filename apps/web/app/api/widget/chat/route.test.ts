@@ -84,7 +84,7 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
   throw new Error(`unexpected rpc ${name}`);
 });
 
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
+vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
 
 const { POST, OPTIONS } = await import("./route");
 

@@ -80,7 +80,7 @@ function from(table: string) {
     }),
   };
 }
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
+vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
 
 const { POST } = await import("./route");
 

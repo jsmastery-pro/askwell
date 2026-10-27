@@ -38,7 +38,7 @@ function from(table: string) {
   if (table === "widget_configs") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fake.config, error: null }) }) }) };
   throw new Error(`unexpected table ${table}`);
 }
-vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
+vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");

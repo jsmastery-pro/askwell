@@ -1,5 +1,6 @@
-import { ERROR_CODES, PLAN_LIMITS, RETRIEVAL_TOP_K, type Plan, type WidgetChatRequest } from "@askwell/shared";
-import { createServiceClient } from "@/lib/supabase/service";
+import { ERROR_CODES, PLAN_LIMITS, RETRIEVAL_TOP_K, type WidgetChatRequest } from "@askwell/shared";
+import { createServiceClient } from "../supabase/service";
+import { unwrap } from "../supabase/query";
 import { embedQuery } from "../ai";
 import { captureAiGeneration, captureServerEvent } from "../posthog/server";
 import { answerFromChunks, type AnswerTelemetry } from "./answer";
@@ -23,7 +24,7 @@ const quotaExceeded: ChatResult = {
 
 /** Whether the project has anything to answer from: a `ready` source (which always has chunks). */
 async function hasReadyChunks(service: ServiceClient, projectId: string): Promise<boolean> {
-  const { data } = await service.from("knowledge_sources").select("id").eq("project_id", projectId).eq("status", "ready").limit(1);
+  const data = unwrap(await service.from("knowledge_sources").select("id").eq("project_id", projectId).eq("status", "ready").limit(1));
   return (data?.length ?? 0) > 0;
 }
 
@@ -45,24 +46,21 @@ export async function handleChat(
 ): Promise<ChatResult> {
   const receivedAt = new Date();
 
-  const { data: project } = await service.from("projects").select("id, owner_id").eq("public_key", key).maybeSingle();
+  const project = unwrap(await service.from("projects").select("id, owner_id").eq("public_key", key).maybeSingle());
   if (!project) return notFound("Widget not found.");
-  const { id: projectId, owner_id: ownerId } = project as { id: string; owner_id: string };
+  const { id: projectId, owner_id: ownerId } = project;
 
   // Another project's conversation looks exactly like a missing one.
   if (conversationId) {
-    const { data: owned } = await service
-      .from("conversations")
-      .select("id")
-      .eq("id", conversationId)
-      .eq("project_id", projectId)
-      .maybeSingle();
+    const owned = unwrap(
+      await service.from("conversations").select("id").eq("id", conversationId).eq("project_id", projectId).maybeSingle(),
+    );
     if (!owned) return notFound("Conversation not found.");
   }
 
   // The plan comes from the owner's account, read here on the server (§5, §9 Plan bypass).
-  const { data: account } = await service.from("accounts").select("plan").eq("clerk_user_id", ownerId).maybeSingle();
-  const plan = (account as { plan: Plan } | null)?.plan ?? "free";
+  const account = unwrap(await service.from("accounts").select("plan").eq("clerk_user_id", ownerId).maybeSingle());
+  const plan = account?.plan ?? "free";
   const limit = PLAN_LIMITS[plan].messagesPerMonth;
 
   // Counts the message right away: false means the limit was already reached, with no OpenAI call.
@@ -85,7 +83,7 @@ export async function handleChat(
       p_match_count: RETRIEVAL_TOP_K,
     });
     if (matchError) throw matchError;
-    chunks = (matches ?? []) as MatchedChunk[];
+    chunks = matches ?? [];
   }
   const { reply, telemetry } = await answerFromChunks(
     message,
@@ -111,7 +109,7 @@ export async function handleChat(
     if (saveError.code === "AWNOP") return notFound("Widget not found.");
     throw saveError;
   }
-  const saved = (savedRows as { conversation_id: string; first_chat: boolean }[])[0]!;
+  const saved = savedRows![0]!;
 
   // After the save, as the project owner (never the visitor). The helpers never throw and don't
   // wait on the network, so PostHog can't change the reply, its status or its timing.
