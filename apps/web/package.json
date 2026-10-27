@@ -29,8 +29,6 @@
   },
   "devDependencies": {
     "@askwell/widget": "workspace:*",
-    "@electric-sql/pglite": "catalog:",
-    "@electric-sql/pglite-pgvector": "catalog:",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.3",
     "@types/node": "catalog:",

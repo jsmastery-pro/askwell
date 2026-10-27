@@ -1,20 +1,13 @@
 // @vitest-environment node
-import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
-import { eq } from "drizzle-orm";
+import { createSupabaseTestDb } from "@askwell/db/supabase-pglite";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase } from "../../../../../../lib/supabase/fake";
-import { createTestDb, type TestDb } from "../../../../../../lib/widget-config/test-db";
 
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null, owner: undefined as unknown }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
-  },
-}));
+const state = vi.hoisted(() => ({ userId: null as string | null, owner: undefined as unknown }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
 // Ownership (lib/projects) reads through the owner client (RLS); which rows RLS lets an owner see
 // is tested against the real migrations on pglite (packages/db), so here another owner's project
@@ -31,10 +24,9 @@ const readKnowledgeFile = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/storage", () => ({ readKnowledgeFile, deleteKnowledgeFile }));
 
-// deleteKnowledgeSource is still Drizzle-backed on this branch (SB-T07 moves it to the service
-// client); a spy that calls through to the real implementation by default lets one test (refuse's
-// delete-failure path) make it throw without touching the others, which rely on it really deleting
-// the row.
+// A spy on deleteKnowledgeSource that calls through to the real implementation by default lets one
+// test (refuse's delete-failure path) make it throw without touching the others, which rely on it
+// really deleting the row.
 const deleteKnowledgeSource = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/knowledge", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../../../../lib/knowledge")>();
@@ -46,8 +38,8 @@ const actualDeleteKnowledgeSource = (
 
 // The claim and revert steps are tested directly against this fake; the status updates and chunk
 // inserts that follow (processKnowledgeSource, deleteKnowledgeSource — SB-T07, also on the service
-// client) proxy straight through to the same pglite db this file's own Drizzle asserts read, so a
-// row they touch is visible here and vice versa.
+// client) proxy straight through to a pglite db with the real Supabase migrations, which this
+// file's own SQL asserts read, so a row they touch is visible here and vice versa.
 type ClaimRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
 const fake = vi.hoisted(() => ({
   claimResult: { data: null as ClaimRow | null, error: null as { message: string } | null },
@@ -55,26 +47,18 @@ const fake = vi.hoisted(() => ({
   revertEq: vi.fn(async () => ({ data: null, error: null })),
 }));
 
-// processKnowledgeSource and deleteKnowledgeSource (lib/knowledge, SB-T07) now go through this
-// same fake too: their knowledge_sources status updates and the row delete proxy straight
-// through to the real pglite db, so Drizzle asserts below see their effects; knowledge_chunks
-// does the same for the batched insert.
 function from(table: string) {
   if (table === "knowledge_chunks") {
     return {
-      // The real client sends embeddings as pgvector's text form (JSON.stringify'd); parse them
-      // back to number[] for Drizzle, which wants the array itself.
+      // The real client sends embeddings as pgvector's text form (JSON.stringify'd), which is
+      // what the vector cast reads here too.
       insert: async (rows: { project_id: string; source_id: string; content: string; embedding: string }[]) => {
-        await db
-          .insert(knowledgeChunks)
-          .values(
-            rows.map((r) => ({
-              projectId: r.project_id,
-              sourceId: r.source_id,
-              content: r.content,
-              embedding: JSON.parse(r.embedding) as number[],
-            })),
-          );
+        await db.query(
+          `INSERT INTO public.knowledge_chunks (project_id, source_id, content, embedding)
+           SELECT r.project_id, r.source_id, r.content, r.embedding::extensions.vector
+           FROM jsonb_to_recordset($1::jsonb) AS r(project_id uuid, source_id uuid, content text, embedding text)`,
+          [JSON.stringify(rows)],
+        );
         return { error: null };
       },
     };
@@ -94,7 +78,7 @@ function from(table: string) {
       const status = values.status as "ready" | "failed";
       return {
         eq: async (_column: string, id: string) => {
-          await db.update(knowledgeSources).set({ status }).where(eq(knowledgeSources.id, id));
+          await db.query("UPDATE public.knowledge_sources SET status = $1 WHERE id = $2", [status, id]);
           return { error: null };
         },
       };
@@ -102,7 +86,7 @@ function from(table: string) {
     select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => fake.existingResult }) }) }),
     delete: () => ({
       eq: async (_column: string, id: string) => {
-        await db.delete(knowledgeSources).where(eq(knowledgeSources.id, id));
+        await db.query("DELETE FROM public.knowledge_sources WHERE id = $1", [id]);
         return { error: null };
       },
     }),
@@ -114,15 +98,13 @@ const { POST } = await import("./route");
 
 const samplePdf = readFileSync(fileURLToPath(new URL("../../../../../../lib/knowledge/fixtures/sample.pdf", import.meta.url)));
 
-let db: TestDb;
-let close: () => Promise<void>;
+let db: Awaited<ReturnType<typeof createSupabaseTestDb>>;
 
 beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
+  db = await createSupabaseTestDb();
 });
 
-afterAll(() => close());
+afterAll(() => db.close());
 
 beforeEach(() => {
   state.userId = null;
@@ -149,29 +131,44 @@ function signIn(userId: string, projectId: string | null) {
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
 async function seedProject(ownerId: string, publicKey: string) {
-  await db.insert(accounts).values({ clerkUserId: ownerId, plan: "free" }).onConflictDoNothing();
-  const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
-  return project!.id;
+  await db.query("INSERT INTO public.accounts (clerk_user_id, plan) VALUES ($1, 'free') ON CONFLICT DO NOTHING", [ownerId]);
+  const { rows } = await db.query<{ id: string }>(
+    "INSERT INTO public.projects (owner_id, name, public_key) VALUES ($1, 'Docs', $2) RETURNING id",
+    [ownerId, publicKey],
+  );
+  return rows[0]!.id;
 }
 
-async function seedSource(projectId: string, overrides: Partial<typeof knowledgeSources.$inferInsert> = {}) {
-  const [source] = await db
-    .insert(knowledgeSources)
-    .values({ projectId, title: "doc.pdf", type: "pdf", status: "processing", storageKey: "projects/p/s", ...overrides })
-    .returning();
-  return source!;
+type SourceRow = { id: string; title: string; type: string; storage_key: string | null; status: string; created_at: Date };
+
+async function seedSource(
+  projectId: string,
+  overrides: { title?: string; type?: string; storage_key?: string | null; status?: string } = {},
+) {
+  const { title = "doc.pdf", type = "pdf", storage_key = "projects/p/s", status = "processing" } = overrides;
+  const { rows } = await db.query<SourceRow>(
+    `INSERT INTO public.knowledge_sources (project_id, title, type, storage_key, status)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [projectId, title, type, storage_key, status],
+  );
+  return rows[0]!;
 }
 
-/** Arms a successful claim with the real seeded row's fields, so ids line up with Drizzle asserts. */
-function claimable(source: Awaited<ReturnType<typeof seedSource>>) {
+async function sourceRows(id: string) {
+  const { rows } = await db.query<SourceRow>("SELECT * FROM public.knowledge_sources WHERE id = $1", [id]);
+  return rows;
+}
+
+/** Arms a successful claim with the real seeded row's fields, so ids line up with the SQL asserts. */
+function claimable(source: SourceRow) {
   fake.claimResult = {
     data: {
       id: source.id,
       title: source.title,
       type: source.type,
-      storage_key: source.storageKey!,
+      storage_key: source.storage_key!,
       status: "processing",
-      created_at: source.createdAt.toISOString(),
+      created_at: source.created_at.toISOString(),
     },
     error: null,
   };
@@ -223,7 +220,7 @@ describe("not found", () => {
 
   it("returns 404 for a pasted-text source (no file to finalize)", async () => {
     const projectId = await seedProject("owner_text", "pk_text");
-    const source = await seedSource(projectId, { type: "text", storageKey: null });
+    const source = await seedSource(projectId, { type: "text", storage_key: null });
     signIn("owner_text", projectId);
     fake.existingResult = { data: { type: "text" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
@@ -260,10 +257,10 @@ describe("success", () => {
     });
 
     await vi.waitFor(async () => {
-      const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id));
+      const [row] = await sourceRows(source.id);
       expect(row?.status).toBe("ready");
     });
-    const chunks = await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, source.id));
+    const { rows: chunks } = await db.query("SELECT 1 FROM public.knowledge_chunks WHERE source_id = $1", [source.id]);
     expect(chunks.length).toBeGreaterThan(0);
   });
 
@@ -289,7 +286,7 @@ describe("refusals clean up the row and the object", () => {
 
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(0);
+    expect(await sourceRows(source.id)).toHaveLength(0);
     expect(deleteKnowledgeFile).toHaveBeenCalledWith("projects/p/s");
     expect(captureServerEvent).not.toHaveBeenCalled();
   });
@@ -303,7 +300,7 @@ describe("refusals clean up the row and the object", () => {
 
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(413);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(0);
+    expect(await sourceRows(source.id)).toHaveLength(0);
   });
 
   it("rejects and cleans up a fake PDF (wrong magic bytes)", async () => {
@@ -315,7 +312,7 @@ describe("refusals clean up the row and the object", () => {
 
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(0);
+    expect(await sourceRows(source.id)).toHaveLength(0);
     expect(deleteKnowledgeFile).toHaveBeenCalledWith("projects/p/s");
   });
 
@@ -332,7 +329,7 @@ describe("refusals clean up the row and the object", () => {
 
     expect(res.status).toBe(500);
     // The row is untouched (never reached the real pglite delete) and the object is never removed.
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(1);
+    expect(await sourceRows(source.id)).toHaveLength(1);
     expect(deleteKnowledgeFile).not.toHaveBeenCalled();
     expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });
@@ -349,7 +346,7 @@ describe("storage read failure", () => {
 
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(1);
+    expect(await sourceRows(source.id)).toHaveLength(1);
     expect(deleteKnowledgeFile).not.toHaveBeenCalled();
     expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });

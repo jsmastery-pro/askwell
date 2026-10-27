@@ -1,19 +1,12 @@
 // @vitest-environment node
-import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/db";
+import { createSupabaseTestDb } from "@askwell/db/supabase-pglite";
 import { MAX_KNOWLEDGE_FILE_BYTES } from "@askwell/shared";
-import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase } from "../../../../../lib/supabase/fake";
-import { createTestDb, type TestDb } from "../../../../../lib/widget-config/test-db";
 
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null, owner: undefined as unknown }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
-  },
-}));
+const state = vi.hoisted(() => ({ userId: null as string | null, owner: undefined as unknown }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
 // Ownership (lib/projects) and the plan (lib/data/billing) both read through the owner client
 // (RLS); which rows RLS lets an owner see is tested against the real migrations on pglite
@@ -26,18 +19,16 @@ vi.mock("../../../../../lib/ai", () => ({ embedTexts }));
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/posthog/server", () => ({ captureServerEvent }));
 
-// Reservation goes through the service client's rpc("reserve_knowledge_source") (SB-T06). This
-// fake re-implements the real Postgres function's count+limit+insert, over the SAME pglite db
-// processKnowledgeSource (lib/knowledge, SB-T07, also on the service client) reads and writes —
-// same FOR UPDATE lock the real function uses, so the existing concurrency test still holds.
-// processKnowledgeSource's status update and chunk insert proxy to the same pglite db once the
-// background ingest kicks in.
+// The service client is faked over a pglite db with the real Supabase migrations. Reservation
+// (rpc("reserve_knowledge_source"), SB-T06) calls the real Postgres function, so its count, limit
+// and FOR UPDATE lock are the ones under test. processKnowledgeSource's status update and chunk
+// insert (lib/knowledge, SB-T07) proxy to the same db once the background ingest kicks in.
 function from(table: string) {
   if (table === "knowledge_sources") {
     return {
       update: (values: { status: "ready" | "failed" }) => ({
         eq: async (_c: string, id: string) => {
-          await db.update(knowledgeSources).set({ status: values.status }).where(eq(knowledgeSources.id, id));
+          await db.query("UPDATE public.knowledge_sources SET status = $1 WHERE id = $2", [values.status, id]);
           return { error: null };
         },
       }),
@@ -45,19 +36,15 @@ function from(table: string) {
   }
   if (table === "knowledge_chunks") {
     return {
-      // The real client sends embeddings as pgvector's text form (JSON.stringify'd); parse them
-      // back to number[] for Drizzle, which wants the array itself.
+      // The real client sends embeddings as pgvector's text form (JSON.stringify'd), which is
+      // what the vector cast reads here too.
       insert: async (rows: { project_id: string; source_id: string; content: string; embedding: string }[]) => {
-        await db
-          .insert(knowledgeChunks)
-          .values(
-            rows.map((r) => ({
-              projectId: r.project_id,
-              sourceId: r.source_id,
-              content: r.content,
-              embedding: JSON.parse(r.embedding) as number[],
-            })),
-          );
+        await db.query(
+          `INSERT INTO public.knowledge_chunks (project_id, source_id, content, embedding)
+           SELECT r.project_id, r.source_id, r.content, r.embedding::extensions.vector
+           FROM jsonb_to_recordset($1::jsonb) AS r(project_id uuid, source_id uuid, content text, embedding text)`,
+          [JSON.stringify(rows)],
+        );
         return { error: null };
       },
     };
@@ -65,39 +52,34 @@ function from(table: string) {
   throw new Error(`unexpected table ${table}`);
 }
 
+type SourceRow = { id: string; title: string; type: string; status: string; created_at: Date };
+
 async function rpc(name: string, args: Record<string, unknown>) {
   if (name !== "reserve_knowledge_source") throw new Error(`unexpected rpc ${name}`);
-  const projectId = args.p_project_id as string;
-  const limit = args.p_source_limit as number;
-  const row = await db.transaction(async (tx) => {
-    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for("update");
-    const existing = await tx.select({ id: knowledgeSources.id }).from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
-    if (existing.length >= limit) return null;
-    const [inserted] = await tx
-      .insert(knowledgeSources)
-      .values({ projectId, title: args.p_title as string, type: "text", status: "processing" })
-      .returning();
-    return inserted!;
-  });
-  if (!row) return { data: null, error: { code: "AWLIM" } };
-  return {
-    data: { id: row.id, title: row.title, type: row.type, status: row.status, created_at: row.createdAt.toISOString() },
-    error: null,
-  };
+  try {
+    const { rows } = await db.query<SourceRow>(
+      "SELECT id, title, type, status, created_at FROM public.reserve_knowledge_source($1, $2, $3, $4, $5)",
+      [args.p_project_id, args.p_title, args.p_type, args.p_storage_key, args.p_source_limit],
+    );
+    const row = rows[0]!;
+    return { data: { ...row, created_at: row.created_at.toISOString() }, error: null };
+  } catch (error) {
+    // As PostgREST reports a raised SQLSTATE: in `code` (AWLIM, AWNOP, ...).
+    const { code, message } = error as { code: string; message: string };
+    return { data: null, error: { code, message } };
+  }
 }
 vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ rpc, from }) }));
 
 const { POST } = await import("./route");
 
-let db: TestDb;
-let close: () => Promise<void>;
+let db: Awaited<ReturnType<typeof createSupabaseTestDb>>;
 
 beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
+  db = await createSupabaseTestDb();
 });
 
-afterAll(() => close());
+afterAll(() => db.close());
 
 beforeEach(() => {
   state.userId = null;
@@ -107,6 +89,16 @@ beforeEach(() => {
   embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
 });
 
+async function sourceStatus(id: string) {
+  const { rows } = await db.query<{ status: string }>("SELECT status FROM public.knowledge_sources WHERE id = $1", [id]);
+  return rows[0]?.status;
+}
+
+async function sourceCount(projectId: string) {
+  const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM public.knowledge_sources WHERE project_id = $1", [projectId]);
+  return rows[0]!.n;
+}
+
 /** Signs in `userId`, with an owner client that sees `projectId` as theirs (null: another owner's). */
 function signIn(userId: string, projectId: string | null, plan: "free" | "pro" = "free") {
   state.userId = userId;
@@ -115,10 +107,13 @@ function signIn(userId: string, projectId: string | null, plan: "free" | "pro" =
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
 async function seedProject(ownerId: string, plan: "free" | "pro", publicKey: string) {
-  await db.insert(accounts).values({ clerkUserId: ownerId, plan }).onConflictDoNothing();
-  const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
-  signIn(ownerId, project!.id, plan);
-  return project!.id;
+  await db.query("INSERT INTO public.accounts (clerk_user_id, plan) VALUES ($1, $2) ON CONFLICT DO NOTHING", [ownerId, plan]);
+  const { rows } = await db.query<{ id: string }>(
+    "INSERT INTO public.projects (owner_id, name, public_key) VALUES ($1, 'Docs', $2) RETURNING id",
+    [ownerId, publicKey],
+  );
+  signIn(ownerId, rows[0]!.id, plan);
+  return rows[0]!.id;
 }
 
 function jsonRequest(body: unknown, headers: Record<string, string> = {}) {
@@ -157,10 +152,9 @@ describe("pasted text", () => {
     expect(body.source).toMatchObject({ title: "Pricing FAQ", type: "text", status: "processing" });
 
     await vi.waitFor(async () => {
-      const [row] = await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, body.source.id));
-      expect(row?.status).toBe("ready");
+      expect(await sourceStatus(body.source.id)).toBe("ready");
     });
-    const chunks = await db.select().from(knowledgeChunks).where(eq(knowledgeChunks.sourceId, body.source.id));
+    const { rows: chunks } = await db.query("SELECT 1 FROM public.knowledge_chunks WHERE source_id = $1", [body.source.id]);
     expect(chunks.length).toBeGreaterThan(0);
   });
 
@@ -201,11 +195,14 @@ describe("pasted text", () => {
   it("keeps an existing project's sources over the new limit, but refuses more", async () => {
     const projectId = await seedProject("owner_over", "free", "pk_over");
     for (let i = 0; i < 5; i++) {
-      await db.insert(knowledgeSources).values({ projectId, title: `old ${i}`, type: "text", status: "ready" });
+      await db.query("INSERT INTO public.knowledge_sources (project_id, title, type, status) VALUES ($1, $2, 'text', 'ready')", [
+        projectId,
+        `old ${i}`,
+      ]);
     }
     const res = await POST(jsonRequest({ type: "text", title: "new", content: "more" }), ctx(projectId));
     expect(res.status).toBe(403);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(5);
+    expect(await sourceCount(projectId)).toBe(5);
   });
 
   it("never lets concurrent pasted texts exceed the Free plan's 3-source limit", async () => {
@@ -214,7 +211,7 @@ describe("pasted text", () => {
       Array.from({ length: 6 }, (_, i) => POST(jsonRequest({ type: "text", title: `t${i}`, content: `c ${i}` }), ctx(projectId))),
     );
     expect(responses.filter((res) => res.status === 201)).toHaveLength(3);
-    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId))).toHaveLength(3);
+    expect(await sourceCount(projectId)).toBe(3);
   });
 });
 

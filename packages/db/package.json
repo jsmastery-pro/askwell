@@ -19,6 +19,7 @@
     "supabase": "^2.122.0"
   },
   "exports": {
-    "./types": "./types.ts"
+    "./types": "./types.ts",
+    "./supabase-pglite": "./supabase-pglite.ts"
   }
 }

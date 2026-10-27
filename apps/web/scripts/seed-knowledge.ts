@@ -26,8 +26,8 @@ for (const file of [".env.local", ".env", join(repoRoot, ".env.local"), join(rep
   }
 }
 
-// Dynamic, after the env-loading loop above, same reason @askwell/db/client used to need it:
-// the service client reads its env vars at construction, which a static import could beat.
+// Dynamic, after the env-loading loop above: a static import is evaluated before the loop runs, so
+// nothing the service client's module graph reads from env at load could see the loaded files.
 const { createServiceClient } = await import("../lib/supabase/service");
 
 // No real tokenizer here — this is a seeding tool, not the ingest pipeline (P3-T02 owns that).
