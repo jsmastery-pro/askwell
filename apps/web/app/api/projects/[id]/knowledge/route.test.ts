@@ -28,8 +28,34 @@ vi.mock("../../../../../lib/posthog/server", () => ({ captureServerEvent }));
 
 // Reservation goes through the service client's rpc("reserve_knowledge_source") (SB-T06). This
 // fake re-implements the real Postgres function's count+limit+insert, over the SAME pglite db
-// processKnowledgeSource (still Drizzle on this branch) reads and writes — same FOR UPDATE lock
-// the real function uses, so the existing concurrency test still holds.
+// processKnowledgeSource (lib/knowledge, SB-T07, also on the service client) reads and writes —
+// same FOR UPDATE lock the real function uses, so the existing concurrency test still holds.
+// processKnowledgeSource's status update and chunk insert proxy to the same pglite db once the
+// background ingest kicks in.
+function from(table: string) {
+  if (table === "knowledge_sources") {
+    return {
+      update: (values: { status: "ready" | "failed" }) => ({
+        eq: async (_c: string, id: string) => {
+          await db.update(knowledgeSources).set({ status: values.status }).where(eq(knowledgeSources.id, id));
+          return { error: null };
+        },
+      }),
+    };
+  }
+  if (table === "knowledge_chunks") {
+    return {
+      insert: async (rows: { project_id: string; source_id: string; content: string; embedding: number[] }[]) => {
+        await db
+          .insert(knowledgeChunks)
+          .values(rows.map((r) => ({ projectId: r.project_id, sourceId: r.source_id, content: r.content, embedding: r.embedding })));
+        return { error: null };
+      },
+    };
+  }
+  throw new Error(`unexpected table ${table}`);
+}
+
 async function rpc(name: string, args: Record<string, unknown>) {
   if (name !== "reserve_knowledge_source") throw new Error(`unexpected rpc ${name}`);
   const projectId = args.p_project_id as string;
@@ -50,7 +76,7 @@ async function rpc(name: string, args: Record<string, unknown>) {
     error: null,
   };
 }
-vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ rpc }) }));
+vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ rpc, from }) }));
 
 const { POST } = await import("./route");
 

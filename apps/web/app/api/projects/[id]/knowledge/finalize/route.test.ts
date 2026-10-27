@@ -55,6 +55,10 @@ const fake = vi.hoisted(() => ({
   revertEq: vi.fn(async () => ({ data: null, error: null })),
 }));
 
+// processKnowledgeSource and deleteKnowledgeSource (lib/knowledge, SB-T07) now go through this
+// same fake too: their knowledge_sources status updates and the row delete proxy straight
+// through to the real pglite db, so Drizzle asserts below see their effects; knowledge_chunks
+// does the same for the batched insert.
 function from(table: string) {
   if (table === "knowledge_chunks") {
     return {
