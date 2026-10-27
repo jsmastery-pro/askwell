@@ -30,4 +30,4 @@
 ## Notes
 - CodeRabbit is required.
 - **Deleting a project** must also delete its files in Storage. RLS deletes the row and cascades the child rows, but not Storage objects. List the project's `storage_key`s first, delete the row with the owner client, then remove the objects with the service client.
-- The owner client never runs in the browser: the dashboard reads on the server, so the Data API is only reached by our server.
+- Our owner client runs on the server, but the Data API is public: any signed-in user can call it with the publishable key and their own Clerk token. RLS and the grants in SB-T02 are the real boundary, so never add a policy or grant just to make a route work. Ask John first.
