@@ -3,7 +3,7 @@
 // transaction, acts as an API role, and rolls back, so the database stays empty.
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { actAs, createSupabaseTestDb } from "./supabase-pglite";
+import { actAs, actAsServiceRole, createSupabaseTestDb } from "./supabase-pglite";
 
 const A = "user_a";
 const B = "user_b";
@@ -142,23 +142,44 @@ describe.each([
     }
   });
 
-  it("denies TRUNCATE to both API roles", async () => {
-    for (const user of [A, null]) {
+  it("denies TRUNCATE to every API role, the server's included", async () => {
+    for (const act of [() => actAs(db, A), () => actAs(db, null), () => actAsServiceRole(db)]) {
       await db.query("SAVEPOINT s");
-      await actAs(db, user);
+      await act();
       await expect(db.query("TRUNCATE messages")).rejects.toThrow(/permission denied/);
       await db.query("ROLLBACK TO SAVEPOINT s");
     }
   });
 
+  it("lets service_role, the server, read and write every table across owners", async () => {
+    await actAsServiceRole(db);
+    for (const table of ALL_TABLES) {
+      expect((await visibleProjects(db, table)).sort(), table).toEqual(
+        table === "accounts" ? [A, B] : [PROJECT_A, PROJECT_B],
+      );
+    }
+    await db.query("INSERT INTO accounts (clerk_user_id) VALUES ('user_c')");
+    await db.query("INSERT INTO projects (owner_id, name, public_key) VALUES ('user_c', 'C', 'pk_c')");
+    expect((await db.query("UPDATE projects SET messages_used = messages_used + 1 WHERE id = $1", [PROJECT_B])).affectedRows).toBe(1);
+    expect((await db.query("UPDATE widget_configs SET label = 'Help' WHERE project_id = $1", [PROJECT_A])).affectedRows).toBe(1);
+    expect((await db.query("DELETE FROM knowledge_chunks WHERE project_id = $1", [PROJECT_A])).affectedRows).toBe(1);
+    const conversation = await db.query<{ id: string }>(
+      "INSERT INTO conversations (project_id, visitor_id) VALUES ($1, 'v2') RETURNING id",
+      [PROJECT_A],
+    );
+    await db.query("INSERT INTO messages (conversation_id, role, body) VALUES ($1, 'bot', 'hello')", [
+      conversation.rows[0]!.id,
+    ]);
+  });
+
   it("pins the ownership helpers' search_path and keeps them from anon", async () => {
     const { rows } = await db.query<{ proname: string; proconfig: string[]; anon: boolean }>(
       `SELECT proname, proconfig, has_function_privilege('anon', oid, 'EXECUTE') AS anon
-       FROM pg_proc WHERE proname IN ('owns_project', 'owns_conversation') ORDER BY proname`,
+       FROM pg_proc WHERE proname IN ('owned_project_ids', 'owned_conversation_ids') ORDER BY proname`,
     );
     expect(rows).toEqual([
-      { proname: "owns_conversation", proconfig: ['search_path=""'], anon: false },
-      { proname: "owns_project", proconfig: ['search_path=""'], anon: false },
+      { proname: "owned_conversation_ids", proconfig: ['search_path=""'], anon: false },
+      { proname: "owned_project_ids", proconfig: ['search_path=""'], anon: false },
     ]);
   });
 });

@@ -62,3 +62,9 @@ export async function actAs(db: PGlite, clerkUserId: string | null): Promise<voi
   await db.query("SELECT set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
   await db.exec(`SET LOCAL ROLE ${role}`);
 }
+
+/** Switches the current transaction to `service_role`, the server's identity (the secret key). */
+export async function actAsServiceRole(db: PGlite): Promise<void> {
+  await db.query("SELECT set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: "service_role" })]);
+  await db.exec("SET LOCAL ROLE service_role");
+}

@@ -89,40 +89,37 @@ CREATE TABLE public.messages (
 CREATE INDEX messages_conversation_id_idx ON public.messages (conversation_id);
 
 -- Ownership helpers ---------------------------------------------------------------------------
--- SECURITY DEFINER so a child table's policy can check the parent without RLS on the parent
--- running again for every row. The empty search_path means every name is schema-qualified, so a
--- caller can't shadow `projects` or `auth.jwt` with their own objects.
+-- The caller's projects (and conversations) as a set, for `project_id IN (SELECT ...)` policies:
+-- Supabase's recommended shape for large tables, since the set is computed once per statement
+-- instead of a lookup per row. SECURITY DEFINER so RLS on the parent doesn't run again inside;
+-- ownership is checked in the body, and the empty search_path means every name is
+-- schema-qualified, so a caller can't shadow `projects` or `auth.jwt` with their own objects.
 
-CREATE FUNCTION public.owns_project(p_project_id uuid)
-RETURNS boolean
+CREATE FUNCTION public.owned_project_ids()
+RETURNS SETOF uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.projects
-    WHERE id = p_project_id AND owner_id = (auth.jwt() ->> 'sub')
-  );
+  SELECT id FROM public.projects WHERE owner_id = (auth.jwt() ->> 'sub');
 $$;
 
 -- messages has no project_id: it belongs to a project through its conversation.
-CREATE FUNCTION public.owns_conversation(p_conversation_id uuid)
-RETURNS boolean
+CREATE FUNCTION public.owned_conversation_ids()
+RETURNS SETOF uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.conversations c
-    JOIN public.projects p ON p.id = c.project_id
-    WHERE c.id = p_conversation_id AND p.owner_id = (auth.jwt() ->> 'sub')
-  );
+  SELECT c.id FROM public.conversations c
+  JOIN public.projects p ON p.id = c.project_id
+  WHERE p.owner_id = (auth.jwt() ->> 'sub');
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.owns_project(uuid), public.owns_conversation(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.owns_project(uuid), public.owns_conversation(uuid) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.owned_project_ids(), public.owned_conversation_ids() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.owned_project_ids(), public.owned_conversation_ids() TO authenticated;
 
 -- Row-level security ------------------------------------------------------------------------
 
@@ -134,9 +131,8 @@ ALTER TABLE public.knowledge_chunks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- `(SELECT auth.jwt() ...)` is evaluated once per statement, not once per row. The ownership
--- helpers take the row's column, so they're called per row (one indexed lookup each); wrapping
--- them in SELECT wouldn't cache anything.
+-- `(SELECT auth.jwt() ...)` and `IN (SELECT owned_..._ids())` are evaluated once per statement,
+-- not once per row.
 
 -- accounts: read your own row. The plan is written by the server (Clerk billing webhook) only.
 CREATE POLICY accounts_select_own ON public.accounts
@@ -162,23 +158,23 @@ CREATE POLICY projects_delete_own ON public.projects
 -- save, knowledge add, the message quota) or come from widget visitors, so they get no policy.
 CREATE POLICY widget_configs_select_own ON public.widget_configs
   FOR SELECT TO authenticated
-  USING (public.owns_project(project_id));
+  USING (project_id IN (SELECT public.owned_project_ids()));
 
 CREATE POLICY knowledge_sources_select_own ON public.knowledge_sources
   FOR SELECT TO authenticated
-  USING (public.owns_project(project_id));
+  USING (project_id IN (SELECT public.owned_project_ids()));
 
 CREATE POLICY knowledge_chunks_select_own ON public.knowledge_chunks
   FOR SELECT TO authenticated
-  USING (public.owns_project(project_id));
+  USING (project_id IN (SELECT public.owned_project_ids()));
 
 CREATE POLICY conversations_select_own ON public.conversations
   FOR SELECT TO authenticated
-  USING (public.owns_project(project_id));
+  USING (project_id IN (SELECT public.owned_project_ids()));
 
 CREATE POLICY messages_select_own ON public.messages
   FOR SELECT TO authenticated
-  USING (public.owns_conversation(conversation_id));
+  USING (conversation_id IN (SELECT public.owned_conversation_ids()));
 
 -- Privileges ----------------------------------------------------------------------------------
 -- RLS covers rows; grants cover operations and columns. Supabase is moving new projects from
@@ -186,10 +182,16 @@ CREATE POLICY messages_select_own ON public.messages
 -- way: revoke everything from the API roles, then grant exactly what the policies above use.
 -- (A missing grant fails with 42501 before any policy runs.)
 REVOKE ALL ON public.accounts, public.projects, public.widget_configs, public.knowledge_sources,
-  public.knowledge_chunks, public.conversations, public.messages FROM anon, authenticated;
+  public.knowledge_chunks, public.conversations, public.messages FROM anon, authenticated, service_role;
 
--- anon gets nothing, not even a privilege for a future policy to open up by mistake. Neither role
+-- anon gets nothing, not even a privilege for a future policy to open up by mistake. No API role
 -- keeps TRUNCATE, which RLS doesn't apply to.
+
+-- service_role is the server's identity (public routes, the Clerk webhook, ensureAccount, SB-T03's
+-- functions). RLS doesn't apply to it, but it still needs the privileges. The tables use
+-- gen_random_uuid() defaults, so there are no sequences to grant.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.accounts, public.projects, public.widget_configs,
+  public.knowledge_sources, public.knowledge_chunks, public.conversations, public.messages TO service_role;
 
 -- authenticated reads every table (rows filtered by the policies) and deletes projects.
 GRANT SELECT ON public.accounts, public.projects, public.widget_configs, public.knowledge_sources,
