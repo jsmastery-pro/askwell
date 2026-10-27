@@ -18,6 +18,7 @@
     "@askwell/shared": "workspace:*",
     "@aws-sdk/client-s3": "^3.1152.0",
     "@clerk/nextjs": "^7.9.11",
+    "@supabase/supabase-js": "^2.118.0",
     "drizzle-orm": "catalog:",
     "next": "16.3.4",
     "openai": "^7.30.1",

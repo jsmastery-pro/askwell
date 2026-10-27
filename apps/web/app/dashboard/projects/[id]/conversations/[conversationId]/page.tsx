@@ -1,4 +1,3 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +7,7 @@ import { Thread } from "../../../../../../components/conversations/Thread";
 import { formatDateTime } from "../../../../../../components/project-shell/format";
 import { FOCUS } from "../../../../../../components/ui/styles";
 import { getConversation } from "../../../../../../lib/data/conversations";
+import { getOwnedProject } from "../../../../../../lib/projects";
 import { SectionHeader } from "../../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +17,11 @@ export default async function ConversationPage({
 }: {
   params: Promise<{ id: string; conversationId: string }>;
 }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const { id, conversationId } = await params;
   // Ownership first, then the conversation must belong to this project: an unknown ID,
   // a malformed ID and another project's conversation all look the same (§9).
-  const project = await getOwnedProject(id, userId);
+  const project = await getOwnedProject(id);
   if (!project) notFound();
   const conversation = await getConversation(project.id, conversationId);
   if (!conversation) notFound();

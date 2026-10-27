@@ -1,87 +1,81 @@
 // @vitest-environment node
-import { accounts, conversations, messages, projects } from "@askwell/db";
 import { getConversationResponseSchema, listConversationsResponseSchema } from "@askwell/shared";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createTestDb, type TestDb } from "../widget-config/test-db";
+import { describe, expect, it, vi } from "vitest";
+import { fakeSupabase } from "../supabase/fake";
 
+// Each read gets a fake owner client. Which rows RLS returns is tested against the real
+// migrations on pglite (packages/db); here, a row RLS hides is simply a row the fake doesn't return.
 vi.mock("server-only", () => ({}));
+vi.mock("../supabase/owner", () => ({
+  createOwnerClient: () => {
+    throw new Error("real owner client used in a test");
+  },
+}));
 
 const { getConversation, listConversations } = await import("./conversations");
 
-let db: TestDb;
-let close: () => Promise<void>;
-let projectId: string;
-let otherProjectId: string;
-let threadId: string;
-let otherThreadId: string;
+const PROJECT_ID = "11111111-2222-4333-8444-555555555555";
+const OTHER_PROJECT_ID = "11111111-2222-4333-8444-666666666666";
+const THREAD_ID = "66666666-7777-4888-8999-aaaaaaaaaaaa";
 
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  await db.insert(accounts).values({ clerkUserId: "owner_1", plan: "free" });
-
-  const [project, otherProject] = await db
-    .insert(projects)
-    .values([
-      { ownerId: "owner_1", name: "Docs", publicKey: "pk_conv_a" },
-      { ownerId: "owner_1", name: "Other", publicKey: "pk_conv_b" },
-    ])
-    .returning();
-  projectId = project!.id;
-  otherProjectId = otherProject!.id;
-
-  const [thread, otherThread] = await db
-    .insert(conversations)
-    .values([
-      { projectId, visitorId: "visitor_a" },
-      { projectId: otherProjectId, visitorId: "visitor_b" },
-    ])
-    .returning();
-  threadId = thread!.id;
-  otherThreadId = otherThread!.id;
-
-  // Explicit, distinct timestamps: a multi-row insert can give every row the same
-  // defaultNow(), which would make the chronological-order assertion below ambiguous.
-  await db
-    .insert(messages)
-    .values([
-      { conversationId: threadId, role: "visitor", body: "Hi there", createdAt: new Date("2026-01-01T00:00:00.000Z") },
-      { conversationId: threadId, role: "bot", body: "Hello!", createdAt: new Date("2026-01-01T00:00:01.000Z") },
-      { conversationId: otherThreadId, role: "visitor", body: "Different project", createdAt: new Date("2026-01-01T00:00:00.000Z") },
-    ]);
-});
-
-afterAll(() => close());
+const paged = (rows: unknown[]) => [{ data: rows }, { data: [] }];
 
 describe("listConversations", () => {
   it("lists newest first and matches the shared schema", async () => {
-    const result = await listConversations(projectId, db);
+    const client = fakeSupabase({
+      from: {
+        conversations: paged([
+          { id: THREAD_ID, visitor_id: "v", created_at: "2026-01-02T00:00:00+00:00", message_count: [{ count: 2 }], preview: [{ body: "Hi there" }] },
+          { id: "66666666-7777-4888-8999-bbbbbbbbbbbb", visitor_id: "v", created_at: "2026-01-01T00:00:00+00:00", message_count: [{ count: 0 }], preview: [] },
+        ]),
+      },
+    });
+
+    const result = await listConversations(PROJECT_ID, client);
+
     listConversationsResponseSchema.parse({ conversations: result });
-    const times = result.map((c) => Date.parse(c.createdAt));
-    expect(times).toEqual([...times].sort((a, b) => b - a));
-    expect(result).toHaveLength(1);
+    expect(result.map((c) => c.preview)).toEqual(["Hi there", ""]);
   });
 
-  it("never includes another project's conversation", async () => {
-    expect((await listConversations(projectId, db)).map((c) => c.id)).not.toContain(otherThreadId);
-    expect((await listConversations(otherProjectId, db)).map((c) => c.id)).toEqual([otherThreadId]);
-  });
-
-  it("returns nothing for a malformed project ID", async () => {
-    expect(await listConversations("abc", db)).toEqual([]);
+  it("returns nothing for a malformed project ID, without querying", async () => {
+    const client = fakeSupabase();
+    expect(await listConversations("abc", client)).toEqual([]);
+    expect(client.calls).toEqual([]);
   });
 });
 
 describe("getConversation", () => {
+  const client = (projectId: string | null) =>
+    fakeSupabase({
+      from: {
+        conversations: { data: projectId && { id: THREAD_ID, project_id: projectId, visitor_id: "v", created_at: "2026-01-01T00:00:00+00:00" } },
+        messages: paged([
+          { id: "77777777-8888-4999-8aaa-000000000001", role: "visitor", body: "Hi there", created_at: "2026-01-01T00:00:00+00:00" },
+          { id: "77777777-8888-4999-8aaa-000000000002", role: "bot", body: "Hello!", created_at: "2026-01-01T00:00:01+00:00" },
+        ]),
+      },
+    });
+
   it("returns this project's thread", async () => {
-    const thread = await getConversation(projectId, threadId, db);
+    const thread = await getConversation(PROJECT_ID, THREAD_ID, client(PROJECT_ID));
+
     getConversationResponseSchema.parse({ conversation: thread });
+    expect(thread).toMatchObject({ id: THREAD_ID, visitorId: "v", createdAt: "2026-01-01T00:00:00.000Z" });
     expect(thread?.messages.map((m) => m.body)).toEqual(["Hi there", "Hello!"]);
   });
 
-  it("returns null for another project's, an unknown or a malformed conversation", async () => {
-    expect(await getConversation(projectId, otherThreadId, db)).toBeNull();
-    expect(await getConversation(projectId, "00000000-0000-4000-8000-000000000000", db)).toBeNull();
-    expect(await getConversation(projectId, "abc", db)).toBeNull();
-    expect(await getConversation("abc", threadId, db)).toBeNull();
+  it("returns null for another project's conversation, even one the owner can see", async () => {
+    expect(await getConversation(PROJECT_ID, THREAD_ID, client(OTHER_PROJECT_ID))).toBeNull();
+  });
+
+  it("returns null when RLS hides the conversation", async () => {
+    expect(await getConversation(PROJECT_ID, THREAD_ID, client(null))).toBeNull();
+  });
+
+  it("returns null for a malformed project or conversation ID, without querying", async () => {
+    const fake = client(PROJECT_ID);
+    expect(await getConversation(PROJECT_ID, "abc", fake)).toBeNull();
+    expect(await getConversation("abc", THREAD_ID, fake)).toBeNull();
+    expect(fake.calls).toEqual([]);
   });
 });

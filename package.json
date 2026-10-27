@@ -15,6 +15,7 @@
     "build": "turbo run build",
     "db:generate": "pnpm --filter @askwell/db db:generate",
     "db:migrate": "pnpm --filter @askwell/db db:migrate",
+    "db:types": "pnpm --silent --filter @askwell/db exec supabase gen types typescript --project-id pasgozggqtprenfgtghb --schema public > packages/db/types.ts",
     "supabase": "pnpm --filter @askwell/db exec supabase --workdir ../.."
   },
   "devDependencies": {

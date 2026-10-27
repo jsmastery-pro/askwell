@@ -1,9 +1,7 @@
 import "server-only";
-import { accounts, projects } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
 import { PLAN_LIMITS, type Plan, type Project } from "@askwell/shared";
-import { and, asc, eq } from "drizzle-orm";
+import { createOwnerClient, type OwnerClient } from "../supabase/owner";
+import { isoTimestamp, unwrap } from "../supabase/query";
 import { isUuid } from "./ids";
 
 export type ProjectUsage = Pick<Project, "messagesUsed" | "periodStart"> & {
@@ -12,48 +10,37 @@ export type ProjectUsage = Pick<Project, "messagesUsed" | "periodStart"> & {
   resetsAt: string;
 };
 
-// Real: messages_used counts from period_start and resets monthly (project.md §6.12).
-export async function getProjectUsage(
-  ownerId: string,
-  projectId: string,
-  database: Database = defaultDb,
-): Promise<ProjectUsage | null> {
+// The project's columns plus its owner's plan, through the projects → accounts foreign key. RLS
+// returns only the signed-in owner's projects and account.
+const USAGE_COLUMNS = "id, name, messages_used, period_start, account:accounts(plan)";
+
+type UsageRow = { messages_used: number; period_start: string; account: { plan: Plan } | null };
+
+// Real: messages_used counts from period_start and resets monthly (project.md §6.12). Null if the
+// project doesn't exist or isn't the signed-in owner's.
+export async function getProjectUsage(projectId: string, client: OwnerClient = createOwnerClient()): Promise<ProjectUsage | null> {
   if (!isUuid(projectId)) return null;
-  const [row] = await database
-    .select({ messagesUsed: projects.messagesUsed, periodStart: projects.periodStart, plan: accounts.plan })
-    .from(projects)
-    .innerJoin(accounts, eq(accounts.clerkUserId, projects.ownerId))
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)))
-    .limit(1);
+  const row = unwrap(await client.from("projects").select(USAGE_COLUMNS).eq("id", projectId).maybeSingle());
   return row ? toUsage(row) : null;
 }
 
 export type ProjectUsageRow = ProjectUsage & Pick<Project, "id" | "name">;
 
-// Real: every project the owner has, oldest first (the Projects page order), with its usage.
-export async function listProjectUsage(ownerId: string, database: Database = defaultDb): Promise<ProjectUsageRow[]> {
-  const rows = await database
-    .select({
-      id: projects.id,
-      name: projects.name,
-      messagesUsed: projects.messagesUsed,
-      periodStart: projects.periodStart,
-      plan: accounts.plan,
-    })
-    .from(projects)
-    .innerJoin(accounts, eq(accounts.clerkUserId, projects.ownerId))
-    .where(eq(projects.ownerId, ownerId))
-    .orderBy(asc(projects.createdAt));
-  return rows.map(({ id, name, ...row }) => ({ id, name, ...toUsage(row) }));
+// Real: every project the signed-in owner has, oldest first (the Projects page order), with its usage.
+export async function listProjectUsage(client: OwnerClient = createOwnerClient()): Promise<ProjectUsageRow[]> {
+  const rows = unwrap(await client.from("projects").select(USAGE_COLUMNS).order("created_at", { ascending: true })) ?? [];
+  return rows.map((row) => ({ id: row.id, name: row.name, ...toUsage(row) }));
 }
 
-function toUsage(row: { messagesUsed: number; periodStart: Date; plan: Plan }): ProjectUsage {
+export function toUsage(row: UsageRow): ProjectUsage {
+  const plan = row.account?.plan ?? "free";
+  const periodStart = new Date(row.period_start);
   return {
-    plan: row.plan,
-    messagesUsed: row.messagesUsed,
-    messagesLimit: PLAN_LIMITS[row.plan].messagesPerMonth,
-    periodStart: row.periodStart.toISOString(),
-    resetsAt: addOneMonth(row.periodStart).toISOString(),
+    plan,
+    messagesUsed: row.messages_used,
+    messagesLimit: PLAN_LIMITS[plan].messagesPerMonth,
+    periodStart: isoTimestamp(row.period_start),
+    resetsAt: addOneMonth(periodStart).toISOString(),
   };
 }
 

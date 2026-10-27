@@ -1,18 +1,18 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { ConversationList } from "../../../../../components/conversations/ConversationList";
 import { RefreshButton } from "../../../../../components/conversations/RefreshButton";
 import { listConversations } from "../../../../../lib/data/conversations";
+import { getOwnedProject } from "../../../../../lib/projects";
 import { SectionHeader } from "../../../../../components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConversationsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const { id } = await params;
   // Ownership first, before any data call (docs/ui-track.md).
-  const project = await getOwnedProject(id, userId);
+  const project = await getOwnedProject(id);
   if (!project) notFound();
 
   const conversations = await listConversations(project.id);

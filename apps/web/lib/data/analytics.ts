@@ -1,10 +1,9 @@
 import "server-only";
-import { conversations, messages, projects } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
 import { PLAN_LIMITS, type Plan } from "@askwell/shared";
-import { and, count, countDistinct, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { SUMMARY_COLUMNS, summaryOf, withPreview } from "../conversations";
 import { listProjects } from "../projects";
+import { createOwnerClient, type OwnerClient } from "../supabase/owner";
+import { isoTimestamp, unwrap, unwrapRow } from "../supabase/query";
 import { getAccountPlan } from "./billing";
 import { addOneMonth, type ProjectUsageRow } from "./usage";
 
@@ -50,89 +49,43 @@ function daysBack(now: Date, days: number, endOffset = 0): string[] {
   return Array.from({ length: days }, (_, i) => isoDay(new Date(now.getTime() - (endOffset + days - 1 - i) * DAY_MS)));
 }
 
-// Grouped day, in UTC, as `YYYY-MM-DD` — matches `isoDay`'s format so counts line up with it.
-const dayExpr = sql<string>`to_char(${messages.createdAt} at time zone 'utc', 'YYYY-MM-DD')`;
-
-// Correlated subquery: the body of a conversation's earliest visitor message, or null.
-const previewColumn = sql<string | null>`(
-  select ${messages.body}
-  from ${messages}
-  where ${messages.conversationId} = ${conversations.id} and ${messages.role} = 'visitor'
-  order by ${messages.createdAt} asc
-  limit 1
-)`;
-
-/** Messages per UTC day in `[start, end]`, scoped to the owner's projects, zero-filled for `days`. */
-async function dailyMessageCounts(
-  ownerId: string,
-  days: string[],
-  start: Date,
-  end: Date,
-  database: Database,
-): Promise<DayCount[]> {
-  const rows = await database
-    .select({ day: dayExpr, messages: count() })
-    .from(messages)
-    .innerJoin(conversations, eq(conversations.id, messages.conversationId))
-    .innerJoin(projects, eq(projects.id, conversations.projectId))
-    .where(and(eq(projects.ownerId, ownerId), gte(messages.createdAt, start), lte(messages.createdAt, end)))
-    .groupBy(dayExpr);
-
-  const counts = new Map(rows.map((row) => [row.day, row.messages]));
-  return days.map((day) => ({ day, messages: counts.get(day) ?? 0 }));
-}
-
 /**
- * Messages, distinct conversations with at least one message, and distinct visitors across
- * those conversations, all in `[start, end]` and scoped to the owner's projects.
+ * Messages, distinct conversations with at least one message, and distinct visitors across those
+ * conversations in `[start, end]`, plus messages per UTC day. owner_activity runs as the signed-in
+ * owner, so RLS limits it to their own projects (PostgREST can't group or count distinct values).
  */
-async function periodTotals(ownerId: string, start: Date, end: Date, database: Database): Promise<Totals> {
-  const [row] = await database
-    .select({
-      messages: count(messages.id),
-      conversations: countDistinct(conversations.id),
-      visitors: countDistinct(conversations.visitorId),
-    })
-    .from(messages)
-    .innerJoin(conversations, eq(conversations.id, messages.conversationId))
-    .innerJoin(projects, eq(projects.id, conversations.projectId))
-    .where(and(eq(projects.ownerId, ownerId), gte(messages.createdAt, start), lte(messages.createdAt, end)));
-  return row ?? { messages: 0, conversations: 0, visitors: 0 };
+async function activity(start: Date, end: Date, client: OwnerClient): Promise<Totals & { daily: Record<string, number> }> {
+  const row = unwrapRow(
+    await client.rpc("owner_activity", { p_start: start.toISOString(), p_end: end.toISOString() }).single(),
+  );
+  const daily = (row.daily ?? {}) as Record<string, number>;
+  return { messages: row.messages, conversations: row.conversations, visitors: row.visitors, daily };
 }
 
 /** The `limit` newest conversations across the owner's projects, with a preview and project name. */
-async function recentChats(ownerId: string, limit: number, database: Database): Promise<RecentChat[]> {
-  const rows = await database
-    .select({
-      conversationId: conversations.id,
-      projectId: projects.id,
-      projectName: projects.name,
-      createdAt: conversations.createdAt,
-      preview: previewColumn,
-    })
-    .from(conversations)
-    .innerJoin(projects, eq(projects.id, conversations.projectId))
-    .where(eq(projects.ownerId, ownerId))
-    .orderBy(desc(conversations.createdAt))
-    .limit(limit);
+async function recentChats(limit: number, client: OwnerClient): Promise<RecentChat[]> {
+  const rows = unwrap(
+    await withPreview(client.from("conversations").select(`id, project_id, created_at, project:projects(name), ${SUMMARY_COLUMNS}`))
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  );
 
-  return rows.map((row) => ({
-    conversationId: row.conversationId,
-    projectId: row.projectId,
-    projectName: row.projectName,
-    preview: row.preview ?? "",
-    createdAt: row.createdAt.toISOString(),
+  return (rows ?? []).map((row) => ({
+    conversationId: row.id,
+    projectId: row.project_id,
+    projectName: row.project?.name ?? "",
+    preview: summaryOf(row).preview,
+    createdAt: isoTimestamp(row.created_at),
   }));
 }
 
 /** The owner's dashboard: plan, project count and usage, plus activity aggregated from their own projects' messages/conversations. */
 export async function getDashboard(
-  ownerId: string,
   range: Range,
   now: Date = new Date(),
-  database: Database = defaultDb,
+  client: OwnerClient = createOwnerClient(),
 ): Promise<Dashboard> {
-  const [rows, plan] = await Promise.all([listProjects(ownerId, database), getAccountPlan(ownerId, database)]);
+  const [rows, plan] = await Promise.all([listProjects(client), getAccountPlan(client)]);
   const limits = PLAN_LIMITS[plan];
   const days = RANGE_DAYS[range];
 
@@ -142,11 +95,10 @@ export async function getDashboard(
   const previousStart = startOfUtcDay(previousDays[0]!);
   const previousEnd = new Date(currentStart.getTime() - 1);
 
-  const [daily, current, previous, recent] = await Promise.all([
-    dailyMessageCounts(ownerId, currentDays, currentStart, now, database),
-    periodTotals(ownerId, currentStart, now, database),
-    periodTotals(ownerId, previousStart, previousEnd, database),
-    recentChats(ownerId, 5, database),
+  const [current, previous, recent] = await Promise.all([
+    activity(currentStart, now, client),
+    activity(previousStart, previousEnd, client),
+    recentChats(5, client),
   ]);
 
   return {
@@ -157,14 +109,14 @@ export async function getDashboard(
       id: row.id,
       name: row.name,
       plan,
-      messagesUsed: row.messagesUsed,
+      messagesUsed: row.messages_used,
       messagesLimit: limits.messagesPerMonth,
-      periodStart: row.periodStart.toISOString(),
-      resetsAt: addOneMonth(row.periodStart).toISOString(),
+      periodStart: isoTimestamp(row.period_start),
+      resetsAt: addOneMonth(new Date(row.period_start)).toISOString(),
     })),
-    daily,
-    current,
-    previous,
+    daily: currentDays.map((day) => ({ day, messages: current.daily[day] ?? 0 })),
+    current: { messages: current.messages, conversations: current.conversations, visitors: current.visitors },
+    previous: { messages: previous.messages, conversations: previous.conversations, visitors: previous.visitors },
     recentChats: recent,
   };
 }

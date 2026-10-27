@@ -25,8 +25,8 @@ function planSummary(plan: Plan) {
 }
 
 export default async function BillingPage() {
-  const { userId } = await auth.protect();
-  const [plan, usage] = await Promise.all([getAccountPlan(userId), listProjectUsage(userId)]);
+  await auth.protect();
+  const [plan, usage] = await Promise.all([getAccountPlan(), listProjectUsage()]);
   const now = new Date().toISOString();
 
   return (

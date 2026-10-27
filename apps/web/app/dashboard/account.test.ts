@@ -1,74 +1,63 @@
 // @vitest-environment node
-import { PGlite } from "@electric-sql/pglite";
-import { vector } from "@electric-sql/pglite-pgvector";
-import * as schema from "@askwell/db";
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { argsOf, callsTo, fakeSupabase } from "../../lib/supabase/fake";
+
+// ensureAccount writes with a fake service client. That owners can't insert or change their own
+// account row is tested against the real migrations on pglite (packages/db).
+vi.mock("server-only", () => ({}));
+vi.mock("../../lib/supabase/service", () => ({
+  createServiceClient: () => {
+    throw new Error("real service client used in a test");
+  },
+}));
 
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/posthog/server", () => ({ captureServerEvent }));
 
 const { ensureAccount } = await import("./account");
 
-const client = new PGlite({ extensions: { vector } });
-const db = drizzle(client, { schema });
-
-beforeAll(async () => {
-  const migrationsFolder = new URL("../../../../packages/db/migrations", import.meta.url).pathname;
-  await migrate(db, { migrationsFolder });
-});
-
-afterAll(async () => {
-  await client.close();
-});
-
 afterEach(() => {
   captureServerEvent.mockClear();
 });
 
-const rowsFor = (clerkUserId: string) =>
-  db.select().from(schema.accounts).where(eq(schema.accounts.clerkUserId, clerkUserId));
+/** A service client whose upsert returns `inserted` rows: one when it created the account, none when it already existed. */
+const serviceReturning = (inserted: { clerk_user_id: string }[]) => fakeSupabase({ from: { accounts: { data: inserted } } });
 
 describe("ensureAccount", () => {
-  it("creates one free account for a new user", async () => {
-    await ensureAccount("user_new", db);
+  it("inserts a free account, leaving an existing row (and its plan) untouched", async () => {
+    const service = serviceReturning([{ clerk_user_id: "user_new" }]);
 
-    const rows = await rowsFor("user_new");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.plan).toBe("free");
+    await ensureAccount("user_new", service);
+
+    const [call] = callsTo(service, "accounts");
+    expect(argsOf(call, "upsert")).toEqual([
+      { clerk_user_id: "user_new", plan: "free" },
+      { onConflict: "clerk_user_id", ignoreDuplicates: true },
+    ]);
+    expect(argsOf(call, "select")).toEqual(["clerk_user_id"]);
   });
 
-  it("does not duplicate the row on a later sign-in", async () => {
-    await ensureAccount("user_repeat", db);
-    await ensureAccount("user_repeat", db);
-
-    expect(await rowsFor("user_repeat")).toHaveLength(1);
+  it("is true only when this call created the row", async () => {
+    expect(await ensureAccount("user_new", serviceReturning([{ clerk_user_id: "user_new" }]))).toBe(true);
+    expect(await ensureAccount("user_repeat", serviceReturning([]))).toBe(false);
   });
 
-  it("leaves an existing Pro plan untouched", async () => {
-    await db.insert(schema.accounts).values({ clerkUserId: "user_pro", plan: "pro" });
+  it("throws a database error instead of reading it as an existing account", async () => {
+    const service = fakeSupabase({ from: { accounts: { error: { code: "42501", message: "permission denied" } } } });
 
-    await ensureAccount("user_pro", db);
-
-    const rows = await rowsFor("user_pro");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.plan).toBe("pro");
+    await expect(ensureAccount("user_new", service)).rejects.toMatchObject({ code: "42501" });
+    expect(captureServerEvent).not.toHaveBeenCalled();
   });
 });
 
 describe("signed_up", () => {
   it("fires once, on the call that creates the account", async () => {
-    expect(await ensureAccount("user_signup", db)).toBe(true);
+    await ensureAccount("user_signup", serviceReturning([{ clerk_user_id: "user_signup" }]));
     expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("user_signup", "signed_up");
   });
 
   it("doesn't fire on later visits by the same user", async () => {
-    await ensureAccount("user_signup_again", db);
-    captureServerEvent.mockClear();
-
-    expect(await ensureAccount("user_signup_again", db)).toBe(false);
+    await ensureAccount("user_signup_again", serviceReturning([]));
     expect(captureServerEvent).not.toHaveBeenCalled();
   });
 });

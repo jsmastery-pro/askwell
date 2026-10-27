@@ -1,34 +1,37 @@
 import "server-only";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
 import type { ConversationSummary, GetConversationResponse } from "@askwell/shared";
 import { getConversationById, listProjectConversations } from "../conversations";
+import { createOwnerClient, type OwnerClient } from "../supabase/owner";
+import { isoTimestamp } from "../supabase/query";
 import { isUuid } from "./ids";
 
 type Thread = GetConversationResponse["conversation"];
 
-// Real reads. The caller (a server component) has already checked ownership via
-// getOwnedProject before calling these with the project's id.
+// Real reads through the owner client: RLS hides other owners' conversations.
 
 // Newest first.
-export async function listConversations(projectId: string, database: Database = defaultDb): Promise<ConversationSummary[]> {
+export async function listConversations(projectId: string, client: OwnerClient = createOwnerClient()): Promise<ConversationSummary[]> {
   if (!isUuid(projectId)) return [];
-  return listProjectConversations(projectId, database);
+  return listProjectConversations(projectId, client);
 }
 
-// Null for an unknown ID, a malformed ID, or a conversation from another project.
+// Null for an unknown ID, a malformed ID, another owner's conversation, or one from another project.
 export async function getConversation(
   projectId: string,
   conversationId: string,
-  database: Database = defaultDb,
+  client: OwnerClient = createOwnerClient(),
 ): Promise<Thread | null> {
   if (!isUuid(projectId) || !isUuid(conversationId)) return null;
-  const conversation = await getConversationById(conversationId, database);
-  if (!conversation || conversation.projectId !== projectId) return null;
+  const conversation = await getConversationById(conversationId, client);
+  if (!conversation || conversation.project_id !== projectId) return null;
+  return toThread(conversation);
+}
+
+export function toThread(conversation: NonNullable<Awaited<ReturnType<typeof getConversationById>>>): Thread {
   return {
     id: conversation.id,
-    visitorId: conversation.visitorId,
-    createdAt: conversation.createdAt.toISOString(),
+    visitorId: conversation.visitor_id,
+    createdAt: isoTimestamp(conversation.created_at),
     messages: conversation.messages,
   };
 }

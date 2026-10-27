@@ -17,9 +17,9 @@ export const dynamic = "force-dynamic";
 const PLAN_NAME = { free: "Free", pro: "Pro" } as const;
 
 export default async function ProjectOverviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const { id } = await params;
-  const usage = await getProjectUsage(userId, id);
+  const usage = await getProjectUsage(id);
   if (!usage) notFound();
 
   const [sourceCount, sources, conversations] = await Promise.all([
@@ -28,7 +28,8 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
     listConversations(id),
   ]);
   const sourcesLimit = PLAN_LIMITS[usage.plan].knowledgeSourcesPerProject;
-  const processing = sources.filter((s) => s.status === "processing").length;
+  // Not yet ready or failed: processing, or uploading (SB-T06), which the UI shows like processing.
+  const processing = sources.filter((s) => s.status !== "ready" && s.status !== "failed").length;
   const failed = sources.filter((s) => s.status === "failed").length;
   const base = `/dashboard/projects/${id}`;
 

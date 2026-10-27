@@ -29,10 +29,10 @@ function SectionTitle({ id, children }: { id: string; children: string }) {
 
 // The home: activity across every project the owner has. Sign-in lands here.
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string | string[] }> }) {
-  const { userId } = await auth.protect();
+  await auth.protect();
   const range = parseRange((await searchParams).range);
   const now = new Date();
-  const data = await getDashboard(userId, range, now);
+  const data = await getDashboard(range, now);
 
   if (data.projectCount === 0) {
     return (

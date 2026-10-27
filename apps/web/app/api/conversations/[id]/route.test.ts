@@ -1,80 +1,87 @@
 // @vitest-environment node
-import { accounts, conversations, messages, projects } from "@askwell/db";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, type TestDb } from "../../../../lib/widget-config/test-db";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { argsOf, callsTo, fakeSupabase, type FakeHandlers, type FakeSupabase } from "../../../../lib/supabase/fake";
 
+// The conversation is read through the owner client (RLS); that RLS hides another owner's
+// conversation is tested against the real migrations on pglite (packages/db). Here, another
+// owner's conversation is one the fake owner client doesn't return.
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
-  },
-}));
+const state = vi.hoisted(() => ({ userId: null as string | null, owner: undefined as unknown }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
+vi.mock("../../../../lib/supabase/owner", () => ({ createOwnerClient: () => state.owner }));
 
 const { GET } = await import("./route");
 
-let db: TestDb;
-let close: () => Promise<void>;
+const CONVERSATION_ID = "00000000-0000-4000-8000-000000000001";
 
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
-});
+let owner: FakeSupabase;
 
-afterAll(() => close());
+function signIn(userId: string, handlers: FakeHandlers = {}) {
+  state.userId = userId;
+  owner = fakeSupabase(handlers);
+  state.owner = owner;
+}
+
+const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+const req = () => new Request("https://app.test");
 
 beforeEach(() => {
   state.userId = null;
+  state.owner = undefined;
 });
-
-const as = (userId: string | null) => {
-  state.userId = userId;
-};
-const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-
-async function seedProjectWithConversation(ownerId: string, publicKey: string) {
-  await db.insert(accounts).values({ clerkUserId: ownerId, plan: "free" }).onConflictDoNothing();
-  const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
-  const [conversation] = await db.insert(conversations).values({ projectId: project!.id, visitorId: "v1" }).returning();
-  await db.insert(messages).values({ conversationId: conversation!.id, role: "visitor", body: "Hi" });
-  return conversation!.id;
-}
 
 describe("unauthenticated", () => {
   it("returns 401", async () => {
-    const res = await GET(new Request("https://app.test"), ctx("00000000-0000-4000-8000-000000000000"));
+    const res = await GET(req(), ctx(CONVERSATION_ID));
     expect(res.status).toBe(401);
   });
 });
 
 describe("GET /api/conversations/:id", () => {
   it("returns the conversation with its messages", async () => {
-    const conversationId = await seedProjectWithConversation("owner_a", "pk_conv_id_a");
-    as("owner_a");
+    signIn("owner_a", {
+      from: {
+        conversations: {
+          data: { id: CONVERSATION_ID, project_id: "p1", visitor_id: "v1", created_at: "2026-10-01T00:00:00+00:00" },
+        },
+        // One page of messages, then an empty one (fetchAll stops on an empty page).
+        messages: [
+          { data: [{ id: "m1", role: "visitor", body: "Hi", created_at: "2026-10-01T00:00:01+00:00" }] },
+          { data: [] },
+        ],
+      },
+    });
 
-    const res = await GET(new Request("https://app.test"), ctx(conversationId));
+    const res = await GET(req(), ctx(CONVERSATION_ID));
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.conversation.id).toBe(conversationId);
-    expect(body.conversation.messages).toEqual([expect.objectContaining({ role: "visitor", body: "Hi" })]);
+    expect(body.conversation).toEqual({
+      id: CONVERSATION_ID,
+      visitorId: "v1",
+      createdAt: "2026-10-01T00:00:00.000Z",
+      messages: [{ id: "m1", role: "visitor", body: "Hi", createdAt: "2026-10-01T00:00:01.000Z" }],
+    });
+    expect(argsOf(callsTo(owner, "conversations")[0], "eq")).toEqual(["id", CONVERSATION_ID]);
+    expect(argsOf(callsTo(owner, "messages")[0], "eq")).toEqual(["conversation_id", CONVERSATION_ID]);
   });
 
   it("returns 404 for another owner's conversation", async () => {
-    const conversationId = await seedProjectWithConversation("owner_b", "pk_conv_id_b");
-    as("owner_c");
+    signIn("owner_c");
 
-    const res = await GET(new Request("https://app.test"), ctx(conversationId));
+    const res = await GET(req(), ctx(CONVERSATION_ID));
 
     expect(res.status).toBe(404);
     expect((await res.json()).error.code).toBe("not_found");
+    expect(callsTo(owner, "messages")).toEqual([]);
   });
 
   it("returns 404 for an unknown or malformed id", async () => {
-    as("owner_d");
-    expect((await GET(new Request("https://app.test"), ctx("00000000-0000-4000-8000-000000000000"))).status).toBe(404);
-    expect((await GET(new Request("https://app.test"), ctx("not-a-uuid"))).status).toBe(404);
+    signIn("owner_d");
+    expect((await GET(req(), ctx("00000000-0000-4000-8000-000000000000"))).status).toBe(404);
+    expect((await GET(req(), ctx("not-a-uuid"))).status).toBe(404);
+    // The malformed id never reaches the database.
+    expect(owner.calls).toHaveLength(1);
   });
 });

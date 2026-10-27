@@ -1,79 +1,94 @@
 import "server-only";
-import { conversations, messages } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
-import type { Database } from "@askwell/db/queries";
+import type { Tables } from "@askwell/db/types";
 import type { ConversationSummary, Message } from "@askwell/shared";
-import { asc, count, desc, eq, sql } from "drizzle-orm";
+import { isUuid } from "../data/ids";
+import { createOwnerClient, type OwnerClient } from "../supabase/owner";
+import { fetchAll, isoTimestamp, unwrap } from "../supabase/query";
 
-export type ConversationRow = typeof conversations.$inferSelect;
-export type MessageRow = typeof messages.$inferSelect;
+// Owner reads through the owner client: RLS returns only conversations (and messages) in the
+// signed-in owner's projects, so another owner's conversation reads as missing.
+
+export type ConversationRow = Tables<"conversations">;
 export type ConversationWithMessages = ConversationRow & { messages: Message[] };
 
-// Same shape check as getOwnedProject in packages/db: a malformed id would make Postgres
-// throw on the uuid cast, so callers treat it as "not found" instead.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type MessageRow = Pick<Tables<"messages">, "id" | "role" | "body" | "created_at">;
 
 function toMessage(row: MessageRow): Message {
-  return { id: row.id, role: row.role, body: row.body, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, role: row.role, body: row.body, createdAt: isoTimestamp(row.created_at) };
 }
 
-// Correlated subquery: the body of a conversation's earliest visitor message, or null.
-// Independent of the outer join, so it's correct even for a conversation with no messages.
-const previewColumn = sql<string | null>`(
-  select ${messages.body}
-  from ${messages}
-  where ${messages.conversationId} = ${conversations.id} and ${messages.role} = 'visitor'
-  order by ${messages.createdAt} asc
-  limit 1
-)`;
+/**
+ * Columns for a conversation summary: its message count, and its earliest visitor message as
+ * `preview` (filtered, ordered and limited on the embedded resource by `withPreview`).
+ */
+export const SUMMARY_COLUMNS = "message_count:messages(count), preview:messages(body)";
+
+/** Narrows a query's `preview` embed to the conversation's first visitor message. */
+export function withPreview<Q extends PreviewQuery<Q>>(query: Q): Q {
+  return query
+    .eq("preview.role", "visitor")
+    .order("created_at", { referencedTable: "preview", ascending: true })
+    .limit(1, { referencedTable: "preview" });
+}
+
+type PreviewQuery<Q> = {
+  eq(column: string, value: string): Q;
+  order(column: string, options: { referencedTable: string; ascending: boolean }): Q;
+  limit(count: number, options: { referencedTable: string }): Q;
+};
+
+/** The preview text and message count from a row selected with SUMMARY_COLUMNS. */
+export function summaryOf(row: { message_count: { count: number }[]; preview: { body: string }[] }) {
+  return { messageCount: row.message_count[0]?.count ?? 0, preview: row.preview[0]?.body ?? "" };
+}
 
 /**
  * A project's conversations, newest first, with each one's message count and the body of its
- * first visitor message (the preview), aggregated in SQL rather than loading every message.
- * The caller is trusted to have already checked ownership.
+ * first visitor message (the preview), counted in the database rather than loading every message.
+ * Empty for another owner's project. Paged, since a busy project can outgrow one response.
  */
 export async function listProjectConversations(
   projectId: string,
-  database: Database = defaultDb,
+  client: OwnerClient = createOwnerClient(),
 ): Promise<ConversationSummary[]> {
-  const rows = await database
-    .select({
-      id: conversations.id,
-      visitorId: conversations.visitorId,
-      createdAt: conversations.createdAt,
-      messageCount: count(messages.id),
-      preview: previewColumn,
-    })
-    .from(conversations)
-    .leftJoin(messages, eq(messages.conversationId, conversations.id))
-    .where(eq(conversations.projectId, projectId))
-    .groupBy(conversations.id)
-    .orderBy(desc(conversations.createdAt));
+  if (!isUuid(projectId)) return [];
+  const rows = await fetchAll((from, to) =>
+    withPreview(client.from("conversations").select(`id, visitor_id, created_at, ${SUMMARY_COLUMNS}`))
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   return rows.map((row) => ({
     id: row.id,
-    visitorId: row.visitorId,
-    preview: row.preview ?? "",
-    messageCount: row.messageCount,
-    createdAt: row.createdAt.toISOString(),
+    visitorId: row.visitor_id,
+    ...summaryOf(row),
+    createdAt: isoTimestamp(row.created_at),
   }));
 }
 
-/** A conversation with its full message history, or `null` if it doesn't exist. Doesn't check ownership. */
+/**
+ * A conversation with its full message history, oldest first. Null if it doesn't exist, isn't in
+ * one of the signed-in owner's projects, or the ID is malformed.
+ */
 export async function getConversationById(
   conversationId: string,
-  database: Database = defaultDb,
+  client: OwnerClient = createOwnerClient(),
 ): Promise<ConversationWithMessages | null> {
-  if (!UUID_RE.test(conversationId)) return null;
+  if (!isUuid(conversationId)) return null;
 
-  const [conversation] = await database.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+  const conversation = unwrap(await client.from("conversations").select("*").eq("id", conversationId).maybeSingle());
   if (!conversation) return null;
 
-  const msgRows = await database
-    .select()
-    .from(messages)
-    .where(eq(messages.conversationId, conversation.id))
-    .orderBy(asc(messages.createdAt));
-
-  return { ...conversation, messages: msgRows.map(toMessage) };
+  const messages = await fetchAll((from, to) =>
+    client
+      .from("messages")
+      .select("id, role, body, created_at")
+      .eq("conversation_id", conversation.id)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  return { ...conversation, messages: messages.map(toMessage) };
 }

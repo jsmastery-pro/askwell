@@ -52,10 +52,10 @@ async function renderPage(data: Dashboard, range?: string | string[]) {
 describe("Dashboard home", () => {
   it("reads this owner's data for the chosen range, falling back to 30d", async () => {
     await renderPage(base, "7d");
-    expect(getDashboard).toHaveBeenLastCalledWith("user_owner", "7d", expect.any(Date));
+    expect(getDashboard).toHaveBeenLastCalledWith("7d", expect.any(Date));
     cleanup();
     await renderPage(base, "abc");
-    expect(getDashboard).toHaveBeenLastCalledWith("user_owner", "30d", expect.any(Date));
+    expect(getDashboard).toHaveBeenLastCalledWith("30d", expect.any(Date));
     expect(screen.getByRole("link", { name: "30d" }).getAttribute("aria-current")).toBe("true");
   });
 

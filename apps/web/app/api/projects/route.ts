@@ -13,7 +13,7 @@ export async function GET() {
   const ownerId = await getOwnerId();
   if (!ownerId) return unauthorized();
 
-  const rows = await listProjects(ownerId);
+  const rows = await listProjects();
   return Response.json({ projects: rows.map(toProject) } satisfies ListProjectsResponse);
 }
 
