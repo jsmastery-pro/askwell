@@ -255,17 +255,19 @@ Lane B (Customize) added once a developer is free for it.
 > - Supabase CLI migrations and generated types
 > - the Supabase MCP for agents, dev only
 >
-> Drizzle, `pg`, pglite and the S3 SDK are removed at the end. The current app stays live until the new layer replaces it. The P6-T05 launch check runs on this version.
+> **Decided 2026-10-27 (product owner):** no local Supabase stack (`supabase start`, Docker) in any sandbox or on the product owner's Mac: the image pull filled the disk and broke every sandbox. Policies and functions are tested on **pglite with Supabase's roles, `auth.jwt()` and default privileges stubbed** (`packages/db/supabase-pglite.ts`, from SB-T02). The real check is on the dev project, through the MCP, after merge.
+>
+> Drizzle, `pg` and the S3 SDK are removed at the end; pglite stays as the test database. The current app stays live until the new layer replaces it. The P6-T05 launch check runs on this version.
 
 | ID | Task | Owner | Needs | Status | PR |
 |---|---|---|---|---|---|
 | SB-T01 | Clerk ↔ Supabase, Data API on, keys, MCP (dev only), agent skills | Product owner | — | todo | — |
-| SB-T10 | Spike: local Supabase + MCP inside the sandboxes | Alice | — | in progress | — |
-| SB-T02 | Supabase schema, RLS policies, generated types | Bob | — | in progress | — |
-| SB-T03 | Postgres functions for atomic operations (`rpc()`) | Bob | SB-T02 | todo | — |
+| SB-T10 | Spike: local Supabase + MCP inside the sandboxes | Alice | — | in progress | — (local Supabase: no, the image pull broke the sandbox disks; MCP check waits on SB-T01) |
+| SB-T02 | Supabase schema and RLS policies (types move to SB-T03) | Bob | — | merge-ready | #92 |
+| SB-T03 | Postgres functions for atomic operations (`rpc()`), generated types | Bob | SB-T02 | todo | — |
 | SB-T04 | Owner side on `supabase-js` + RLS | Bob | SB-T03 | todo | — |
 | SB-T05 | Widget, chat, billing webhook on `supabase-js` + `rpc()` | Alice | SB-T03 | todo | — |
 | SB-T06 | Storage with direct signed uploads; 10 MB | Alice | SB-T03 | todo | — |
 | SB-T07 | Knowledge processing on Supabase | Alice | SB-T05, SB-T06 | todo | — |
-| SB-T08 | Remove Drizzle, pg, pglite, S3 SDK, old env | Bob | SB-T04…T07 | todo | — |
+| SB-T08 | Remove Drizzle, pg, S3 SDK, old env (pglite stays for tests) | Bob | SB-T04…T07 | todo | — |
 | SB-T09 | Spec rewrite + RLS / function-grant security audit | John | alongside; audit after SB-T08 | in progress | — |

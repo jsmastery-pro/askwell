@@ -1,11 +1,11 @@
-# SB-T02 — Supabase schema, RLS policies and generated types
+# SB-T02 — Supabase schema and RLS policies
 
 | Field | Value |
 |---|---|
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | — (local work). Applying to dev needs SB-T01 and SB-T10's answer. |
-| Files allowed | `supabase/**` (new: `config.toml`, `migrations/`, `seed.sql`, tests), `packages/db/types.ts` (generated, new), `package.json` (`supabase` scripts only), a new local-test helper under `packages/db/**` |
+| Files allowed | `supabase/**` (new: `config.toml`, `migrations/`, `seed.sql`), `package.json` (`supabase` scripts only), a new pglite test helper and tests under `packages/db/**` |
 | project.md | §7 Data model, §9 Security rules |
 
 ## Goal
@@ -19,22 +19,22 @@ The same 7 tables as today, defined as a Supabase CLI migration, with RLS that e
    - `widget_configs`, `knowledge_sources`, `knowledge_chunks`, `conversations`, `messages`: a user reads them when they own the parent project (use a `security definer` helper like `owns_project(project_id)`, with a fixed `search_path`).
    - Writes that need a plan or limit check (config save, knowledge add, quota) **don't** get direct policies. They go through server routes and SB-T03's functions.
    - `anon` gets **nothing** on any table. Revoke `TRUNCATE` from `anon` and `authenticated`, as in today's 0003.
-3. `supabase gen types typescript --local > packages/db/types.ts`, plus a `pnpm` script to regenerate it.
-4. Tests against the **local** Supabase (`supabase start`):
+3. Types move to SB-T03: they're generated from the dev project once this migration is applied there.
+4. Tests on **pglite**, with a helper that stubs what the migration relies on: the `anon`, `authenticated` and `service_role` roles, the `auth` and `extensions` schemas, `auth.jwt()` as Supabase defines it, and Supabase's default privileges. SB-T03 reuses the helper. Tests:
    - owner A can't read owner B's projects, chunks or messages
    - `anon` reads nothing
    - an owner can't insert a project directly
    - deleting a project cascades
-   Make the test runner skip these with a clear message if Docker isn't available, and say so in the PR.
 5. Don't touch the app's code yet. SB-T04/T05 switch it over.
 
 ## Done when
-- [ ] `supabase db reset` builds the schema locally from the migrations
-- [ ] The policy tests pass against local Supabase
-- [ ] Types generated
+- [ ] pglite applies the migration with Supabase's roles and privileges stubbed
+- [ ] The policy tests pass on pglite
 - [ ] The PR lists every policy in a table: table, operation, rule
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` pass
 
 ## Notes
 - CodeRabbit is required (database, security). This is a contract change, approved by the product owner on 2026-10-27.
+- **Decided 2026-10-27:** no local Supabase stack in any sandbox (the image pull broke the disks). The real checks run on the dev project through the MCP after merge.
+- After the reset, dev has no Drizzle migration history. Never run `pnpm db:migrate` against dev again; migrations go through `supabase db push` (or the MCP) from then on.
 - Dev data is throwaway. Applying this to the dev project means resetting it: only after merge, through the MCP or by the product owner.

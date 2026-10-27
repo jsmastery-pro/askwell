@@ -19,7 +19,7 @@
    - creating a project calls `rpc("create_project")` through the service client
    - rename and delete go through the owner client, with RLS checking ownership
 4. **`ensureAccount`** (first sign-in) inserts the `accounts` row through the service client.
-5. Tests: mock `supabase-js` for unit tests, and run the key owner flows against local Supabase.
+5. Tests: mock `supabase-js` for unit tests. Policy behavior is already covered on pglite (SB-T02); no local Supabase stack.
 
 ## Done when
 - [ ] The dashboard works end to end against dev Supabase (on the PR's Vercel preview)
@@ -29,3 +29,5 @@
 
 ## Notes
 - CodeRabbit is required.
+- **Deleting a project** must also delete its files in Storage. RLS deletes the row and cascades the child rows, but not Storage objects. List the project's `storage_key`s first, delete the row with the owner client, then remove the objects with the service client.
+- The owner client never runs in the browser: the dashboard reads on the server, so the Data API is only reached by our server.

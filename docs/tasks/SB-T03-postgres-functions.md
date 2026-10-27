@@ -1,11 +1,11 @@
-# SB-T03 — Postgres functions for atomic operations (`rpc()`)
+# SB-T03 — Postgres functions for atomic operations (`rpc()`) and generated types
 
 | Field | Value |
 |---|---|
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | SB-T02 |
-| Files allowed | `supabase/migrations/**` (new migration), `supabase/tests/**`, `packages/db/types.ts` (regenerated) |
+| Files allowed | `supabase/migrations/**` (new migration), tests under `packages/db/**` (reusing `supabase-pglite.ts`), `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only) |
 | project.md | §5 Plans, §6.3, §6.4, §6.6, §9 |
 
 ## Goal
@@ -25,10 +25,12 @@ Every operation that today relies on a transaction or row lock in TypeScript bec
 - `security definer` only where needed, always with `set search_path = ''` and fully qualified names.
 
 ## Done when
-- [ ] Each function has tests against local Supabase, including at-limit refusals and a concurrency test for `consume_message` and `first_chat` once-only
+- [ ] Each function has tests on pglite (SB-T02's helper), including at-limit refusals and a concurrency test for `consume_message` and `first_chat` once-only
 - [ ] A test proves `anon` and `authenticated` can't execute them
-- [ ] Types regenerated
+- [ ] `packages/db/types.ts` generated from the **dev project** (`supabase gen types typescript --project-id pasgozggqtprenfgtghb`, or the MCP), plus a `pnpm db:types` script. Never `--local`.
 - [ ] Checks pass
 
 ## Notes
 - CodeRabbit is required.
+- No local Supabase stack (decided 2026-10-27). Types need SB-T02's migration on dev. If it isn't there yet, open the PR with the functions and tests, and add the types once dev has the schema.
+- Concurrency on pglite: it runs one connection, so test the locking logic (at-limit refusal, `first_chat` once only) with sequential calls. The real concurrency check runs on dev after merge.
