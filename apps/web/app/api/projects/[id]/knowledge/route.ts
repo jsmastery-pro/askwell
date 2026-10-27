@@ -1,9 +1,11 @@
-import { getOwnedProject } from "@askwell/db/queries";
-import { ERROR_CODES, PLAN_LIMITS, addTextKnowledgeRequestSchema, MAX_KNOWLEDGE_FILE_BYTES, type AddKnowledgeResponse, type KnowledgeSource, type Plan } from "@askwell/shared";
+import { ERROR_CODES, PLAN_LIMITS, addTextKnowledgeRequestSchema, MAX_KNOWLEDGE_FILE_BYTES, type AddKnowledgeResponse } from "@askwell/shared";
 import { createServiceClient } from "../../../../../lib/supabase/service";
+import { getAccountPlan } from "../../../../../lib/data/billing";
+import { toKnowledgeSource } from "../../../../../lib/data/knowledge";
 import { runAfterResponse } from "../../../../../lib/knowledge/background";
 import { processKnowledgeSource } from "../../../../../lib/knowledge";
 import { captureServerEvent } from "../../../../../lib/posthog/server";
+import { getOwnedProject } from "../../../../../lib/projects";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../lib/projects/http";
 
 export const dynamic = "force-dynamic";
@@ -12,16 +14,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 type Context = { params: Promise<{ id: string }> };
-type ServiceClient = ReturnType<typeof createServiceClient>;
 
 const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 // MAX_KNOWLEDGE_FILE_BYTES plus room for JSON overhead and the title field.
 const MAX_REQUEST_BYTES = MAX_KNOWLEDGE_FILE_BYTES + 64 * 1024;
-
-async function getOwnerPlan(service: ServiceClient, ownerId: string): Promise<Plan> {
-  const { data } = await service.from("accounts").select("plan").eq("clerk_user_id", ownerId).maybeSingle();
-  return (data as { plan: Plan } | null)?.plan ?? "free";
-}
 
 function sourceLimitReached(limit: number) {
   return errorResponse(
@@ -29,18 +25,6 @@ function sourceLimitReached(limit: number) {
     `Your plan allows ${limit} knowledge source${limit === 1 ? "" : "s"} per project, files and pasted text together. Upgrade to add more.`,
     403,
   );
-}
-
-type ReservedRow = { id: string; title: string; type: string; status: string; created_at: string };
-
-function toKnowledgeSource(row: ReservedRow): KnowledgeSource {
-  return {
-    id: row.id,
-    title: row.title,
-    type: row.type as KnowledgeSource["type"],
-    status: row.status as KnowledgeSource["status"],
-    createdAt: new Date(row.created_at).toISOString(),
-  };
 }
 
 async function handleText(projectId: string, ownerId: string, request: Request) {
@@ -51,14 +35,13 @@ async function handleText(projectId: string, ownerId: string, request: Request) 
     return invalidInput(`The pasted text is too large. Max ${MAX_FILE_MB} MB.`);
   }
 
-  const service = createServiceClient();
-  const limit = PLAN_LIMITS[await getOwnerPlan(service, ownerId)].knowledgeSourcesPerProject;
+  const limit = PLAN_LIMITS[await getAccountPlan()].knowledgeSourcesPerProject;
 
   // Pasted text has no storage key: the function inserts it straight to `processing` (SB-T06),
   // the same atomic lock+count+insert files use, so pasted text and files count together (§5).
-  // `db:types` still has this argument as required (generated from dev, before this PR's
-  // migration makes it nullable there); the cast bridges that until dev catches up.
-  const { data: row, error } = await service.rpc("reserve_knowledge_source", {
+  // `db:types`' reserve_knowledge_source still has this argument as required (generated from dev,
+  // before this PR's migration makes it nullable there); the cast bridges that until dev catches up.
+  const { data: row, error } = await createServiceClient().rpc("reserve_knowledge_source", {
     p_project_id: projectId,
     p_title: parsed.data.title,
     p_type: "text",
@@ -71,11 +54,10 @@ async function handleText(projectId: string, ownerId: string, request: Request) 
     console.error(`reserve_knowledge_source failed for project ${projectId}`, error);
     return errorResponse(ERROR_CODES.internal, "Could not add this text.", 500);
   }
-  const source = row as ReservedRow;
 
-  runAfterResponse(() => processKnowledgeSource(source.id, projectId, () => parsed.data.content));
+  runAfterResponse(() => processKnowledgeSource(row.id, projectId, () => parsed.data.content));
   captureServerEvent(ownerId, "knowledge_added", { project_id: projectId, type: "text" });
-  return Response.json({ source: toKnowledgeSource(source) } satisfies AddKnowledgeResponse, { status: 201 });
+  return Response.json({ source: toKnowledgeSource(row) } satisfies AddKnowledgeResponse, { status: 201 });
 }
 
 export async function POST(request: Request, { params }: Context) {
@@ -83,7 +65,7 @@ export async function POST(request: Request, { params }: Context) {
   if (!ownerId) return unauthorized();
 
   const { id: projectId } = await params;
-  if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
+  if (!(await getOwnedProject(projectId))) return projectNotFound();
 
   // Before reading anything: a huge body is refused without being buffered in memory (§9 File upload).
   const declared = Number(request.headers.get("content-length"));

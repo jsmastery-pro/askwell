@@ -345,7 +345,7 @@ export type Database = {
     Enums: {
       message_role: "visitor" | "bot"
       plan: "free" | "pro"
-      source_status: "processing" | "ready" | "failed"
+      source_status: "processing" | "ready" | "failed" | "uploading"
       source_type: "text" | "pdf" | "md" | "txt"
       widget_animation: "fade" | "slide" | "scale"
       widget_position: "bottom-right" | "bottom-left" | "top-right" | "top-left"
@@ -478,7 +478,7 @@ export const Constants = {
     Enums: {
       message_role: ["visitor", "bot"],
       plan: ["free", "pro"],
-      source_status: ["processing", "ready", "failed"],
+      source_status: ["processing", "ready", "failed", "uploading"],
       source_type: ["text", "pdf", "md", "txt"],
       widget_animation: ["fade", "slide", "scale"],
       widget_position: ["bottom-right", "bottom-left", "top-right", "top-left"],

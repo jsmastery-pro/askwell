@@ -4,17 +4,22 @@ import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fakeSupabase } from "../../../../../../lib/supabase/fake";
 import { createTestDb, type TestDb } from "../../../../../../lib/widget-config/test-db";
 
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null }));
+const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null, owner: undefined as unknown }));
 vi.mock("@askwell/db/client", () => ({
   get db() {
     return state.db;
   },
 }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
+// Ownership (lib/projects) reads through the owner client (RLS); which rows RLS lets an owner see
+// is tested against the real migrations on pglite (packages/db), so here another owner's project
+// is simply a row the fake doesn't return.
+vi.mock("../../../../../../lib/supabase/owner", () => ({ createOwnerClient: () => state.owner }));
 
 const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/ai", () => ({ embedTexts }));
@@ -26,11 +31,10 @@ const readKnowledgeFile = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/storage", () => ({ readKnowledgeFile, deleteKnowledgeFile }));
 
-// The claim step now goes through the service client, not Drizzle (SB-T06 review item 1): a fake
-// of the one `.from("knowledge_sources")` shape finalize uses, independent of the real pglite
-// row's Drizzle-tracked status (which only ever needs to hold values its own enum already has —
-// `uploading` lives solely in supabase/migrations, exercised by packages/db's pglite tests, not
-// packages/db/migrations, which this fixture runs on).
+// The claim and revert steps are tested directly against this fake; the status updates and chunk
+// inserts that follow (processKnowledgeSource, deleteKnowledgeSource — SB-T07, also on the service
+// client) proxy straight through to the same pglite db this file's own Drizzle asserts read, so a
+// row they touch is visible here and vice versa.
 type ClaimRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
 const fake = vi.hoisted(() => ({
   claimResult: { data: null as ClaimRow | null, error: null as { message: string } | null },
@@ -39,23 +43,43 @@ const fake = vi.hoisted(() => ({
 }));
 
 function from(table: string) {
+  if (table === "knowledge_chunks") {
+    return {
+      insert: async (rows: { project_id: string; source_id: string; content: string; embedding: number[] }[]) => {
+        await db
+          .insert(knowledgeChunks)
+          .values(rows.map((r) => ({ projectId: r.project_id, sourceId: r.source_id, content: r.content, embedding: r.embedding })));
+        return { error: null };
+      },
+    };
+  }
   if (table !== "knowledge_sources") throw new Error(`unexpected table ${table}`);
   return {
-    update(values: { status: string }) {
+    update(values: { status: "processing" | "uploading" | "ready" | "failed" }) {
+      if (values.status === "processing") {
+        // The atomic claim: processing only from uploading, once.
+        return { eq: () => ({ eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => fake.claimResult }) }) }) }) };
+      }
       if (values.status === "uploading") {
         // The best-effort revert on a storage-read failure: fire-and-forget, no select after it.
         return { eq: () => ({ eq: fake.revertEq }) };
       }
-      // The atomic claim: processing only from uploading, once.
+      // ready/failed: processKnowledgeSource's real status update, proxied to the real pglite row.
+      const status = values.status as "ready" | "failed";
       return {
-        eq: () => ({
-          eq: () => ({
-            eq: () => ({ select: () => ({ maybeSingle: async () => fake.claimResult }) }),
-          }),
-        }),
+        eq: async (_column: string, id: string) => {
+          await db.update(knowledgeSources).set({ status }).where(eq(knowledgeSources.id, id));
+          return { error: null };
+        },
       };
     },
     select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => fake.existingResult }) }) }),
+    delete: () => ({
+      eq: async (_column: string, id: string) => {
+        await db.delete(knowledgeSources).where(eq(knowledgeSources.id, id));
+        return { error: null };
+      },
+    }),
   };
 }
 vi.mock("../../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
@@ -76,6 +100,7 @@ afterAll(() => close());
 
 beforeEach(() => {
   state.userId = null;
+  state.owner = undefined;
   captureServerEvent.mockClear();
   readKnowledgeFile.mockReset();
   deleteKnowledgeFile.mockReset();
@@ -87,9 +112,12 @@ beforeEach(() => {
   fake.revertEq.mockClear();
 });
 
-const as = (userId: string | null) => {
+/** Signs in `userId`, with an owner client that sees `projectId` as theirs (null: another owner's). */
+function signIn(userId: string, projectId: string | null) {
   state.userId = userId;
-};
+  state.owner = fakeSupabase({ from: { projects: { data: projectId && { id: projectId } } } });
+}
+
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
 async function seedProject(ownerId: string, publicKey: string) {
@@ -140,7 +168,7 @@ describe("tenant isolation", () => {
   it("returns 404 for another owner's project", async () => {
     const projectId = await seedProject("owner_a", "pk_a1");
     const source = await seedSource(projectId);
-    as("owner_b");
+    signIn("owner_b", null);
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(404);
   });
@@ -149,7 +177,7 @@ describe("tenant isolation", () => {
 describe("not found", () => {
   it("returns 404 for an unknown source id", async () => {
     const projectId = await seedProject("owner_unknown", "pk_unknown");
-    as("owner_unknown");
+    signIn("owner_unknown", projectId);
     const res = await POST(request("00000000-0000-4000-8000-0000000000ff"), ctx(projectId));
     expect(res.status).toBe(404);
   });
@@ -158,7 +186,7 @@ describe("not found", () => {
     const projectId = await seedProject("owner_mismatch", "pk_mismatch");
     const otherProjectId = await seedProject("owner_mismatch2", "pk_mismatch2");
     const source = await seedSource(otherProjectId);
-    as("owner_mismatch");
+    signIn("owner_mismatch", projectId);
     // Not claimable (wrong project), and the fallback lookup is scoped to this project too, so it
     // finds nothing — same as an unknown id.
     const res = await POST(request(source.id), ctx(projectId));
@@ -168,7 +196,7 @@ describe("not found", () => {
   it("returns 404 for a pasted-text source (no file to finalize)", async () => {
     const projectId = await seedProject("owner_text", "pk_text");
     const source = await seedSource(projectId, { type: "text", storageKey: null });
-    as("owner_text");
+    signIn("owner_text", projectId);
     fake.existingResult = { data: { type: "text" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(404);
@@ -179,7 +207,7 @@ describe("already finalized", () => {
   it("rejects finalizing a source that isn't `uploading` any more", async () => {
     const projectId = await seedProject("owner_done", "pk_done");
     const source = await seedSource(projectId, { status: "ready" });
-    as("owner_done");
+    signIn("owner_done", projectId);
     fake.existingResult = { data: { type: "pdf" }, error: null };
     const res = await POST(request(source.id), ctx(projectId));
     expect(res.status).toBe(400);
@@ -190,7 +218,7 @@ describe("success", () => {
   it("accepts a real PDF, starts processing, and fires knowledge_added", async () => {
     const projectId = await seedProject("owner_ok", "pk_ok");
     const source = await seedSource(projectId, { title: "handbook.pdf" });
-    as("owner_ok");
+    signIn("owner_ok", projectId);
     claimable(source);
     readKnowledgeFile.mockResolvedValue(samplePdf);
 
@@ -214,7 +242,7 @@ describe("success", () => {
   it("accepts a plain text file (md/txt skip the PDF magic-byte check)", async () => {
     const projectId = await seedProject("owner_txt", "pk_txt");
     const source = await seedSource(projectId, { type: "txt", title: "notes.txt" });
-    as("owner_txt");
+    signIn("owner_txt", projectId);
     claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("Some notes."));
 
@@ -227,7 +255,7 @@ describe("refusals clean up the row and the object", () => {
   it("rejects and cleans up an empty object", async () => {
     const projectId = await seedProject("owner_empty", "pk_empty");
     const source = await seedSource(projectId);
-    as("owner_empty");
+    signIn("owner_empty", projectId);
     claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(0));
 
@@ -241,7 +269,7 @@ describe("refusals clean up the row and the object", () => {
   it("rejects and cleans up an oversized object", async () => {
     const projectId = await seedProject("owner_big", "pk_big");
     const source = await seedSource(projectId);
-    as("owner_big");
+    signIn("owner_big", projectId);
     claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.alloc(11 * 1024 * 1024));
 
@@ -253,7 +281,7 @@ describe("refusals clean up the row and the object", () => {
   it("rejects and cleans up a fake PDF (wrong magic bytes)", async () => {
     const projectId = await seedProject("owner_fake", "pk_fake");
     const source = await seedSource(projectId);
-    as("owner_fake");
+    signIn("owner_fake", projectId);
     claimable(source);
     readKnowledgeFile.mockResolvedValue(Buffer.from("not a real pdf"));
 
@@ -268,7 +296,7 @@ describe("storage read failure", () => {
   it("returns 400, keeps the source for a retry, and hands `uploading` back", async () => {
     const projectId = await seedProject("owner_readfail", "pk_readfail");
     const source = await seedSource(projectId);
-    as("owner_readfail");
+    signIn("owner_readfail", projectId);
     claimable(source);
     vi.spyOn(console, "error").mockImplementation(() => {});
     readKnowledgeFile.mockRejectedValue(new Error("object not found"));

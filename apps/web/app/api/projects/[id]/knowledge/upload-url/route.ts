@@ -1,17 +1,17 @@
-import { getOwnedProject } from "@askwell/db/queries";
 import {
   ERROR_CODES,
   KNOWLEDGE_FILE_TYPES,
   MAX_KNOWLEDGE_FILE_BYTES,
   PLAN_LIMITS,
   requestKnowledgeUploadRequestSchema,
-  type KnowledgeSource,
-  type Plan,
   type RequestKnowledgeUploadResponse,
 } from "@askwell/shared";
 import type { Enums } from "@askwell/db/types";
 import { createServiceClient } from "../../../../../../lib/supabase/service";
+import { toKnowledgeSource } from "../../../../../../lib/data/knowledge";
+import { getAccountPlan } from "../../../../../../lib/data/billing";
 import { randomUUID } from "node:crypto";
+import { getOwnedProject } from "../../../../../../lib/projects";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../../lib/projects/http";
 import { createKnowledgeUploadUrl, deleteKnowledgeFile, knowledgeFileKey } from "../../../../../../lib/storage";
 
@@ -31,10 +31,7 @@ const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 // is actually running, not abandoned — reclaiming that would delete a source mid-ingest.
 const ABANDONED_AFTER_MS = 2 * 60 * 60 * 1000;
 
-// `db:types` is generated from dev, which doesn't have this PR's `uploading` status until it
-// merges and the migration runs there (project.md's migration rule). It's real in the migration
-// itself; this bridges the gap so the service client's generic types still catch every other typo.
-const UPLOADING = "uploading" as unknown as Enums<"source_status">;
+const UPLOADING: Enums<"source_status"> = "uploading";
 
 async function reclaimAbandoned(service: ServiceClient, projectId: string): Promise<void> {
   const cutoff = new Date(Date.now() - ABANDONED_AFTER_MS).toISOString();
@@ -49,21 +46,25 @@ async function reclaimAbandoned(service: ServiceClient, projectId: string): Prom
     return;
   }
 
-  for (const row of (stale ?? []) as { id: string; storage_key: string | null }[]) {
-    await service.from("knowledge_sources").delete().eq("id", row.id);
-    if (row.storage_key) {
-      try {
-        await deleteKnowledgeFile(row.storage_key);
-      } catch (cleanupError) {
-        console.error(`Couldn't remove the abandoned object for source ${row.id}`, cleanupError);
-      }
+  for (const row of stale ?? []) {
+    // Scoped to `uploading` too: if finalize claimed this row between the select above and here,
+    // it's `processing` now and this delete matches nothing, instead of deleting it mid-ingest.
+    const { error: deleteError, count } = await service
+      .from("knowledge_sources")
+      .delete({ count: "exact" })
+      .eq("id", row.id)
+      .eq("status", UPLOADING);
+    if (deleteError) {
+      console.error(`Could not remove the abandoned reservation ${row.id}`, deleteError);
+      continue;
+    }
+    if (!count || row.storage_key === null) continue;
+    try {
+      await deleteKnowledgeFile(row.storage_key);
+    } catch (cleanupError) {
+      console.error(`Couldn't remove the abandoned object for source ${row.id}`, cleanupError);
     }
   }
-}
-
-async function getOwnerPlan(service: ServiceClient, ownerId: string): Promise<Plan> {
-  const { data } = await service.from("accounts").select("plan").eq("clerk_user_id", ownerId).maybeSingle();
-  return (data as { plan: Plan } | null)?.plan ?? "free";
 }
 
 function extensionType(fileName: string): (typeof KNOWLEDGE_FILE_TYPES)[keyof typeof KNOWLEDGE_FILE_TYPES] | null {
@@ -80,24 +81,12 @@ function sourceLimitReached(limit: number) {
   );
 }
 
-type ReservedRow = { id: string; title: string; type: string; status: string; created_at: string };
-
-function toKnowledgeSource(row: ReservedRow): KnowledgeSource {
-  return {
-    id: row.id,
-    title: row.title,
-    type: row.type as KnowledgeSource["type"],
-    status: row.status as KnowledgeSource["status"],
-    createdAt: new Date(row.created_at).toISOString(),
-  };
-}
-
 export async function POST(request: Request, { params }: Context) {
   const ownerId = await getOwnerId();
   if (!ownerId) return unauthorized();
 
   const { id: projectId } = await params;
-  if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
+  if (!(await getOwnedProject(projectId))) return projectNotFound();
 
   const parsed = requestKnowledgeUploadRequestSchema.safeParse(await readJson(request));
   if (!parsed.success) return invalidInput("A file name and size are required.");
@@ -112,7 +101,7 @@ export async function POST(request: Request, { params }: Context) {
   const service = createServiceClient();
   await reclaimAbandoned(service, projectId);
 
-  const limit = PLAN_LIMITS[await getOwnerPlan(service, ownerId)].knowledgeSourcesPerProject;
+  const limit = PLAN_LIMITS[await getAccountPlan()].knowledgeSourcesPerProject;
   const sourceId = randomUUID();
   const storageKey = knowledgeFileKey(projectId, sourceId);
 
@@ -143,7 +132,7 @@ export async function POST(request: Request, { params }: Context) {
   }
 
   return Response.json(
-    { source: toKnowledgeSource(row as ReservedRow), path: signed.path, token: signed.token } satisfies RequestKnowledgeUploadResponse,
+    { source: toKnowledgeSource(row), path: signed.path, token: signed.token } satisfies RequestKnowledgeUploadResponse,
     { status: 201 },
   );
 }

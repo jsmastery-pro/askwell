@@ -3,17 +3,22 @@ import { accounts, knowledgeChunks, knowledgeSources, projects } from "@askwell/
 import { MAX_KNOWLEDGE_FILE_BYTES } from "@askwell/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fakeSupabase } from "../../../../../lib/supabase/fake";
 import { createTestDb, type TestDb } from "../../../../../lib/widget-config/test-db";
 
 vi.mock("server-only", () => ({}));
 
-const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null }));
+const state = vi.hoisted(() => ({ db: undefined as unknown, userId: null as string | null, owner: undefined as unknown }));
 vi.mock("@askwell/db/client", () => ({
   get db() {
     return state.db;
   },
 }));
 vi.mock("@clerk/nextjs/server", () => ({ auth: async () => ({ userId: state.userId }) }));
+// Ownership (lib/projects) and the plan (lib/data/billing) both read through the owner client
+// (RLS); which rows RLS lets an owner see is tested against the real migrations on pglite
+// (packages/db), so here another owner's project is simply a row the fake doesn't return.
+vi.mock("../../../../../lib/supabase/owner", () => ({ createOwnerClient: () => state.owner }));
 
 const embedTexts = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/ai", () => ({ embedTexts }));
@@ -21,17 +26,10 @@ vi.mock("../../../../../lib/ai", () => ({ embedTexts }));
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/posthog/server", () => ({ captureServerEvent }));
 
-// Reservation now goes through the service client's rpc("reserve_knowledge_source") (SB-T06).
-// This fake re-implements the real Postgres function's count+limit+insert, over the SAME pglite
-// db processKnowledgeSource (still Drizzle on this branch) reads and writes — same FOR UPDATE
-// lock the real function uses, so the existing concurrency test still holds.
-const fake = vi.hoisted(() => ({ account: null as { plan: string } | null }));
-
-function from(table: string) {
-  if (table === "accounts") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fake.account, error: null }) }) }) };
-  throw new Error(`unexpected table ${table}`);
-}
-
+// Reservation goes through the service client's rpc("reserve_knowledge_source") (SB-T06). This
+// fake re-implements the real Postgres function's count+limit+insert, over the SAME pglite db
+// processKnowledgeSource (still Drizzle on this branch) reads and writes — same FOR UPDATE lock
+// the real function uses, so the existing concurrency test still holds.
 async function rpc(name: string, args: Record<string, unknown>) {
   if (name !== "reserve_knowledge_source") throw new Error(`unexpected rpc ${name}`);
   const projectId = args.p_project_id as string;
@@ -52,7 +50,7 @@ async function rpc(name: string, args: Record<string, unknown>) {
     error: null,
   };
 }
-vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
+vi.mock("../../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ rpc }) }));
 
 const { POST } = await import("./route");
 
@@ -68,21 +66,23 @@ afterAll(() => close());
 
 beforeEach(() => {
   state.userId = null;
-  fake.account = null;
+  state.owner = undefined;
   captureServerEvent.mockClear();
   embedTexts.mockReset();
   embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
 });
 
-const as = (userId: string | null) => {
+/** Signs in `userId`, with an owner client that sees `projectId` as theirs (null: another owner's). */
+function signIn(userId: string, projectId: string | null, plan: "free" | "pro" = "free") {
   state.userId = userId;
-};
+  state.owner = fakeSupabase({ from: { projects: { data: projectId && { id: projectId } }, accounts: { data: { plan } } } });
+}
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
 async function seedProject(ownerId: string, plan: "free" | "pro", publicKey: string) {
   await db.insert(accounts).values({ clerkUserId: ownerId, plan }).onConflictDoNothing();
   const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
-  fake.account = { plan };
+  signIn(ownerId, project!.id, plan);
   return project!.id;
 }
 
@@ -104,7 +104,7 @@ describe("unauthenticated", () => {
 describe("tenant isolation", () => {
   it("returns 404 for another owner's project", async () => {
     const projectId = await seedProject("owner_a", "free", "pk_a1");
-    as("owner_b");
+    signIn("owner_b", null);
     const res = await POST(jsonRequest({ type: "text", title: "t", content: "c" }), ctx(projectId));
     expect(res.status).toBe(404);
     expect((await res.json()).error.code).toBe("not_found");
@@ -114,7 +114,6 @@ describe("tenant isolation", () => {
 describe("pasted text", () => {
   it("creates a processing source and produces chunks in the background", async () => {
     const projectId = await seedProject("owner_text", "free", "pk_text");
-    as("owner_text");
 
     const res = await POST(jsonRequest({ type: "text", title: "Pricing FAQ", content: "We charge $10/month." }), ctx(projectId));
     const body = await res.json();
@@ -132,14 +131,12 @@ describe("pasted text", () => {
 
   it("rejects blank content with 400", async () => {
     const projectId = await seedProject("owner_text2", "free", "pk_text2");
-    as("owner_text2");
     const res = await POST(jsonRequest({ type: "text", title: "t", content: "" }), ctx(projectId));
     expect(res.status).toBe(400);
   });
 
   it("rejects pasted text over the MAX_KNOWLEDGE_FILE_BYTES cap with 400", async () => {
     const projectId = await seedProject("owner_text3", "free", "pk_text3");
-    as("owner_text3");
     const tooBig = "a".repeat(MAX_KNOWLEDGE_FILE_BYTES + 1);
     const res = await POST(jsonRequest({ type: "text", title: "t", content: tooBig }), ctx(projectId));
     expect(res.status).toBe(400);
@@ -147,7 +144,6 @@ describe("pasted text", () => {
 
   it("refuses a 4th source on Free with 403 plan_limit", async () => {
     const projectId = await seedProject("owner_limit", "free", "pk_limit");
-    as("owner_limit");
     for (let i = 0; i < 3; i++) {
       const res = await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
       expect(res.status).toBe(201);
@@ -161,7 +157,6 @@ describe("pasted text", () => {
 
   it("allows more sources on Pro", async () => {
     const projectId = await seedProject("owner_pro", "pro", "pk_pro");
-    as("owner_pro");
     for (let i = 0; i < 4; i++) {
       const res = await POST(jsonRequest({ type: "text", title: `t${i}`, content: `content ${i}` }), ctx(projectId));
       expect(res.status).toBe(201);
@@ -170,7 +165,6 @@ describe("pasted text", () => {
 
   it("keeps an existing project's sources over the new limit, but refuses more", async () => {
     const projectId = await seedProject("owner_over", "free", "pk_over");
-    as("owner_over");
     for (let i = 0; i < 5; i++) {
       await db.insert(knowledgeSources).values({ projectId, title: `old ${i}`, type: "text", status: "ready" });
     }
@@ -181,7 +175,6 @@ describe("pasted text", () => {
 
   it("never lets concurrent pasted texts exceed the Free plan's 3-source limit", async () => {
     const projectId = await seedProject("owner_text_race", "free", "pk_text_race");
-    as("owner_text_race");
     const responses = await Promise.all(
       Array.from({ length: 6 }, (_, i) => POST(jsonRequest({ type: "text", title: `t${i}`, content: `c ${i}` }), ctx(projectId))),
     );
@@ -193,7 +186,6 @@ describe("pasted text", () => {
 describe("request size", () => {
   it("returns 413 on a Content-Length over the limit, before reading the body", async () => {
     const projectId = await seedProject("owner_big", "free", "pk_big");
-    as("owner_big");
     const request = jsonRequest({ type: "text", title: "t", content: "small" }, { "content-length": String(11 * 1024 * 1024) });
     const json = vi.spyOn(request, "json");
 
@@ -205,7 +197,6 @@ describe("request size", () => {
 
   it("allows a request plus JSON overhead through to the normal checks", async () => {
     const projectId = await seedProject("owner_edge", "free", "pk_edge");
-    as("owner_edge");
     const request = jsonRequest(
       { type: "text", title: "t", content: "small" },
       { "content-length": String(MAX_KNOWLEDGE_FILE_BYTES + 1024) },
@@ -217,7 +208,6 @@ describe("request size", () => {
 describe("knowledge_added", () => {
   it("fires for pasted text with type text", async () => {
     const projectId = await seedProject("owner_ev_text", "free", "pk_ev_text");
-    as("owner_ev_text");
     const res = await POST(jsonRequest({ type: "text", title: "FAQ", content: "Hours: 9-5." }), ctx(projectId));
     expect(res.status).toBe(201);
     expect(captureServerEvent).toHaveBeenCalledExactlyOnceWith("owner_ev_text", "knowledge_added", {
@@ -228,7 +218,6 @@ describe("knowledge_added", () => {
 
   it("doesn't fire when the add fails", async () => {
     const projectId = await seedProject("owner_ev_fail", "free", "pk_ev_fail");
-    as("owner_ev_fail");
     expect((await POST(jsonRequest({ type: "text", title: "t", content: "" }), ctx(projectId))).status).toBe(400);
     expect(captureServerEvent).not.toHaveBeenCalled();
   });
@@ -237,7 +226,6 @@ describe("knowledge_added", () => {
 describe("content type", () => {
   it("rejects a request that isn't JSON, including multipart (files go through the upload flow instead)", async () => {
     const projectId = await seedProject("owner_badtype", "free", "pk_badtype");
-    as("owner_badtype");
     const form = new FormData();
     form.set("file", new Blob(["x"]), "doc.txt");
     const res = await POST(new Request("https://app.test/api/projects/x/knowledge", { method: "POST", body: form }), ctx(projectId));
@@ -246,7 +234,6 @@ describe("content type", () => {
 
   it("rejects plain text", async () => {
     const projectId = await seedProject("owner_badtype2", "free", "pk_badtype2");
-    as("owner_badtype2");
     const res = await POST(
       new Request("https://app.test/api/projects/x/knowledge", {
         method: "POST",

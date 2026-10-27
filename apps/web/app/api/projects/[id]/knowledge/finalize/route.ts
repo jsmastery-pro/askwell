@@ -5,13 +5,14 @@ import {
   type AddKnowledgeResponse,
   type KnowledgeSource,
 } from "@askwell/shared";
-import { getOwnedProject } from "@askwell/db/queries";
-import type { Enums } from "@askwell/db/types";
+import type { Enums, Tables } from "@askwell/db/types";
 import { createServiceClient } from "../../../../../../lib/supabase/service";
+import { toKnowledgeSource } from "../../../../../../lib/data/knowledge";
 import { runAfterResponse } from "../../../../../../lib/knowledge/background";
 import { extractFileText, hasPdfMagicBytes } from "../../../../../../lib/knowledge/extract";
 import { deleteKnowledgeSource, processKnowledgeSource } from "../../../../../../lib/knowledge";
 import { captureServerEvent } from "../../../../../../lib/posthog/server";
+import { getOwnedProject } from "../../../../../../lib/projects";
 import { errorResponse, getOwnerId, invalidInput, projectNotFound, readJson, unauthorized } from "../../../../../../lib/projects/http";
 import { deleteKnowledgeFile, readKnowledgeFile } from "../../../../../../lib/storage";
 
@@ -26,22 +27,9 @@ const MAX_FILE_MB = MAX_KNOWLEDGE_FILE_BYTES / (1024 * 1024);
 const uploadNotFound = () => errorResponse(ERROR_CODES.notFound, "Upload not found.", 404);
 const alreadyFinalized = () => invalidInput("This upload was already finalized.");
 
-type ClaimedRow = { id: string; title: string; type: string; storage_key: string; status: string; created_at: string };
+type ClaimedRow = Pick<Tables<"knowledge_sources">, "id" | "title" | "type" | "storage_key" | "status" | "created_at">;
 
-// `db:types` is generated from dev, which doesn't have this PR's `uploading` status until it
-// merges and the migration runs there (project.md's migration rule). It's real in the migration
-// itself; this bridges the gap so the service client's generic types still catch every other typo.
-const UPLOADING = "uploading" as unknown as Enums<"source_status">;
-
-function toKnowledgeSource(row: ClaimedRow): KnowledgeSource {
-  return {
-    id: row.id,
-    title: row.title,
-    type: row.type as KnowledgeSource["type"],
-    status: row.status as KnowledgeSource["status"],
-    createdAt: new Date(row.created_at).toISOString(),
-  };
-}
+const UPLOADING: Enums<"source_status"> = "uploading";
 
 type ClaimResult =
   | { outcome: "claimed"; row: ClaimedRow }
@@ -64,7 +52,7 @@ async function claimForFinalize(service: ServiceClient, sourceId: string, projec
     .select("id, title, type, storage_key, status, created_at")
     .maybeSingle();
   if (error) throw error;
-  if (claimed) return { outcome: "claimed", row: claimed as ClaimedRow };
+  if (claimed) return { outcome: "claimed", row: claimed };
 
   // No row was flipped: find out why, scoped to this project so we never confirm another
   // tenant's source id. Pasted text is never `uploading`, so it lands here too (same 404 as
@@ -96,7 +84,7 @@ export async function POST(request: Request, { params }: Context) {
   if (!ownerId) return unauthorized();
 
   const { id: projectId } = await params;
-  if (!(await getOwnedProject(projectId, ownerId))) return projectNotFound();
+  if (!(await getOwnedProject(projectId))) return projectNotFound();
 
   const parsed = finalizeKnowledgeUploadRequestSchema.safeParse(await readJson(request));
   if (!parsed.success) return invalidInput("A source id is required.");
@@ -107,10 +95,12 @@ export async function POST(request: Request, { params }: Context) {
   if (result.outcome === "already_finalized") return alreadyFinalized();
   const { row } = result;
   const type = row.type as Exclude<KnowledgeSource["type"], "text">;
+  // Only a file upload is ever claimed from `uploading`; pasted text never has a storage key.
+  const storageKey = row.storage_key!;
 
   let buffer: Buffer;
   try {
-    buffer = await readKnowledgeFile(row.storage_key);
+    buffer = await readKnowledgeFile(storageKey);
   } catch (error) {
     console.error(`Could not read the uploaded object for source ${row.id}`, error);
     // Nothing was read, so ingest never started — no double-billing risk here. Hand the
@@ -120,12 +110,12 @@ export async function POST(request: Request, { params }: Context) {
     return errorResponse(ERROR_CODES.invalidInput, "The upload didn't complete. Try again.", 400);
   }
 
-  if (buffer.byteLength === 0) return refuse(row.id, row.storage_key, "The upload didn't complete. Try again.", 400);
+  if (buffer.byteLength === 0) return refuse(row.id, storageKey, "The upload didn't complete. Try again.", 400);
   if (buffer.byteLength > MAX_KNOWLEDGE_FILE_BYTES) {
-    return refuse(row.id, row.storage_key, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
+    return refuse(row.id, storageKey, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
   }
   if (type === "pdf" && !hasPdfMagicBytes(buffer)) {
-    return refuse(row.id, row.storage_key, "The file is not a valid PDF.", 400);
+    return refuse(row.id, storageKey, "The file is not a valid PDF.", 400);
   }
 
   captureServerEvent(ownerId, "knowledge_added", { project_id: projectId, type });
