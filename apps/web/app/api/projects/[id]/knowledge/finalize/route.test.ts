@@ -31,6 +31,19 @@ const readKnowledgeFile = vi.hoisted(() => vi.fn());
 const deleteKnowledgeFile = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../lib/storage", () => ({ readKnowledgeFile, deleteKnowledgeFile }));
 
+// deleteKnowledgeSource is still Drizzle-backed on this branch (SB-T07 moves it to the service
+// client); a spy that calls through to the real implementation by default lets one test (refuse's
+// delete-failure path) make it throw without touching the others, which rely on it really deleting
+// the row.
+const deleteKnowledgeSource = vi.hoisted(() => vi.fn());
+vi.mock("../../../../../../lib/knowledge", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../../../lib/knowledge")>();
+  return { ...actual, deleteKnowledgeSource };
+});
+const actualDeleteKnowledgeSource = (
+  await vi.importActual<typeof import("../../../../../../lib/knowledge")>("../../../../../../lib/knowledge")
+).deleteKnowledgeSource;
+
 // The claim and revert steps are tested directly against this fake; the status updates and chunk
 // inserts that follow (processKnowledgeSource, deleteKnowledgeSource — SB-T07, also on the service
 // client) proxy straight through to the same pglite db this file's own Drizzle asserts read, so a
@@ -110,6 +123,8 @@ beforeEach(() => {
   fake.claimResult = { data: null, error: null };
   fake.existingResult = { data: null, error: null };
   fake.revertEq.mockClear();
+  deleteKnowledgeSource.mockReset();
+  deleteKnowledgeSource.mockImplementation(actualDeleteKnowledgeSource);
 });
 
 /** Signs in `userId`, with an owner client that sees `projectId` as theirs (null: another owner's). */
@@ -289,6 +304,24 @@ describe("refusals clean up the row and the object", () => {
     expect(res.status).toBe(400);
     expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(0);
     expect(deleteKnowledgeFile).toHaveBeenCalledWith("projects/p/s");
+  });
+
+  it("hands the row back to `uploading` and returns 500 when the row delete itself fails", async () => {
+    const projectId = await seedProject("owner_delfail", "pk_delfail");
+    const source = await seedSource(projectId);
+    signIn("owner_delfail", projectId);
+    claimable(source);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    readKnowledgeFile.mockResolvedValue(Buffer.alloc(0));
+    deleteKnowledgeSource.mockRejectedValueOnce(new Error("db down"));
+
+    const res = await POST(request(source.id), ctx(projectId));
+
+    expect(res.status).toBe(500);
+    // The row is untouched (never reached the real pglite delete) and the object is never removed.
+    expect(await db.select().from(knowledgeSources).where(eq(knowledgeSources.id, source.id))).toHaveLength(1);
+    expect(deleteKnowledgeFile).not.toHaveBeenCalled();
+    expect(fake.revertEq).toHaveBeenCalledWith("status", "processing");
   });
 });
 

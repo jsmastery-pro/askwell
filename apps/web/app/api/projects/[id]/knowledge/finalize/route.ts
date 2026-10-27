@@ -67,10 +67,16 @@ async function claimForFinalize(service: ServiceClient, sourceId: string, projec
   return { outcome: "already_finalized" };
 }
 
-async function refuse(sourceId: string, storageKey: string, message: string, status: number) {
-  // The row goes first, same order as a real delete (P3-T03 notes): if this throws, the source
-  // and object are both untouched and finalize can be retried.
-  await deleteKnowledgeSource(sourceId);
+async function refuse(service: ServiceClient, sourceId: string, storageKey: string, message: string, status: number) {
+  // The row goes first, same order as a real delete (P3-T03 notes). The row is already
+  // `processing` here, so on failure hand `uploading` back so finalize can be retried.
+  try {
+    await deleteKnowledgeSource(sourceId);
+  } catch (error) {
+    console.error(`Could not remove the rejected source ${sourceId}`, error);
+    await service.from("knowledge_sources").update({ status: UPLOADING }).eq("id", sourceId).eq("status", "processing");
+    return errorResponse(ERROR_CODES.internal, "Could not reject the upload. Try again.", 500);
+  }
   try {
     await deleteKnowledgeFile(storageKey);
   } catch (error) {
@@ -110,12 +116,12 @@ export async function POST(request: Request, { params }: Context) {
     return errorResponse(ERROR_CODES.invalidInput, "The upload didn't complete. Try again.", 400);
   }
 
-  if (buffer.byteLength === 0) return refuse(row.id, storageKey, "The upload didn't complete. Try again.", 400);
+  if (buffer.byteLength === 0) return refuse(service, row.id, storageKey, "The upload didn't complete. Try again.", 400);
   if (buffer.byteLength > MAX_KNOWLEDGE_FILE_BYTES) {
-    return refuse(row.id, storageKey, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
+    return refuse(service, row.id, storageKey, `The file is too large. Max ${MAX_FILE_MB} MB.`, 413);
   }
   if (type === "pdf" && !hasPdfMagicBytes(buffer)) {
-    return refuse(row.id, storageKey, "The file is not a valid PDF.", 400);
+    return refuse(service, row.id, storageKey, "The file is not a valid PDF.", 400);
   }
 
   captureServerEvent(ownerId, "knowledge_added", { project_id: projectId, type });
