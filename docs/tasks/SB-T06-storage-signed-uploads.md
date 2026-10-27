@@ -5,7 +5,7 @@
 | Owner | Alice |
 | Track | Supabase-native |
 | Needs first | SB-T03 (`reserve_knowledge_source`); SB-T04's `createServiceClient()` (see Notes) |
-| Files allowed | `supabase/migrations/**` (new migration: bucket + storage policies), `apps/web/lib/storage/**`, `apps/web/app/api/projects/[id]/knowledge/**` (new upload-URL and finalize routes), `apps/web/components/knowledge/**`, `apps/web/lib/data/knowledge-actions.ts` and its test (the client's upload calls), `packages/db/supabase-functions-owner.test.ts` (status only), `packages/shared/src/knowledge.ts` (back to 10 MB), `apps/web/components/landing/Hero.tsx` and `docs/askwell-knowledge.md` (size wording), co-located tests |
+| Files allowed | `supabase/migrations/**` (new migration: bucket + storage policies), `apps/web/lib/storage/**`, `apps/web/app/api/projects/[id]/knowledge/**` (new upload-URL and finalize routes), `apps/web/components/knowledge/**`, `apps/web/lib/data/knowledge-actions.ts` and its test (the client's upload calls), `packages/db/supabase-functions-owner.test.ts` (status only), `packages/shared/src/knowledge.ts` (back to 10 MB), `apps/web/components/landing/Hero.tsx` and `docs/askwell-knowledge.md` (size wording), `apps/web/lib/projects/index.ts` (`removeProjectFiles` only: call `lib/storage`; added after SB-T04, #95), co-located tests |
 | project.md | §6.4, §9 File upload |
 
 ## Why
