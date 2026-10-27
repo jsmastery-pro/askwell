@@ -21,6 +21,39 @@ vi.mock("../../../../../lib/ai", () => ({ embedTexts }));
 const captureServerEvent = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../lib/posthog/server", () => ({ captureServerEvent }));
 
+// Reservation now goes through the service client's rpc("reserve_knowledge_source") (SB-T06).
+// This fake re-implements the real Postgres function's count+limit+insert, over the SAME pglite
+// db processKnowledgeSource (still Drizzle on this branch) reads and writes — same FOR UPDATE
+// lock the real function uses, so the existing concurrency test still holds.
+const fake = vi.hoisted(() => ({ account: null as { plan: string } | null }));
+
+function from(table: string) {
+  if (table === "accounts") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fake.account, error: null }) }) }) };
+  throw new Error(`unexpected table ${table}`);
+}
+
+async function rpc(name: string, args: Record<string, unknown>) {
+  if (name !== "reserve_knowledge_source") throw new Error(`unexpected rpc ${name}`);
+  const projectId = args.p_project_id as string;
+  const limit = args.p_source_limit as number;
+  const row = await db.transaction(async (tx) => {
+    await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).for("update");
+    const existing = await tx.select({ id: knowledgeSources.id }).from(knowledgeSources).where(eq(knowledgeSources.projectId, projectId));
+    if (existing.length >= limit) return null;
+    const [inserted] = await tx
+      .insert(knowledgeSources)
+      .values({ projectId, title: args.p_title as string, type: "text", status: "processing" })
+      .returning();
+    return inserted!;
+  });
+  if (!row) return { data: null, error: { code: "AWLIM" } };
+  return {
+    data: { id: row.id, title: row.title, type: row.type, status: row.status, created_at: row.createdAt.toISOString() },
+    error: null,
+  };
+}
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
+
 const { POST } = await import("./route");
 
 let db: TestDb;
@@ -35,6 +68,7 @@ afterAll(() => close());
 
 beforeEach(() => {
   state.userId = null;
+  fake.account = null;
   captureServerEvent.mockClear();
   embedTexts.mockReset();
   embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => Array(1536).fill(0.1)));
@@ -48,6 +82,7 @@ const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 async function seedProject(ownerId: string, plan: "free" | "pro", publicKey: string) {
   await db.insert(accounts).values({ clerkUserId: ownerId, plan }).onConflictDoNothing();
   const [project] = await db.insert(projects).values({ ownerId, name: "Docs", publicKey }).returning();
+  fake.account = { plan };
   return project!.id;
 }
 
