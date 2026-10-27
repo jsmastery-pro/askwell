@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | SB-T03 and SB-T11, merged and applied to dev |
-| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only), `supabase/migrations/**` (one new migration: `owner_activity`), `packages/db/supabase-*.test.ts` (its tests), co-located tests |
+| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only), `supabase/migrations/**` (one new migration: `owner_activity`), `packages/db/package.json` (`exports` entry `"./types"` only), `packages/db/supabase-*.test.ts` (its tests), co-located tests |
 | project.md | §6.3, §6.7, §6.8, §6.12, §9 |
 
 ## Steps
