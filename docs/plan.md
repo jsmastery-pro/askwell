@@ -219,7 +219,7 @@ Lane B (Customize) added once a developer is free for it.
 | P6-T04 | Responsive + empty-state polish | Bob | P6-T03 | done | #81 |
 | P6-T06 | Fix the landing "Install in one line" section | Bob | P6-T03, P6-T04 | done | #83 |
 | P6-T07 | Landing nav knows you're signed in | Bob | — | done | #90 |
-| P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05, SB-T01…T10 | todo | — |
+| P6-T05 | Launch check: core flow on Vercel production | Product owner | P6-T02, P6-T03, P6-T04, P6-T06, MV-T01…T05, SB-T01…T11 | todo | — |
 
 > **Missing `ARCJET_KEY` (2026-10-18, product owner):** in production, the chat route returns 503 when the key is unset. Arcjet outages still fail open. Built in P6-T02.
 
@@ -264,9 +264,10 @@ Lane B (Customize) added once a developer is free for it.
 | SB-T01 | Clerk ↔ Supabase, Data API on, keys, MCP (dev only), agent skills | Product owner | — | todo | — |
 | SB-T10 | Spike: local Supabase + MCP inside the sandboxes | Alice | — | in progress | — (local Supabase: no, the image pull broke the sandbox disks; MCP check waits on SB-T01) |
 | SB-T02 | Supabase schema and RLS policies (types move to SB-T03) | Bob | — | merge-ready | #92 |
-| SB-T03 | Postgres functions for atomic operations (`rpc()`), generated types | Bob | SB-T02 | todo | — |
-| SB-T04 | Owner side on `supabase-js` + RLS | Bob | SB-T03 | todo | — |
-| SB-T05 | Widget, chat, billing webhook on `supabase-js` + `rpc()` | Alice | SB-T03 | todo | — |
+| SB-T03 | Postgres functions: project and knowledge limits (`rpc()`) | Bob | SB-T02 | todo | — |
+| SB-T11 | Postgres functions: chat quota, chat save, chunk search (`rpc()`) | Alice | SB-T02 | todo | — |
+| SB-T04 | Generated types; owner side on `supabase-js` + RLS | Bob | SB-T03, SB-T11 (on dev) | todo | — |
+| SB-T05 | Widget, chat, billing webhook on `supabase-js` + `rpc()` | Alice | SB-T04, SB-T11 | todo | — |
 | SB-T06 | Storage with direct signed uploads; 10 MB | Alice | SB-T03 | todo | — |
 | SB-T07 | Knowledge processing on Supabase | Alice | SB-T05, SB-T06 | todo | — |
 | SB-T08 | Remove Drizzle, pg, S3 SDK, old env (pglite stays for tests) | Bob | SB-T04…T07 | todo | — |

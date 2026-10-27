@@ -1,36 +1,36 @@
-# SB-T03 — Postgres functions for atomic operations (`rpc()`) and generated types
+# SB-T03 — Postgres functions: project and knowledge limits (`rpc()`)
 
 | Field | Value |
 |---|---|
 | Owner | Bob |
 | Track | Supabase-native |
-| Needs first | SB-T02 |
-| Files allowed | `supabase/migrations/**` (new migration), tests under `packages/db/**` (reusing `supabase-pglite.ts`), `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only) |
-| project.md | §5 Plans, §6.3, §6.4, §6.6, §9 |
+| Needs first | SB-T02 (#92) |
+| Files allowed | `supabase/migrations/**` (one new migration), `packages/db/supabase-functions-owner.test.ts` (new), `packages/db/supabase-pglite.ts` (additions only) |
+| project.md | §5 Plans, §6.3, §6.4, §9 |
 
 ## Goal
-Every operation that today relies on a transaction or row lock in TypeScript becomes one Postgres function, called with `supabase.rpc()`.
+The two owner-side operations that today rely on a row lock in TypeScript become Postgres functions, called with `supabase.rpc()`. SB-T11 (Alice) does the chat functions in parallel.
 
 ## Functions
 | Function | Replaces | Rules |
 |---|---|---|
-| `create_project(owner_id, name, public_key, project_limit)` | `lib/projects` count + insert under lock | Counts the owner's projects under a lock, inserts the project and its default widget config, and refuses when at the limit |
-| `reserve_knowledge_source(project_id, title, type, storage_key, source_limit)` | knowledge route's locked count + insert | Files and pasted text count together (M2) |
-| `consume_message(project_id, message_limit)` | quota reset + conditional `+1` in `lib/chat` | Resets the period when it's a month old; increments only while under the limit; returns whether it counted |
-| `save_chat_turn(project_id, conversation_id, visitor_id, question, reply, asked_at, replied_at)` | `lib/chat` save transaction | Creates the conversation when needed, saves both messages, and returns the conversation ID plus `first_chat` (decided under the project lock, as in #77) |
-| `match_chunks(project_id, query_embedding, match_count)` | `packages/db/queries/chunks.ts` | Cosine distance through the HNSW index; always one project only |
+| `create_project(owner_id, name, public_key, project_limit)` | `lib/projects` count + insert under lock | Locks the owner's `accounts` row, counts their projects, inserts the project and its default widget config, and refuses when at the limit |
+| `reserve_knowledge_source(project_id, title, type, storage_key, source_limit)` | knowledge route's locked count + insert | Locks the project row; files and pasted text count together (M2); inserts the source as `processing` |
 
-- **Limits come in as parameters** from our server, which reads the plan from `PLAN_LIMITS` in `packages/shared`. That keeps one source of truth.
-- So **`EXECUTE` is granted only to `service_role`**, and revoked from `public`, `anon` and `authenticated`. Owners can't call these with their own token and pass a bigger limit.
-- `security definer` only where needed, always with `set search_path = ''` and fully qualified names.
+## Rules for every function (same in SB-T11)
+- **Limits come in as parameters** from our server, which reads the plan from `PLAN_LIMITS` in `packages/shared`. One source of truth.
+- So **`EXECUTE` is granted only to `service_role`**, and revoked from `PUBLIC`, `anon` and `authenticated`. Owners can't call these with their own token and pass a bigger limit. Remember Supabase's default privileges grant EXECUTE on new `public` functions to all API roles: revoke explicitly.
+- `SECURITY INVOKER` unless there's a reason; if `SECURITY DEFINER`, always `SET search_path = ''`. Name every object with its schema.
+- Refusals are a result the server can map to our error codes (e.g. return a status, or raise with a known `SQLSTATE`), not a generic error. Say which in the PR.
 
 ## Done when
-- [ ] Each function has tests on pglite (SB-T02's helper), including at-limit refusals and a concurrency test for `consume_message` and `first_chat` once-only
-- [ ] A test proves `anon` and `authenticated` can't execute them
-- [ ] `packages/db/types.ts` generated from the **dev project** (`supabase gen types typescript --project-id pasgozggqtprenfgtghb`, or the MCP), plus a `pnpm db:types` script. Never `--local`.
+- [ ] Tests on pglite (SB-T02's helper), under both default-privilege modes: happy path, at-limit refusal, wrong project, and that a refused call inserts nothing
+- [ ] A test proves `anon` and `authenticated` can't execute either function, and `service_role` can
+- [ ] The PR lists each function: signature, security mode, grants, what it returns or raises
 - [ ] Checks pass
 
 ## Notes
 - CodeRabbit is required.
-- No local Supabase stack (decided 2026-10-27). Types need SB-T02's migration on dev. If it isn't there yet, open the PR with the functions and tests, and add the types once dev has the schema.
-- Concurrency on pglite: it runs one connection, so test the locking logic (at-limit refusal, `first_chat` once only) with sequential calls. The real concurrency check runs on dev after merge.
+- No local Supabase stack (decided 2026-10-27). pglite runs one connection, so test the lock logic with sequential calls. The real concurrency check runs on dev after merge.
+- Types are generated in SB-T04, once SB-T03 and SB-T11 are applied to dev.
+- Branch from `main` after #92 merges. If you start before, branch from `bob/SB-T02-schema-rls` and rebase onto `main` before opening the PR.

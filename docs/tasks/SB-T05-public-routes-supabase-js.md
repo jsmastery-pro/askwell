@@ -4,7 +4,7 @@
 |---|---|
 | Owner | Alice |
 | Track | Supabase-native |
-| Needs first | SB-T03, plus SB-T04's `lib/supabase` helpers (merge it first, or coordinate the file with Bob) |
+| Needs first | SB-T11, and SB-T04 merged (its `lib/supabase` helpers and generated types) |
 | Files allowed | `apps/web/lib/widget-config/**`, `apps/web/lib/chat/**`, `apps/web/app/api/widget/**`, `apps/web/app/api/clerk/webhook/**`, `apps/web/app/embed/page.tsx` (config lookup only), co-located tests |
 | project.md | §6.5, §6.6, §6.10, §9 |
 

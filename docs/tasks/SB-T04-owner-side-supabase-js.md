@@ -4,11 +4,12 @@
 |---|---|
 | Owner | Bob |
 | Track | Supabase-native |
-| Needs first | SB-T03 |
-| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, co-located tests |
+| Needs first | SB-T03 and SB-T11, merged and applied to dev |
+| Files allowed | `apps/web/lib/supabase/**` (new: client helpers), `apps/web/lib/data/**`, `apps/web/lib/projects/**`, `apps/web/lib/conversations/**`, `apps/web/app/dashboard/**` (data calls only), `apps/web/app/api/projects/**` (except `[id]/knowledge`), `apps/web/app/api/conversations/**`, `apps/web/app/api/knowledge/**`, `apps/web/package.json`, `pnpm-lock.yaml`, `packages/db/types.ts` (generated, new), `package.json` (`db:types` script only), co-located tests |
 | project.md | §6.3, §6.7, §6.8, §6.12, §9 |
 
 ## Steps
+0. **Types:** `packages/db/types.ts` generated from the **dev project** (`supabase gen types typescript --project-id pasgozggqtprenfgtghb`, or the MCP), plus a `pnpm db:types` script. Never `--local`. The clients below are typed with it.
 1. **`lib/supabase`:**
    - `createOwnerClient()`: server-side, sends the signed-in Clerk session token (`accessToken: async () => (await auth()).getToken()`), so RLS applies.
    - `createServiceClient()`: server-only, uses `SUPABASE_SECRET_KEY`. `import "server-only"`. Never imported by client code.
