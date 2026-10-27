@@ -312,6 +312,20 @@ describe.each([
       ]);
       expect(rows).toHaveLength(2);
     });
+
+    it("rejects a null or non-positive match_count with 22023, instead of LIMIT NULL returning every row", async () => {
+      await seedProject(db, PROJECT, "pk_a");
+      await actAsServiceRole(db);
+      await seedChunk(PROJECT, "ready", "a", 1);
+      for (const matchCount of [null, 0, -1]) {
+        const error = await refused(db, "SELECT * FROM match_chunks($1, $2::extensions.vector, $3)", [
+          PROJECT,
+          VECTOR_1536(1),
+          matchCount,
+        ]);
+        expect(error.code).toBe("22023");
+      }
+    });
   });
 
   describe("privileges", () => {

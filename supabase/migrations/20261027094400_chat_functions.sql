@@ -129,23 +129,33 @@ $$;
 -- (docs/security-review.md) stops the embedding call for a project with zero ready chunks, but
 -- searchChunks itself never filtered by source status, so a project with both a ready and a
 -- processing/failed source could still retrieve the latter's chunks. Filtering here closes that.
+-- A null or non-positive p_match_count would otherwise reach LIMIT as LIMIT NULL (every row) or
+-- LIMIT 0/negative silently, so it's guarded the same way as SB-T03's limit parameters: 22023.
 CREATE FUNCTION public.match_chunks(
   p_project_id uuid,
   p_query_embedding extensions.vector(1536),
   p_match_count integer
 )
 RETURNS TABLE (content text, distance double precision)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
 SET search_path = ''
 AS $$
+BEGIN
+  IF p_match_count IS NULL OR p_match_count < 1 THEN
+    RAISE EXCEPTION 'match count must be a positive integer, got %', p_match_count
+      USING ERRCODE = '22023';
+  END IF;
+
+  RETURN QUERY
   SELECT kc.content, (kc.embedding OPERATOR(extensions.<=>) p_query_embedding)::double precision AS distance
   FROM public.knowledge_chunks kc
   JOIN public.knowledge_sources ks ON ks.id = kc.source_id
   WHERE kc.project_id = p_project_id AND ks.status = 'ready'
   ORDER BY kc.embedding OPERATOR(extensions.<=>) p_query_embedding
   LIMIT p_match_count;
+END;
 $$;
 
 -- Grants ----------------------------------------------------------------------------------------
