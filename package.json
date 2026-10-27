@@ -14,7 +14,9 @@
     "test": "turbo run test",
     "build": "turbo run build",
     "db:generate": "pnpm --filter @askwell/db db:generate",
-    "db:migrate": "pnpm --filter @askwell/db db:migrate"
+    "db:migrate": "pnpm --filter @askwell/db db:migrate",
+    "supabase": "pnpm --filter @askwell/db exec supabase --workdir ../..",
+    "db:types": "pnpm --silent supabase gen types typescript --local --schema public > packages/db/types.ts"
   },
   "devDependencies": {
     "turbo": "catalog:",

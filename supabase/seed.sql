@@ -1,0 +1,2 @@
+-- Loaded by `supabase db reset` after the migrations. Intentionally empty: the RLS tests seed and
+-- roll back their own rows (packages/db/supabase-rls.test.ts), and dev data comes from using the app.
