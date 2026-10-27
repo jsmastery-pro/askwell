@@ -5,7 +5,7 @@
 | Owner | Bob |
 | Track | Supabase-native |
 | Needs first | SB-T04, SB-T05, SB-T06, SB-T07 |
-| Files allowed | `packages/db/**`, `apps/web/lib/widget-config/test-db.ts`, `package.json`, `apps/web/package.json`, `packages/db/package.json`, `pnpm-lock.yaml`, `.env.example`, any remaining test that still imports Drizzle |
+| Files allowed | `packages/db/**`, `apps/web/lib/widget-config/test-db.ts`, `package.json`, `apps/web/package.json`, `packages/db/package.json`, `pnpm-lock.yaml`, `.env.example`, `apps/web/next.config.ts` (only if it references removed packages), any remaining test that still imports Drizzle |
 | project.md | §3, §11 |
 
 ## Steps
@@ -27,3 +27,4 @@
 
 ## Notes
 - CodeRabbit is required.
+- **Started early (John, 2026-10-27):** SB-T04–T06 are merged and SB-T07 (#98) only waits on CodeRabbit. Don't touch `lib/knowledge`, the seed script or the two knowledge route tests until #98 merges, then rebase. Keep the Supabase CLI and `db:types`. `BUCKET_NAME` goes too (SB-T06 uses the `knowledge` bucket). Vercel's old env values stay until the product owner's prod cutover.
