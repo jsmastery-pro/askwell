@@ -1,14 +1,6 @@
 // @vitest-environment node
 import { WIDGET_DEFAULTS } from "@askwell/shared";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, seedProject, type TestDb } from "../../../../lib/widget-config/test-db";
-
-const state = vi.hoisted(() => ({ db: undefined as unknown }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
-  },
-}));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Arcjet is mocked at the SDK boundary (no network); the real limiter in lib/rate-limit runs.
 type Conclusion = "ALLOW" | "DENY" | "ERROR";
@@ -27,28 +19,44 @@ arcjet.protect.mockImplementation(async () => {
   };
 });
 
+// getWidgetConfigByKey runs through the service client (SB-T05): one fake project per key, keyed
+// the same way the route does (public_key -> project -> account + widget_configs).
+type Row = Record<string, unknown> | null;
+const fake = vi.hoisted(() => ({
+  projects: {} as Record<string, Row>,
+  account: null as Row,
+  config: null as Row,
+  throwOnLookup: false,
+}));
+
+function from(table: string) {
+  if (fake.throwOnLookup) throw new Error("database down");
+  if (table === "projects") {
+    return { select: () => ({ eq: (_col: string, key: string) => ({ maybeSingle: async () => ({ data: fake.projects[key] ?? null, error: null }) }) }) };
+  }
+  if (table === "accounts") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fake.account, error: null }) }) }) };
+  if (table === "widget_configs") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: fake.config, error: null }) }) }) };
+  throw new Error(`unexpected table ${table}`);
+}
+vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from }) }));
+
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
   // Requests arrive as on Vercel, which sets x-real-ip to the client IP.
   vi.stubEnv("VERCEL", "1");
   arcjet.conclusion = "ALLOW";
+  fake.projects = {
+    pk_free: { id: "proj_free", owner_id: "owner_free" },
+    pk_pro: { id: "proj_pro", owner_id: "owner_pro" },
+  };
+  fake.account = null;
+  fake.config = { button_color: "#ff0000", position: "bottom-right", label: null, animation: "fade", header_text: null, show_badge: false };
+  fake.throwOnLookup = false;
 });
 
 afterEach(() => vi.unstubAllEnvs());
 
 const { GET, OPTIONS } = await import("./route");
-
-let db: TestDb;
-let close: () => Promise<void>;
-
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
-  await seedProject(db, { plan: "free", publicKey: "pk_free", config: { buttonColor: "#ff0000", showBadge: false } });
-  await seedProject(db, { plan: "pro", publicKey: "pk_pro", config: { buttonColor: "#ff0000", showBadge: false } });
-});
-
-afterAll(() => close());
 
 let ip = 0;
 function get(key: string | null, clientIp = `10.0.0.${++ip}`) {
@@ -59,6 +67,7 @@ function get(key: string | null, clientIp = `10.0.0.${++ip}`) {
 
 describe("GET /api/widget/config", () => {
   it("returns a Free project's defaults with the badge, ignoring stored values", async () => {
+    fake.account = { plan: "free" };
     const res = await get("pk_free");
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
@@ -66,6 +75,7 @@ describe("GET /api/widget/config", () => {
   });
 
   it("returns a Pro project's stored values", async () => {
+    fake.account = { plan: "pro" };
     const { config } = await (await get("pk_pro")).json();
     expect(config.buttonColor).toBe("#ff0000");
     expect(config.showBadge).toBe(false);
@@ -119,22 +129,13 @@ describe("GET /api/widget/config", () => {
   });
 
   it("returns a JSON 500 with CORS when the lookup fails (L6)", async () => {
-    const realDb = state.db;
-    state.db = {
-      select: () => {
-        throw new Error("database down");
-      },
-    };
+    fake.throwOnLookup = true;
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      const res = await get("pk_pro");
-      expect(res.status).toBe(500);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(await res.json()).toEqual({ error: { code: "internal", message: "Something went wrong." } });
-    } finally {
-      state.db = realDb;
-      logged.mockRestore();
-    }
+    const res = await get("pk_pro");
+    expect(res.status).toBe(500);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(await res.json()).toEqual({ error: { code: "internal", message: "Something went wrong." } });
+    logged.mockRestore();
   });
 
   it("answers the CORS preflight", () => {

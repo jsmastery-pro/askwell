@@ -1,9 +1,7 @@
-import { accounts } from "@askwell/db";
-import { db as defaultDb } from "@askwell/db/client";
 import type { Plan } from "@askwell/shared";
+import { createServiceClient } from "../../../../lib/supabase/service";
 import { clerkClient } from "@clerk/nextjs/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
-import { and, eq, ne } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { captureServerEvent } from "../../../../lib/posthog/server";
 
@@ -12,14 +10,18 @@ export const dynamic = "force-dynamic";
 // The Clerk Billing plan slug for Pro (dashboard, test mode). Other plans' events are ignored.
 const PRO_PLAN_SLUG = "pro";
 
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
 /** True only when an account row actually changed plan, so a redelivered webhook is a no-op. */
-async function setPlan(clerkUserId: string, plan: Plan): Promise<boolean> {
-  const changed = await defaultDb
-    .update(accounts)
-    .set({ plan })
-    .where(and(eq(accounts.clerkUserId, clerkUserId), ne(accounts.plan, plan)))
-    .returning({ clerkUserId: accounts.clerkUserId });
-  return changed.length > 0;
+async function setPlan(service: ServiceClient, clerkUserId: string, plan: Plan): Promise<boolean> {
+  const { data, error } = await service
+    .from("accounts")
+    .update({ plan })
+    .eq("clerk_user_id", clerkUserId)
+    .neq("plan", plan)
+    .select("clerk_user_id");
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
 }
 
 type SubscriptionItem = { status: string; periodEnd: number | null; endedAt: number | null; plan: { slug: string } | null };
@@ -53,6 +55,8 @@ export async function POST(request: NextRequest) {
     return new Response("Webhook verification failed", { status: 400 });
   }
 
+  const service = createServiceClient();
+
   // The payer on a user-type subscription carries the Clerk user id (project.md §9 Webhook).
   if (event.type === "subscriptionItem.active" && event.data.plan?.slug === PRO_PLAN_SLUG) {
     const userId = event.data.payer?.user_id;
@@ -66,13 +70,13 @@ export async function POST(request: NextRequest) {
         return new Response("Subscription check failed", { status: 500 });
       }
       // Svix delivers at least once: only a real free → pro change counts as an upgrade.
-      if (active && (await setPlan(userId, "pro"))) captureServerEvent(userId, "upgraded", { plan: "pro" });
+      if (active && (await setPlan(service, userId, "pro"))) captureServerEvent(userId, "upgraded", { plan: "pro" });
     }
   } else if (event.type === "subscriptionItem.ended" && event.data.plan?.slug === PRO_PLAN_SLUG) {
     // Not "canceled": Clerk keeps Pro access through the paid period after a cancellation
     // request, so only the subscription actually ending should downgrade the account.
     const userId = event.data.payer?.user_id;
-    if (userId) await setPlan(userId, "free");
+    if (userId) await setPlan(service, userId, "free");
   }
 
   return Response.json({ received: true });

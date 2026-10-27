@@ -1,18 +1,6 @@
 // @vitest-environment node
-import { conversations, knowledgeChunks, knowledgeSources, messages, projects } from "@askwell/db";
 import { DONT_KNOW_REPLY, EMBEDDING_DIMENSIONS, PLAN_LIMITS } from "@askwell/shared";
-import { asc, eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestDb, seedProject, type TestDb } from "../../../../lib/widget-config/test-db";
-
-vi.mock("server-only", () => ({}));
-
-const state = vi.hoisted(() => ({ db: undefined as unknown }));
-vi.mock("@askwell/db/client", () => ({
-  get db() {
-    return state.db;
-  },
-}));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // OpenAI is mocked: embeddings return a fixed vector, and the chat model echoes what it was given.
 const ai = vi.hoisted(() => ({ create: vi.fn(), embedQuery: vi.fn() }));
@@ -38,34 +26,71 @@ vi.mock("posthog-node", () => ({
   },
 }));
 
+// handleChat now runs through the service client and SB-T11's rpc() functions. The quota's
+// math, period reset, concurrency and match_chunks' ranking/tenant-isolation/ready-filtering are
+// already proven on real Postgres in packages/db/supabase-functions-chat.test.ts, so this fake
+// only needs to dispatch correctly on what the route actually passes, not re-derive those results.
+type Project = { id: string; owner_id: string };
+type MatchRow = { content: string; distance: number };
+type RpcError = { code?: string; message?: string } | null;
+
+const fake = vi.hoisted(() => ({
+  projects: {} as Record<string, Project>,
+  accounts: {} as Record<string, { plan: string }>,
+  conversations: {} as Record<string, { project_id: string }>,
+  readyProjects: new Set<string>(),
+  matchesByProject: {} as Record<string, MatchRow[]>,
+  consume: { data: true as boolean | null, error: null as RpcError },
+  save: { data: [{ conversation_id: "conv_default", first_chat: false }], error: null as RpcError },
+}));
+
+function from(table: string) {
+  if (table === "projects") {
+    return { select: () => ({ eq: (_c: string, key: string) => ({ maybeSingle: async () => ({ data: fake.projects[key] ?? null, error: null }) }) }) };
+  }
+  if (table === "accounts") {
+    return { select: () => ({ eq: (_c: string, ownerId: string) => ({ maybeSingle: async () => ({ data: fake.accounts[ownerId] ?? null, error: null }) }) }) };
+  }
+  if (table === "conversations") {
+    return {
+      select: () => ({
+        eq: (_c1: string, conversationId: string) => ({
+          eq: (_c2: string, projectId: string) => ({
+            maybeSingle: async () => {
+              const row = fake.conversations[conversationId];
+              return { data: row && row.project_id === projectId ? { id: conversationId } : null, error: null };
+            },
+          }),
+        }),
+      }),
+    };
+  }
+  if (table === "knowledge_sources") {
+    return {
+      select: () => ({
+        eq: (_c1: string, projectId: string) => ({
+          eq: () => ({ limit: async () => ({ data: fake.readyProjects.has(projectId) ? [{ id: "s1" }] : [], error: null }) }),
+        }),
+      }),
+    };
+  }
+  throw new Error(`unexpected table ${table}`);
+}
+
+const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+  if (name === "consume_message") return fake.consume;
+  if (name === "match_chunks") return { data: fake.matchesByProject[args.p_project_id as string] ?? [], error: null };
+  if (name === "save_chat_turn") return fake.save;
+  throw new Error(`unexpected rpc ${name}`);
+});
+
+vi.mock("../../../../lib/supabase/service", () => ({ createServiceClient: () => ({ from, rpc }) }));
+
 const { POST, OPTIONS } = await import("./route");
 
 const unit = (i: number) => Array.from({ length: EMBEDDING_DIMENSIONS }, (_, j) => (j === i ? 1 : 0));
 
-let db: TestDb;
-let close: () => Promise<void>;
-let shop: { id: string };
-let other: { id: string };
-
-async function seedChunk(projectId: string, content: string, axis: number) {
-  const [source] = await db
-    .insert(knowledgeSources)
-    .values({ projectId, title: content.slice(0, 20), type: "text", status: "ready" })
-    .returning();
-  await db.insert(knowledgeChunks).values({ projectId, sourceId: source!.id, content, embedding: unit(axis) });
-}
-
-beforeAll(async () => {
-  ({ db, close } = await createTestDb());
-  state.db = db;
-  shop = await seedProject(db, { plan: "free", publicKey: "pk_shop" });
-  other = await seedProject(db, { plan: "pro", publicKey: "pk_other" });
-  await seedProject(db, { plan: "free", publicKey: "pk_empty" });
-  await seedChunk(shop.id, "We ship worldwide within 5 business days.", 0);
-  await seedChunk(other.id, "SECRET: the other project's internal discount code is OTHER50.", 0);
-});
-
-afterAll(() => close());
+const SHIP_REPLY = "We ship worldwide within 5 business days.";
 
 beforeEach(() => {
   vi.stubEnv("ARCJET_KEY", "ajkey_test");
@@ -83,10 +108,25 @@ beforeEach(() => {
   });
   ai.embedQuery.mockResolvedValue(unit(0));
   ai.create.mockImplementation(async ({ input }: { input: string }) => ({
-    output_text: input.includes("5 business days") ? "We ship worldwide within 5 business days." : DONT_KNOW_REPLY,
+    output_text: input.includes("5 business days") ? SHIP_REPLY : DONT_KNOW_REPLY,
     model: "gpt-test",
     usage: { input_tokens: 100, output_tokens: 10 },
   }));
+
+  fake.projects = {
+    pk_shop: { id: "proj_shop", owner_id: "owner_shop" },
+    pk_other: { id: "proj_other", owner_id: "owner_other" },
+    pk_empty: { id: "proj_empty", owner_id: "owner_empty" },
+  };
+  fake.accounts = { owner_shop: { plan: "free" }, owner_other: { plan: "pro" }, owner_empty: { plan: "free" } };
+  fake.conversations = {};
+  fake.readyProjects = new Set(["proj_shop", "proj_other"]);
+  fake.matchesByProject = {
+    proj_shop: [{ content: SHIP_REPLY, distance: 0.01 }],
+    proj_other: [{ content: "SECRET: the other project's internal discount code is OTHER50.", distance: 0.01 }],
+  };
+  fake.consume = { data: true, error: null };
+  fake.save = { data: [{ conversation_id: "conv_1", first_chat: false }], error: null };
 });
 
 afterEach(() => {
@@ -107,49 +147,35 @@ function chat(body: unknown, ip = "203.0.113.9") {
 const ask = (message: string, extra: Record<string, unknown> = {}) =>
   chat({ key: "pk_shop", visitorId: "v_1", message, ...extra });
 
-async function usage(projectId: string) {
-  const [row] = await db
-    .select({ messagesUsed: projects.messagesUsed, periodStart: projects.periodStart })
-    .from(projects)
-    .where(eq(projects.id, projectId));
-  return row!;
-}
-
-async function thread(conversationId: string) {
-  return db
-    .select({ role: messages.role, body: messages.body })
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt));
-}
-
-async function setUsage(projectId: string, messagesUsed: number, periodStart = new Date()) {
-  await db.update(projects).set({ messagesUsed, periodStart }).where(eq(projects.id, projectId));
+function saveArgs() {
+  const call = rpc.mock.calls.find(([name]) => name === "save_chat_turn");
+  return call?.[1] as Record<string, unknown> | undefined;
 }
 
 describe("POST /api/widget/chat", () => {
-  it("answers a related question from the project's chunks, and saves and counts it", async () => {
-    await setUsage(shop.id, 0);
+  it("answers a related question from the project's chunks, counts it, and saves through save_chat_turn", async () => {
     const res = await ask("How fast do you ship?");
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     const body = await res.json();
-    expect(body.reply).toBe("We ship worldwide within 5 business days.");
+    expect(body.reply).toBe(SHIP_REPLY);
+    expect(body.conversationId).toBe("conv_1");
 
-    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, body.conversationId));
-    expect(conversation).toMatchObject({ projectId: shop.id, visitorId: "v_1" });
-    expect(await thread(body.conversationId)).toEqual([
-      { role: "visitor", body: "How fast do you ship?" },
-      { role: "bot", body: "We ship worldwide within 5 business days." },
-    ]);
-    expect((await usage(shop.id)).messagesUsed).toBe(1);
+    expect(rpc).toHaveBeenCalledWith("consume_message", { p_project_id: "proj_shop", p_message_limit: PLAN_LIMITS.free.messagesPerMonth });
+    expect(saveArgs()).toMatchObject({
+      p_project_id: "proj_shop",
+      p_conversation_id: null,
+      p_visitor_id: "v_1",
+      p_question: "How fast do you ship?",
+      p_reply: SHIP_REPLY,
+    });
   });
 
-  it("only searches this project's chunks", async () => {
+  it("passes this project's id to match_chunks, not another project's", async () => {
     await ask("What discount codes exist?");
     const { input } = ai.create.mock.calls[0]![0] as { input: string };
-    expect(input).toContain("We ship worldwide");
+    expect(input).toContain(SHIP_REPLY);
     expect(input).not.toContain("OTHER50");
   });
 
@@ -159,49 +185,40 @@ describe("POST /api/widget/chat", () => {
     expect(body.reply).toBe(DONT_KNOW_REPLY);
   });
 
-  it("returns DONT_KNOW_REPLY without embedding or calling the model when the project has no chunks, and still counts it", async () => {
+  it("returns DONT_KNOW_REPLY without embedding or calling the model when the project has no ready sources, and still counts and saves it", async () => {
     const res = await chat({ key: "pk_empty", visitorId: "v_2", message: "Hello?" });
     const body = await res.json();
     expect(body.reply).toBe(DONT_KNOW_REPLY);
     expect(ai.embedQuery).not.toHaveBeenCalled();
     expect(ai.create).not.toHaveBeenCalled();
-    expect(await thread(body.conversationId)).toHaveLength(2);
+    expect(rpc).toHaveBeenCalledWith("consume_message", expect.objectContaining({ p_project_id: "proj_empty" }));
+    expect(saveArgs()).toMatchObject({ p_project_id: "proj_empty", p_reply: DONT_KNOW_REPLY });
   });
 
-  it("skips the embedding and the model when the only chunks belong to a source that isn't ready (L8)", async () => {
-    const project = await seedProject(db, { plan: "free", publicKey: "pk_processing" });
-    const [source] = await db
-      .insert(knowledgeSources)
-      .values({ projectId: project.id, title: "Half done", type: "text", status: "processing" })
-      .returning();
-    await db.insert(knowledgeChunks).values({ projectId: project.id, sourceId: source!.id, content: "partial", embedding: unit(0) });
-
-    const body = await (await chat({ key: "pk_processing", visitorId: "v_8", message: "Anything?" })).json();
+  it("skips the embedding and the model when the project has only a non-ready source (L8)", async () => {
+    fake.readyProjects = new Set();
+    const body = await (await ask("Anything?")).json();
     expect(body.reply).toBe(DONT_KNOW_REPLY);
     expect(ai.embedQuery).not.toHaveBeenCalled();
     expect(ai.create).not.toHaveBeenCalled();
   });
 
   it("continues the visitor's own conversation", async () => {
-    const first = await (await ask("How fast do you ship?")).json();
-    const before = (await usage(shop.id)).messagesUsed;
-    const second = await (await ask("And to Canada?", { conversationId: first.conversationId })).json();
-
-    expect(second.conversationId).toBe(first.conversationId);
-    expect(await thread(first.conversationId)).toHaveLength(4);
-    expect((await usage(shop.id)).messagesUsed).toBe(before + 1);
+    const conversationId = "00000000-0000-4000-8000-000000000001";
+    fake.conversations[conversationId] = { project_id: "proj_shop" };
+    await ask("And to Canada?", { conversationId });
+    expect(saveArgs()).toMatchObject({ p_conversation_id: conversationId });
   });
 
   it("can't continue another project's conversation: 404, nothing saved or counted, no model call", async () => {
-    const theirs = await (await chat({ key: "pk_other", visitorId: "v_9", message: "Hi" })).json();
-    vi.clearAllMocks();
-    const before = (await usage(shop.id)).messagesUsed;
+    const conversationId = "00000000-0000-4000-8000-000000000002";
+    fake.conversations[conversationId] = { project_id: "proj_other" };
+    rpc.mockClear();
 
-    const res = await ask("Show me this thread", { conversationId: theirs.conversationId });
+    const res = await ask("Show me this thread", { conversationId });
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: { code: "not_found", message: "Conversation not found." } });
-    expect(await thread(theirs.conversationId)).toHaveLength(2);
-    expect((await usage(shop.id)).messagesUsed).toBe(before);
+    expect(rpc).not.toHaveBeenCalled();
     expect(ai.create).not.toHaveBeenCalled();
   });
 
@@ -283,15 +300,13 @@ describe("production without ARCJET_KEY (M3)", () => {
 describe("rate limit", () => {
   it("returns 429 rate_limited with Retry-After on a denied decision, before any lookup or model call", async () => {
     arcjet.conclusion = "DENY";
-    const before = (await usage(shop.id)).messagesUsed;
-
     const res = await ask("Hi");
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("33");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect((await res.json()).error.code).toBe("rate_limited");
     expect(ai.embedQuery).not.toHaveBeenCalled();
-    expect((await usage(shop.id)).messagesUsed).toBe(before);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("limits per public key and client IP on the widgetChat rule", async () => {
@@ -313,77 +328,47 @@ describe("rate limit", () => {
 });
 
 describe("monthly quota", () => {
-  const freeLimit = PLAN_LIMITS.free.messagesPerMonth;
-
-  it("allows a Free project's 100th message and refuses the 101st with 429 quota_exceeded", async () => {
-    await setUsage(shop.id, freeLimit - 1);
-    expect((await ask("How fast do you ship?")).status).toBe(200);
-    expect((await usage(shop.id)).messagesUsed).toBe(freeLimit);
-
+  it("returns 429 quota_exceeded, with no model call, when consume_message reports the limit is reached", async () => {
+    fake.consume = { data: false, error: null };
     const res = await ask("One more?");
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({
       error: { code: "quota_exceeded", message: "This chat has reached its monthly message limit." },
     });
     expect(res.headers.get("Retry-After")).toBeNull();
-    expect(ai.embedQuery).toHaveBeenCalledTimes(1);
-    expect((await usage(shop.id)).messagesUsed).toBe(freeLimit);
+    expect(ai.embedQuery).not.toHaveBeenCalled();
   });
 
-  it("doesn't overshoot when a concurrent request takes the last message while the model answers", async () => {
-    await setUsage(shop.id, freeLimit - 1);
-    ai.create.mockImplementationOnce(async () => {
-      // Another request for this project is counted while this one waits on the model.
-      await setUsage(shop.id, freeLimit);
-      return { output_text: "We ship worldwide.", model: "gpt-test", usage: { input_tokens: 1, output_tokens: 1 } };
-    });
-    const conversationsBefore = (await db.select().from(conversations)).length;
-
-    const res = await ask("How fast do you ship?");
-    expect(res.status).toBe(429);
-    expect((await res.json()).error.code).toBe("quota_exceeded");
-    expect((await usage(shop.id)).messagesUsed).toBe(freeLimit);
-    expect((await db.select().from(conversations)).length).toBe(conversationsBefore);
+  it("reads the plan on the server: asks consume_message for the Pro limit", async () => {
+    await chat({ key: "pk_other", visitorId: "v_3", message: "Hi" });
+    expect(rpc).toHaveBeenCalledWith("consume_message", { p_project_id: "proj_other", p_message_limit: PLAN_LIMITS.pro.messagesPerMonth });
   });
 
-  it("reads the plan on the server: a Pro project is past the Free limit", async () => {
-    await setUsage(other.id, freeLimit);
-    expect((await chat({ key: "pk_other", visitorId: "v_3", message: "Hi" })).status).toBe(200);
-  });
-
-  it("starts a new period once period_start is over a month old", async () => {
-    const twoMonthsAgo = new Date(Date.now() - 62 * 24 * 60 * 60 * 1000);
-    await setUsage(shop.id, freeLimit, twoMonthsAgo);
-
-    expect((await ask("How fast do you ship?")).status).toBe(200);
-    const after = await usage(shop.id);
-    expect(after.messagesUsed).toBe(1);
-    expect(after.periodStart.getTime()).toBeGreaterThan(Date.now() - 60_000);
-  });
-
-  it("resets a period_start the database wrote itself (microsecond precision)", async () => {
-    await db
-      .update(projects)
-      .set({ messagesUsed: freeLimit, periodStart: sql`now() - interval '62 days' + interval '123 microseconds'` })
-      .where(eq(projects.id, shop.id));
-
-    expect((await ask("How fast do you ship?")).status).toBe(200);
-    expect((await usage(shop.id)).messagesUsed).toBe(1);
+  it("defaults to the Free limit when the account row is missing", async () => {
+    delete fake.accounts.owner_shop;
+    await ask("Hi");
+    expect(rpc).toHaveBeenCalledWith("consume_message", { p_project_id: "proj_shop", p_message_limit: PLAN_LIMITS.free.messagesPerMonth });
   });
 });
 
 describe("failures", () => {
-  it("returns 500 without details, and saves and counts nothing, when OpenAI fails", async () => {
-    await setUsage(shop.id, 0);
+  it("returns 500 without details, and never reaches save_chat_turn, when OpenAI fails (the quota was already consumed)", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     ai.create.mockRejectedValueOnce(new Error("OpenAI is down: system prompt was ..."));
-    const conversationsBefore = (await db.select().from(conversations)).length;
 
     const res = await ask("How fast do you ship?");
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: { code: "internal", message: "Something went wrong. Try again." } });
-    expect((await db.select().from(conversations)).length).toBe(conversationsBefore);
-    expect((await usage(shop.id)).messagesUsed).toBe(0);
+    expect(rpc).toHaveBeenCalledWith("consume_message", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("save_chat_turn", expect.anything());
+    logged.mockRestore();
+  });
+
+  it("returns 500 when save_chat_turn fails with an unexpected code", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    fake.save = { data: [], error: { code: "XXXXX", message: "boom" } };
+    const res = await ask("How fast do you ship?");
+    expect(res.status).toBe(500);
     logged.mockRestore();
   });
 });
@@ -402,46 +387,25 @@ describe("PostHog: first_chat and the AI trace", () => {
   const captured = (event: string) =>
     posthog.capture.mock.calls.map(([call]) => call as Captured).filter((call) => call.event === event);
 
-  let seq = 0;
-  async function freshProject(withChunk = true) {
-    const publicKey = `pk_fresh${++seq}`;
-    const project = await seedProject(db, { plan: "pro", publicKey });
-    if (withChunk) await seedChunk(project.id, "We ship worldwide within 5 business days.", 0);
-    return { ...project, publicKey, ownerId: `user_${publicKey}` };
-  }
-  const send = (publicKey: string, extra: Record<string, unknown> = {}) =>
-    chat({ key: publicKey, visitorId: "v_ph", message: "How fast do you ship?", ...extra });
-
-  it("sends first_chat once, as the owner, when the project's first conversation is saved", async () => {
-    const project = await freshProject();
-    const first = await (await send(project.publicKey)).json();
-    await send(project.publicKey, { conversationId: first.conversationId }); // same conversation
-    await send(project.publicKey); // a second conversation
-
-    expect(captured("first_chat")).toEqual([
-      { distinctId: project.ownerId, event: "first_chat", properties: { project_id: project.id } },
-    ]);
+  it("sends first_chat as the owner when save_chat_turn reports the project's first conversation", async () => {
+    fake.save = { data: [{ conversation_id: "conv_1", first_chat: true }], error: null };
+    await ask("How fast do you ship?");
+    expect(captured("first_chat")).toEqual([{ distinctId: "owner_shop", event: "first_chat", properties: { project_id: "proj_shop" } }]);
   });
 
-  it("sends first_chat once when a project's first chats arrive at the same time", async () => {
-    const project = await freshProject();
-    const results = await Promise.all([1, 2, 3].map((n) => send(project.publicKey, { visitorId: `v_race${n}` })));
-
-    expect(results.map((res) => res.status)).toEqual([200, 200, 200]);
-    expect(await db.select().from(conversations).where(eq(conversations.projectId, project.id))).toHaveLength(3);
-    expect(captured("first_chat")).toHaveLength(1);
+  it("sends no first_chat when save_chat_turn reports it isn't the first", async () => {
+    fake.save = { data: [{ conversation_id: "conv_1", first_chat: false }], error: null };
+    await ask("How fast do you ship?");
+    expect(captured("first_chat")).toHaveLength(0);
   });
 
   it("sends one $ai_generation per model reply as the owner, grouped by conversation", async () => {
-    const project = await freshProject();
-    const first = await (await send(project.publicKey)).json();
-    await send(project.publicKey, { conversationId: first.conversationId });
+    fake.save = { data: [{ conversation_id: "conv_trace", first_chat: false }], error: null };
+    await ask("How fast do you ship?");
 
-    const generations = captured("$ai_generation");
-    expect(generations).toHaveLength(2);
-    for (const generation of generations) {
-      expect(generation).toEqual({
-        distinctId: project.ownerId,
+    expect(captured("$ai_generation")).toEqual([
+      {
+        distinctId: "owner_shop",
         event: "$ai_generation",
         properties: {
           $ai_model: "gpt-test",
@@ -449,49 +413,43 @@ describe("PostHog: first_chat and the AI trace", () => {
           $ai_input_tokens: 100,
           $ai_output_tokens: 10,
           $ai_latency: expect.any(Number),
-          $ai_trace_id: first.conversationId,
-          project_id: project.id,
+          $ai_trace_id: "conv_trace",
+          project_id: "proj_shop",
         },
-      });
-    }
+      },
+    ]);
   });
 
   it("never sends the visitor's message, the chunks or the reply in any event", async () => {
-    const project = await freshProject();
-    await chat({ key: project.publicKey, visitorId: "v_private", message: "My order 4471 for jane@example.com is late" });
-
+    await chat({ key: "pk_shop", visitorId: "v_private", message: "My order 4471 for jane@example.com is late" });
     const sent = JSON.stringify(posthog.capture.mock.calls);
-    for (const text of ["4471", "jane@example.com", "is late", "We ship worldwide", "5 business days", "v_private"]) {
+    for (const text of ["4471", "jane@example.com", "is late", SHIP_REPLY, "v_private"]) {
       expect(sent).not.toContain(text);
     }
   });
 
-  it("sends no $ai_generation when the model was skipped (no chunks)", async () => {
-    const project = await freshProject(false);
-    const body = await (await send(project.publicKey)).json();
-
+  it("sends no $ai_generation when the model was skipped (no ready sources)", async () => {
+    fake.readyProjects = new Set();
+    const body = await (await ask("Anything?")).json();
     expect(body.reply).toBe(DONT_KNOW_REPLY);
     expect(captured("$ai_generation")).toHaveLength(0);
-    expect(captured("first_chat")).toHaveLength(1);
   });
 
   it("sends nothing when the request is refused", async () => {
-    const project = await freshProject();
-    await db.update(projects).set({ messagesUsed: PLAN_LIMITS.pro.messagesPerMonth }).where(eq(projects.id, project.id));
-    expect((await send(project.publicKey)).status).toBe(429);
+    fake.consume = { data: false, error: null };
+    expect((await ask("Hi")).status).toBe(429);
     expect(posthog.capture).not.toHaveBeenCalled();
   });
 
   it("still returns the reply when the PostHog client throws", async () => {
-    const project = await freshProject();
     posthog.capture.mockImplementation(() => {
       throw new Error("PostHog down");
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const res = await send(project.publicKey);
+    const res = await ask("How fast do you ship?");
     expect(res.status).toBe(200);
-    expect((await res.json()).reply).toBe("We ship worldwide within 5 business days.");
+    expect((await res.json()).reply).toBe(SHIP_REPLY);
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
     posthog.capture.mockReset();
