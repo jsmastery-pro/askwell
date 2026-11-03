@@ -4,8 +4,7 @@ import { APP_NAME, publicKeySchema } from "@askwell/shared";
 import { parseHostOrigin } from "../../components/embed/bridge";
 import { EmbedPanel } from "../../components/embed/EmbedPanel";
 import { EmbedUnavailable } from "../../components/embed/EmbedUnavailable";
-// TEMPORARY: the stand-in for A1. Switch to "../../lib/widget/config" when A1 merges.
-import { getPublicWidgetConfig } from "../../components/embed/widget-config";
+import { getPublicWidgetConfig } from "../../lib/widget/config";
 
 export const metadata: Metadata = {
   title: `Chat · ${APP_NAME}`,

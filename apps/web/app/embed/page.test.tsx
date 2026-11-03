@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The config lookup (A1) is mocked: these tests are about the page.
 const getPublicWidgetConfig = vi.fn<(key: string) => Promise<WidgetSettings | null>>();
-vi.mock("../../components/embed/widget-config", () => ({
+vi.mock("../../lib/widget/config", () => ({
   getPublicWidgetConfig: (key: string) => getPublicWidgetConfig(key),
 }));
 
