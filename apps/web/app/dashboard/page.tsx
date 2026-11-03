@@ -1,27 +1,25 @@
-import { UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { Suspense } from "react";
-import { Spinner } from "../../components/ui";
+import type { Metadata } from "next";
+import { PageHeader } from "../../components/dashboard/PageHeader";
+import { Button, EmptyState, GlassPanel } from "../../components/ui";
 
-// Placeholder that proves the auth flow. B4 replaces it with the real layout.
+export const metadata: Metadata = { title: "Projects" };
 
-async function SignedIn() {
-  // The proxy already redirects signed-out requests; the page checks too.
-  await auth.protect();
-  return (
-    <div className="flex items-center gap-3">
-      <p>Signed in</p>
-      <UserButton />
-    </div>
-  );
-}
-
+// Phase 1: no projects yet. Phase 2 lists them and enables "Create project".
 export default function DashboardPage() {
   return (
-    <main className="flex min-h-dvh items-center justify-center p-4">
-      <Suspense fallback={<Spinner />}>
-        <SignedIn />
-      </Suspense>
-    </main>
+    <>
+      <PageHeader title="Projects" description="Each project is one chat bot for one website." />
+      <GlassPanel padding="none">
+        <EmptyState
+          title="No projects yet"
+          description="Create a project, add what your bot should know, then paste one script tag on your site."
+          action={
+            <Button disabled title="Coming soon">
+              Create project
+            </Button>
+          }
+        />
+      </GlassPanel>
+    </>
   );
 }
