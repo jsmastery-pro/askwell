@@ -35,6 +35,22 @@ export interface EmbedPanelProps {
   initialState?: ChatState;
 }
 
+/**
+ * Escape inside the panel asks the loader to close it. Key events don't cross
+ * the iframe boundary, so the loader can't see them. Sent through the bridge:
+ * only to the validated host origin, and nothing when messaging is off.
+ * Ignored while an IME is composing (Escape cancels the composition). Safari
+ * can end the composition before that keydown, so `isComposing` is false;
+ * its keyCode is still 229, so that counts as composing too.
+ */
+export function closeOnEscape(
+  event: { key: string; isComposing: boolean; keyCode?: number },
+  bridge: Pick<EmbedBridge, "send"> | null,
+): void {
+  if (event.key !== "Escape" || event.isComposing || event.keyCode === 229) return;
+  bridge?.send({ type: "askwell:close" });
+}
+
 /** The chat panel inside the widget iframe (project.md §6.5 "Panel"). */
 export function EmbedPanel({
   config,
@@ -57,8 +73,12 @@ export function EmbedPanel({
     // The loader sends nothing the panel acts on yet. Valid messages from the
     // host origin arrive here; everything else is dropped by the bridge.
     const stop = bridge.listen(() => undefined);
+    const onKeyDown = (event: { key: string; isComposing: boolean; keyCode: number }) =>
+      closeOnEscape(event, bridge);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       stop();
+      window.removeEventListener("keydown", onKeyDown);
       bridgeRef.current = null;
     };
   }, [hostOrigin]);

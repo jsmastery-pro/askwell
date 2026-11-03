@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  A plain page with the install snippet, for testing the widget from another
+  origin. Edit the two marked lines, then serve this folder, e.g.:
+
+    cd apps/widget/examples && python3 -m http.server 8080
+
+  and open http://localhost:8080. The chat button should appear in the
+  configured corner; a bad or unknown key shows nothing.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Widget test page</title>
+    <style>
+      body { margin: 0; padding: 32px; font: 16px/1.5 Georgia, serif; color: #222; background: #fdfaf3; }
+      main { max-width: 640px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Some customer's website</h1>
+      <p>This page is not part of the app. It only loads the widget script, like a customer's site would.</p>
+    </main>
+
+    <script
+      src="http://localhost:3000/widget.js"
+      data-key="pk_your_key"
+      async
+    ></script>
+    <!-- ↑ Line 1: src = your app's URL + /widget.js. Line 2: data-key = the project's public key. -->
+  </body>
+</html>
