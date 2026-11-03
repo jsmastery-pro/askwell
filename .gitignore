@@ -12,6 +12,9 @@ next-env.d.ts
 # Vercel
 .vercel/
 
+# Supabase CLI cache (written by pnpm db:types)
+supabase/.temp/
+
 # env files (keep .env.example tracked)
 .env
 .env*.local
