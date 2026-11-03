@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PGlite, Transaction } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { applyMigrations, asRole, createTestDb } from "@askwell/db";
+import { applyMigrations, asRole, createTestDb } from "@askwell/db/testing";
 
 let db: PGlite;
 

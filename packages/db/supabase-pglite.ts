@@ -2,8 +2,9 @@
 // RLS policies and functions can be tested without a local Supabase stack,
 // Docker or the shared dev project (CLAUDE.md "Database rules").
 //
-// Never import this from apps/web runtime code: it pulls in a WASM Postgres
-// and node:fs, and it is a devDependency of @askwell/db.
+// Import it from "@askwell/db/testing" in tests only. Never import it from
+// apps/web runtime code: it pulls in a WASM Postgres and node:fs, and pglite
+// is a devDependency of @askwell/db.
 //
 // What it mirrors was read from the askwell-dev project on 2026-11-03
 // (pg_roles, pg_default_acl, pg_namespace ACLs and the auth.* function
