@@ -59,16 +59,23 @@ create table public.knowledge_sources (
   -- Null for pasted text.
   storage_key text,
   status text not null check (status in ('uploading', 'processing', 'ready', 'failed')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Target of knowledge_chunks' composite FK below.
+  unique (id, project_id)
 );
 
--- Deleted with their source and with their project.
+-- Deleted with their source and with their project. The composite FK makes
+-- a chunk's project the same as its source's project, so a chunk can never
+-- show one project's content under another (RLS and retrieval filter on
+-- knowledge_chunks.project_id).
 create table public.knowledge_chunks (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects (id) on delete cascade,
-  source_id uuid not null references public.knowledge_sources (id) on delete cascade,
+  source_id uuid not null,
   content text not null,
-  embedding extensions.vector(1536) not null
+  embedding extensions.vector(1536) not null,
+  foreign key (source_id, project_id)
+    references public.knowledge_sources (id, project_id) on delete cascade
 );
 
 create table public.conversations (

@@ -579,6 +579,26 @@ describe("cascades", () => {
     expect(rows).toEqual([{ id: IDS[OWNER_B].chunk }]);
   });
 
+  it("a chunk's project must be its source's project", async () => {
+    const insert = asRole(db, "service_role", (tx) =>
+      tx.query(
+        `insert into public.knowledge_chunks (project_id, source_id, content, embedding)
+         values ($1, $2, 'Leak', ${EMBEDDING})`,
+        [IDS[OWNER_B].project, IDS[OWNER_A].source],
+      ),
+    );
+    await expect(insert).rejects.toThrow(/knowledge_chunks_source_id_project_id_fkey/);
+    await expect(
+      asRole(db, "service_role", (tx) =>
+        tx.query(`update public.knowledge_chunks set project_id = $1 where id = $2`, [
+          IDS[OWNER_B].project,
+          IDS[OWNER_A].chunk,
+        ]),
+      ),
+    ).rejects.toThrow(/knowledge_chunks_source_id_project_id_fkey/);
+    expect(await count(db, "knowledge_chunks")).toBe(2);
+  });
+
   it("deleting an account deletes its projects and everything in them", async () => {
     await db.query(`delete from public.accounts where clerk_user_id = $1`, [OWNER_A]);
     for (const table of TABLES) expect(await count(db, table), table).toBe(1);
