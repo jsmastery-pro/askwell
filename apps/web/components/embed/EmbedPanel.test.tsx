@@ -6,8 +6,9 @@ import {
 } from "@askwell/shared";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { createEmbedBridge, type BridgeWindow } from "./bridge";
 import { initialChatState, type ChatState } from "./chat-state";
-import { EmbedPanel } from "./EmbedPanel";
+import { closeOnEscape, EmbedPanel } from "./EmbedPanel";
 import { EmbedUnavailable } from "./EmbedUnavailable";
 
 const HOST = "http://localhost:8080";
@@ -90,5 +91,39 @@ describe("EmbedUnavailable", () => {
     const html = renderToStaticMarkup(<EmbedUnavailable hostOrigin={HOST} />);
     expect(html).toContain("This chat isn&#x27;t available");
     expect(html).toContain('aria-label="Close chat"');
+  });
+});
+
+describe("closeOnEscape", () => {
+  /** A bridge on a fake window that records every postMessage. */
+  function bridgeFor(hostOrigin: string | null) {
+    const posted: { message: unknown; targetOrigin: string }[] = [];
+    const win: BridgeWindow = {
+      parent: { postMessage: (message, targetOrigin) => posted.push({ message, targetOrigin }) },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    return { bridge: createEmbedBridge(hostOrigin, win), posted };
+  }
+
+  it("sends askwell:close to the host origin only", () => {
+    const { bridge, posted } = bridgeFor(HOST);
+    closeOnEscape({ key: "Escape", isComposing: false }, bridge);
+    expect(posted).toEqual([{ message: { type: "askwell:close" }, targetOrigin: HOST }]);
+  });
+
+  it("ignores other keys and Escape during IME composition", () => {
+    const { bridge, posted } = bridgeFor(HOST);
+    closeOnEscape({ key: "Enter", isComposing: false }, bridge);
+    closeOnEscape({ key: "Esc", isComposing: false }, bridge);
+    closeOnEscape({ key: "Escape", isComposing: true }, bridge);
+    expect(posted).toEqual([]);
+  });
+
+  it("sends nothing when messaging is off", () => {
+    const { bridge, posted } = bridgeFor(null);
+    closeOnEscape({ key: "Escape", isComposing: false }, bridge);
+    closeOnEscape({ key: "Escape", isComposing: false }, null);
+    expect(posted).toEqual([]);
   });
 });
