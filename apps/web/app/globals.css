@@ -139,7 +139,7 @@
    `color-scheme: dark` also switches Clerk's default theme to dark.
    The landing page keeps its own dark surface (its :root rule above is more
    specific), and /embed never gets data-theme. Text contrast (AA):
-   fg 19.8:1, fg-muted 13.1:1, fg-subtle 7.8:1 on grey-950. */
+   fg 19.8:1, fg-muted 13.4:1, fg-subtle 7.8:1 on grey-950. */
 :root[data-theme="dark"],
 :root[data-theme="dark"] [data-surface="light"] {
   color-scheme: dark;
