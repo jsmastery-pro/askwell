@@ -6,6 +6,7 @@ export * from "./plans";
 export * from "./limits";
 export * from "./errors";
 export * from "./widget";
+export * from "./embed";
 export * from "./models";
 export * from "./api/common";
 export * from "./api/widget";

@@ -55,16 +55,42 @@ describe("proxy", () => {
 });
 
 describe("proxy matcher", () => {
-  // Next matches each entry against the whole pathname.
-  const runsOn = (path: string) =>
-    config.matcher.some((pattern) => new RegExp(`^${pattern}$`).test(path));
+  // Next's own matcher (next/experimental/testing/server), which needs the
+  // AsyncLocalStorage global Next's runtime normally provides.
+  const runsOn = async (url: string) => {
+    const g = globalThis as { AsyncLocalStorage?: unknown };
+    g.AsyncLocalStorage ??= (await import("node:async_hooks")).AsyncLocalStorage;
+    const { unstable_doesMiddlewareMatch } = await import("next/experimental/testing/server");
+    return unstable_doesMiddlewareMatch({ config, url });
+  };
 
-  it.each(["/", "/dashboard", "/dashboard/x", "/sign-in", "/embed", "/api/projects", "/api/widget/config"])(
-    "runs on %s",
-    (path) => expect(runsOn(path)).toBe(true),
-  );
+  it.each([
+    "/",
+    "/dashboard",
+    "/dashboard/billing",
+    "/sign-in",
+    "/sign-up",
+    "/api/projects",
+    "/api/projects/1",
+    "/api/knowledge/1",
+    "/api/conversations/1",
+    "/api/widget/config",
+    "/api/widget/chat",
+    // Only the exact /embed segment is skipped.
+    "/embedded",
+    "/embed-preview",
+  ])("runs on %s", async (path) => expect(await runsOn(path)).toBe(true));
 
-  it.each(["/_next/static/chunk.js", "/favicon.ico", "/logo.svg"])("skips %s", (path) =>
-    expect(runsOn(path)).toBe(false),
-  );
+  it.each([
+    // The widget: no auth, and no Clerk handshake inside a cross-site iframe.
+    "/embed",
+    "/embed/",
+    "/embed?key=pk_test_123&origin=https://host.example",
+    "/widget.js",
+    "/widget.js?v=1",
+    // Next internals and static files.
+    "/_next/static/chunk.js",
+    "/favicon.ico",
+    "/logo.svg",
+  ])("skips %s", async (path) => expect(await runsOn(path)).toBe(false));
 });

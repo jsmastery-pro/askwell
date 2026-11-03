@@ -24,7 +24,11 @@ export type RouteAccess = "owner-page" | "owner-api" | "public";
 const startsWithAny = (pathname: string, prefixes: readonly string[]) =>
   prefixes.some((prefix) => pathname.startsWith(prefix));
 
-/** Classify a request path. Everything not listed as owner is public. */
+/**
+ * Classify a request path. Everything not listed as owner is public.
+ * (The widget's /embed and /widget.js never reach the proxy: its matcher
+ * skips them, so Clerk doesn't run there at all.)
+ */
 export function routeAccess(pathname: string): RouteAccess {
   if (startsWithAny(pathname, OWNER_API_PREFIXES)) return "owner-api";
   if (startsWithAny(pathname, OWNER_PAGE_PREFIXES)) return "owner-page";
