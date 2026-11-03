@@ -16,7 +16,12 @@ describe("landing motion", () => {
     expect(start).toBeGreaterThan(-1);
     // No animation is applied outside the no-preference block.
     expect(css.slice(0, start)).not.toMatch(/animation(-[a-z]+)?\s*:/);
-    expect(css.slice(start).indexOf(`.${ENTER}`)).toBeGreaterThan(-1);
-    expect(css.slice(start).indexOf(`.${REVEAL}`)).toBeGreaterThan(-1);
+    // The block ends at the first closing brace in column 0.
+    const end = css.indexOf("\n}", start);
+    expect(end).toBeGreaterThan(start);
+    expect(css.slice(end + 2)).not.toMatch(/animation(-[a-z]+)?\s*:/);
+    const noPreferenceBody = css.slice(start, end);
+    expect(noPreferenceBody).toContain(`.${ENTER} {`);
+    expect(noPreferenceBody).toContain(`.${REVEAL} {`);
   });
 });

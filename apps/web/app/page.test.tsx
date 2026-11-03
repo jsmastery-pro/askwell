@@ -63,6 +63,21 @@ describe("landing page", () => {
     }
   });
 
+  it("puts each plan's value under its own header", () => {
+    const pricing = html.slice(html.indexOf('id="pricing"'), html.indexOf('id="install"'));
+    const headers = [...pricing.matchAll(/data-price="([^"]+)"/g)].map(([, plan]) => plan);
+    expect(headers).toEqual([...PLANS]);
+    const rows = [...pricing.matchAll(/<tr[^>]*><th[^>]*>(.*?)<\/th>(.*?)<\/tr>/g)];
+    for (const row of PRICING_ROWS) {
+      const match = rows.find(([, label]) => text(label ?? "") === row.label);
+      expect(match).toBeDefined();
+      const cells = [...(match?.[2] ?? "").matchAll(/<td[^>]*>(.*?)<\/td>/g)].map(([, cell]) =>
+        text(cell ?? ""),
+      );
+      expect(cells).toEqual(PLANS.map((plan) => row.values[plan]));
+    }
+  });
+
   it("shows the install snippet with a placeholder key", () => {
     expect(text(html)).toContain('data-key="pk_your_key"');
   });
