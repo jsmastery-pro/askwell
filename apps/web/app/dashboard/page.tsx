@@ -1,25 +1,20 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PageHeader } from "../../components/dashboard/PageHeader";
-import { Button, EmptyState, GlassPanel } from "../../components/ui";
+import { ProjectsSection, ProjectsSkeleton } from "../../components/projects/ProjectsSection";
 
 export const metadata: Metadata = { title: "Projects" };
 
-// Phase 1: no projects yet. Phase 2 lists them and enables "Create project".
+// The owner's projects (§6.3): create, list, rename, delete. The list is read
+// on the server inside <Suspense> (it reads the session); changes go through
+// the /api/projects routes from client components.
 export default function DashboardPage() {
   return (
     <>
       <PageHeader title="Projects" description="Each project is one chat bot for one website." />
-      <GlassPanel padding="none">
-        <EmptyState
-          title="No projects yet"
-          description="Create a project, add what your bot should know, then paste one script tag on your site."
-          action={
-            <Button disabled title="Coming soon">
-              Create project
-            </Button>
-          }
-        />
-      </GlassPanel>
+      <Suspense fallback={<ProjectsSkeleton />}>
+        <ProjectsSection />
+      </Suspense>
     </>
   );
 }

@@ -20,13 +20,15 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         aria-hidden="true"
         className="pointer-events-none fixed -top-24 right-0 -z-10 size-96 rounded-full bg-glow blur-glow"
       />
-      <Sidebar
-        plan={
-          <Suspense fallback={<PlanBadgeSkeleton />}>
-            <PlanBadge />
-          </Suspense>
-        }
-      />
+      <Suspense fallback={<div aria-hidden="true" className="h-16 border-b border-line md:h-dvh md:w-60 md:shrink-0 md:border-r md:border-b-0" />}>
+        <Sidebar
+          plan={
+            <Suspense fallback={<PlanBadgeSkeleton />}>
+              <PlanBadge />
+            </Suspense>
+          }
+        />
+      </Suspense>
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:px-10 md:py-10">
         <div className="mx-auto flex max-w-5xl flex-col gap-6">{children}</div>
       </main>
