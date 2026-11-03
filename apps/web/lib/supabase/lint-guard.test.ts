@@ -3,10 +3,17 @@
 // allowed where they belong. Runs the real repo config through ESLint's API.
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const eslint = new ESLint({ cwd: ROOT });
+
+// The first lint loads the whole config (Next's plugins included), which can
+// take well over 5s on a busy machine. Do it once here, with room to spare,
+// so no single test pays for the cold start.
+beforeAll(async () => {
+  await eslint.lintText("export {};", { filePath: `${ROOT}apps/web/app/warmup.ts` });
+}, 60_000);
 
 // Built, not written out: only service.ts may name the secret's variable.
 const SECRET = ["SUPABASE", "SECRET", "KEY"].join("_");

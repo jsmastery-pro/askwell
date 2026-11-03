@@ -371,18 +371,21 @@ describe("types.ts", () => {
     expect(fromDb).toEqual(TYPES_SHAPE);
   });
 
-  it("lists exactly the public functions, each returning a set of IDs", async () => {
+  it("lists exactly the public functions, and the helpers return a set of IDs", async () => {
     const { rows } = await db.query<{ proname: string; args: string; returns: string }>(
       `select proname, pg_get_function_arguments(oid) as args,
               pg_get_function_result(oid) as returns
        from pg_proc where pronamespace = 'public'::regnamespace order by proname`,
     );
     const functions: Record<keyof Database["public"]["Functions"], true> = {
+      create_project: true,
       owned_conversation_ids: true,
       owned_project_ids: true,
     };
     expect(rows.map((row) => row.proname)).toEqual(Object.keys(functions).sort());
-    for (const row of rows) expect(row, row.proname).toMatchObject({ args: "", returns: "SETOF uuid" });
+    const helpers = rows.filter((row) => (HELPERS as readonly string[]).includes(row.proname));
+    expect(helpers).toHaveLength(HELPERS.length);
+    for (const row of helpers) expect(row, row.proname).toMatchObject({ args: "", returns: "SETOF uuid" });
   });
 });
 
@@ -649,7 +652,7 @@ describe("functions", () => {
       `select proname, proconfig from pg_proc
        where pronamespace = 'public'::regnamespace order by proname`,
     );
-    expect(rows.map((row) => row.proname)).toEqual(["owned_conversation_ids", "owned_project_ids"]);
+    expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) expect(row.proconfig, row.proname).toEqual(['search_path=""']);
   });
 
@@ -666,8 +669,11 @@ describe("functions", () => {
               exists (select 1 from aclexplode(proacl) where grantee = 0 and privilege_type = 'EXECUTE') as public_x,
               has_function_privilege('anon', oid, 'execute') as anon_x,
               has_function_privilege('authenticated', oid, 'execute') as authenticated_x
-       from pg_proc where pronamespace = 'public'::regnamespace order by proname`,
+       from pg_proc where pronamespace = 'public'::regnamespace and proname = any($1)
+       order by proname`,
+      [[...HELPERS]],
     );
+    expect(rows).toHaveLength(HELPERS.length);
     for (const row of rows) {
       expect(row, row.proname).toMatchObject({
         prosecdef: true,
