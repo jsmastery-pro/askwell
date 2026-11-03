@@ -218,6 +218,9 @@ importers:
         specifier: 0.0.1
         version: 0.0.1
     devDependencies:
+      '@askwell/widget':
+        specifier: workspace:*
+        version: link:../widget
       '@tailwindcss/turbopack':
         specifier: 4.3.3
         version: 4.3.3

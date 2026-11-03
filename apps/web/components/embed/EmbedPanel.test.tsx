@@ -120,6 +120,14 @@ describe("closeOnEscape", () => {
     expect(posted).toEqual([]);
   });
 
+  it("ignores Safari's composition-ending Escape (isComposing false, keyCode 229)", () => {
+    const { bridge, posted } = bridgeFor(HOST);
+    closeOnEscape({ key: "Escape", isComposing: false, keyCode: 229 }, bridge);
+    expect(posted).toEqual([]);
+    closeOnEscape({ key: "Escape", isComposing: false, keyCode: 27 }, bridge);
+    expect(posted).toEqual([{ message: { type: "askwell:close" }, targetOrigin: HOST }]);
+  });
+
   it("sends nothing when messaging is off", () => {
     const { bridge, posted } = bridgeFor(null);
     closeOnEscape({ key: "Escape", isComposing: false }, bridge);

@@ -7,7 +7,7 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "node scripts/build-widget.mjs && next dev",
+    "dev": "node scripts/build-widget.mjs --dev",
     "build": "node scripts/build-widget.mjs && next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit"
@@ -23,6 +23,7 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@askwell/widget": "workspace:*",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
