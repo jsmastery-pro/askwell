@@ -1,7 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { Suspense } from "react";
-import { Spinner } from "@/components/ui";
+import { Spinner } from "../../components/ui";
 
 // Placeholder that proves the auth flow. B4 replaces it with the real layout.
 
