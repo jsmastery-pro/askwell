@@ -50,3 +50,17 @@ export function parseQuery<T>(schema: SafeParser<T>, searchParams: URLSearchPara
   }
   return parseInput(schema, query);
 }
+
+/**
+ * Reads a JSON request body and parses it with `schema`. A body that isn't
+ * JSON is a 400 `validation_failed` too.
+ */
+export async function parseJsonBody<T>(schema: SafeParser<T>, request: Request): Promise<ParseResult<T>> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return validationFailed("Send a JSON body.");
+  }
+  return parseInput(schema, body);
+}
