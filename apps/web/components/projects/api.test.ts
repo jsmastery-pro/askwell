@@ -80,6 +80,26 @@ describe("projects API client", () => {
     });
   });
 
+  it.each([
+    ["an HTML 200 page (a proxy)", () => new Response("<html>Sign in</html>", { status: 200 })],
+    ["an empty 200 body", () => new Response(null, { status: 200 })],
+    ["a 200 without a project", () => Response.json({ ok: true })],
+    ["a 200 with a malformed project", () => Response.json({ project: { id: 1 } })],
+  ])("treats %s as an internal error, never ok: true", async (_label, make) => {
+    respondWith(make());
+    expect(await createProject("Docs bot")).toEqual({
+      ok: false,
+      error: { code: "internal", message: "Something went wrong. Try again." },
+    });
+    respondWith(make());
+    expect((await renameProject("p1", "Renamed")).ok).toBe(false);
+  });
+
+  it("treats a delete success without an id as an internal error", async () => {
+    respondWith(Response.json({}));
+    expect((await deleteProject("p1")).ok).toBe(false);
+  });
+
   it("turns a network failure into an internal error", async () => {
     respondWith(new TypeError("Failed to fetch"));
     const result = await renameProject("p1", "Renamed");
