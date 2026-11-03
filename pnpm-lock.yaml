@@ -245,6 +245,9 @@ importers:
 
   packages/db:
     devDependencies:
+      '@askwell/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@electric-sql/pglite':
         specifier: 0.5.14
         version: 0.5.14
