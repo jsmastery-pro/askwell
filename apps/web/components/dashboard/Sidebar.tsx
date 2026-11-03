@@ -8,6 +8,7 @@ import { APP_NAME } from "@askwell/shared";
 import { cx } from "../ui/cx";
 import { CloseIcon, MenuIcon } from "./icons";
 import { DASHBOARD_NAV, isNavItemActive } from "./nav";
+import { ThemeToggle } from "./ThemeToggle";
 
 export interface SidebarProps {
   /** The plan badge (a server component, streamed in). */
@@ -96,6 +97,9 @@ export function Sidebar({ plan }: SidebarProps) {
             );
           })}
         </ul>
+        <div className="mt-4 border-t border-line pt-4 pb-1 md:pb-0">
+          <ThemeToggle />
+        </div>
       </nav>
     </aside>
   );

@@ -133,6 +133,41 @@
     inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 
+/* Light surface, dark theme (dashboard, sign-in/up). Same token names, dark
+   values, when <html data-theme="dark"> (lib/theme sets it before paint from
+   the visitor's choice: light, dark, or system = prefers-color-scheme).
+   `color-scheme: dark` also switches Clerk's default theme to dark.
+   The landing page keeps its own dark surface (its :root rule above is more
+   specific), and /embed never gets data-theme. Text contrast (AA):
+   fg 19.8:1, fg-muted 13.1:1, fg-subtle 7.8:1 on grey-950. */
+:root[data-theme="dark"],
+:root[data-theme="dark"] [data-surface="light"] {
+  color-scheme: dark;
+  --surface-bg: var(--color-grey-950);
+  --surface-fg: var(--color-white);
+  --surface-fg-muted: var(--color-grey-300);
+  --surface-fg-subtle: var(--color-grey-400);
+  --surface-glass: rgb(255 255 255 / 0.05);
+  --surface-glass-strong: rgb(255 255 255 / 0.08);
+  --surface-line: rgb(255 255 255 / 0.1);
+  --surface-line-strong: rgb(255 255 255 / 0.2);
+  --surface-primary: var(--color-white);
+  --surface-primary-fg: var(--color-black);
+  --surface-hover: rgb(255 255 255 / 0.08);
+  --surface-skeleton: rgb(255 255 255 / 0.08);
+  --surface-focus: rgb(255 255 255 / 0.6);
+  --surface-glow: rgb(255 255 255 / 0.06);
+  --surface-scrollbar-track: var(--color-grey-950);
+  --surface-scrollbar-thumb: var(--color-grey-600);
+  --surface-scrollbar-thumb-hover: var(--color-grey-500);
+  --surface-shadow-glass:
+    0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.5),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --surface-shadow-glass-lg:
+    0 2px 4px rgb(0 0 0 / 0.4), 0 32px 64px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
 /* Style variant for anything inside a dark surface, e.g. `surface-dark:…`. */
 @custom-variant surface-dark (&:where([data-surface="dark"], [data-surface="dark"] *));
 

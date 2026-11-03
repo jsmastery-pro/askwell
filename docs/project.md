@@ -377,8 +377,8 @@ Every screen follows this. Agents don't pick their own style.
 |---|---|
 | Overall | Black and white, with glass effects (blurred, translucent panels) |
 | Landing page | Dark, with simple motion: subtle entrance and scroll animations |
-| Dashboard | Light, monochrome, glass panels |
-| Sign-in / sign-up | Clerk's default look |
+| Dashboard | Light or dark (follows the OS, with a toggle) |
+| Sign-in / sign-up | Clerk's default look, dark theme in dark mode |
 | Tokens | One set of design tokens (colors, radius, shadows, blur) shared by every page |
 | States | Empty, loading and error states on every screen |
 | Responsive | Works down to 375 px wide |

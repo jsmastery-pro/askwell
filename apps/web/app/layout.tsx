@@ -8,6 +8,7 @@ import {
   SIGN_IN_PATH,
   SIGN_UP_PATH,
 } from "@/lib/auth/routes";
+import { themeScript } from "@/lib/theme/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,9 +27,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // The theme script sets data-theme on <html> before React hydrates, so the
+    // attributes differ from the server render on purpose.
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Light / dark before the first paint (lib/theme). A fixed string we
+            build ourselves: no user input reaches it. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript() }} />
+      </head>
       <body>
-        {/* Clerk's default appearance (§13). Redirects live here, not in env. */}
+        {/* Clerk's default appearance (§13), which follows the page's
+            color-scheme: dark in the dark theme. Redirects live here, not in env. */}
         <ClerkProvider
           signInUrl={SIGN_IN_PATH}
           signUpUrl={SIGN_UP_PATH}
