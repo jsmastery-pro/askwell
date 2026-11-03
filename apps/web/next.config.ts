@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   // Workspace packages ship TypeScript source; Next compiles them.
-  transpilePackages: ["@askwell/shared"],
+  transpilePackages: ["@askwell/shared", "@askwell/db"],
   turbopack: {
     rules: {
       "*.css": {
