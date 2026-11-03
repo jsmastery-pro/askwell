@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { APP_NAME } from "@askwell/shared";
+import { APP_NAME, publicKeySchema } from "@askwell/shared";
 import { parseHostOrigin } from "../../components/embed/bridge";
 import { EmbedPanel } from "../../components/embed/EmbedPanel";
 import { EmbedUnavailable } from "../../components/embed/EmbedUnavailable";
@@ -20,9 +20,16 @@ const first = (value: string | string[] | undefined) => (typeof value === "strin
 
 async function Embed({ searchParams }: Pick<PageProps<"/embed">, "searchParams">) {
   const params = await searchParams;
-  const key = first(params.key);
+  const raw = first(params.key);
+  const key = raw !== null && publicKeySchema.safeParse(raw).success ? raw : null;
   const hostOrigin = parseHostOrigin(first(params.origin));
-  const config = key ? await getPublicWidgetConfig(key) : null;
+  // A lookup failure (database down) shows the same state as an unknown key.
+  const config = key
+    ? await getPublicWidgetConfig(key).catch((error: unknown) => {
+        console.error("Couldn't load the widget config", error);
+        return null;
+      })
+    : null;
 
   if (!key || !config) return <EmbedUnavailable hostOrigin={hostOrigin} />;
   return <EmbedPanel config={config} publicKey={key} hostOrigin={hostOrigin} />;
