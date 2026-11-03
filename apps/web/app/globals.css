@@ -6,7 +6,10 @@
  * One set of tokens, two surfaces:
  *   <div data-surface="dark">  → landing (black, white glass)
  *   <div data-surface="light"> → dashboard (light grey, white glass)
- * :root defaults to light. Components use only the semantic tokens below
+ * :root defaults to light. When a page's top-level element is a dark
+ * surface, :root takes the dark values too, so the window scrollbar and
+ * the overscroll area match the page.
+ * Components use only the semantic tokens below
  * (bg-surface, text-fg, bg-glass, border-line, rounded-panel, shadow-glass,
  * backdrop-blur-glass…), so the same markup works on both surfaces.
  *
@@ -63,6 +66,9 @@
   --color-skeleton: var(--surface-skeleton);
   --color-focus: var(--surface-focus);
   --color-glow: var(--surface-glow);
+  --color-scrollbar-track: var(--surface-scrollbar-track);
+  --color-scrollbar-thumb: var(--surface-scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--surface-scrollbar-thumb-hover);
 
   --shadow-glass: var(--surface-shadow-glass);
   --shadow-glass-lg: var(--surface-shadow-glass-lg);
@@ -86,6 +92,9 @@
   --surface-skeleton: rgb(0 0 0 / 0.07);
   --surface-focus: rgb(0 0 0 / 0.5);
   --surface-glow: rgb(0 0 0 / 0.07);
+  --surface-scrollbar-track: var(--color-grey-100);
+  --surface-scrollbar-thumb: var(--color-grey-400);
+  --surface-scrollbar-thumb-hover: var(--color-grey-500);
   --surface-shadow-glass:
     0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06),
     inset 0 1px 0 rgb(255 255 255 / 0.7);
@@ -94,8 +103,10 @@
     inset 0 1px 0 rgb(255 255 255 / 0.7);
 }
 
-/* Dark surface (landing). */
-[data-surface="dark"] {
+/* Dark surface (landing). The :root selector covers pages whose top-level
+   element is a dark surface (the page is a direct child of <body>). */
+[data-surface="dark"],
+:root:has(> body > [data-surface="dark"]) {
   color-scheme: dark;
   --surface-bg: var(--color-black);
   --surface-fg: var(--color-white);
@@ -111,6 +122,9 @@
   --surface-skeleton: rgb(255 255 255 / 0.08);
   --surface-focus: rgb(255 255 255 / 0.6);
   --surface-glow: rgb(255 255 255 / 0.1);
+  --surface-scrollbar-track: var(--color-grey-950);
+  --surface-scrollbar-thumb: var(--color-grey-600);
+  --surface-scrollbar-thumb-hover: var(--color-grey-500);
   --surface-shadow-glass:
     0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.5),
     inset 0 1px 0 rgb(255 255 255 / 0.06);
@@ -129,5 +143,37 @@
 
   [data-surface] {
     @apply bg-surface text-fg;
+  }
+
+  /* Scrollbars follow the surface. scrollbar-color inherits as a computed
+     color, so it's set on every surface, not only on :root: a nested
+     surface (and every scroll area inside it) gets its own colors. */
+  :root,
+  [data-surface] {
+    scrollbar-color: var(--surface-scrollbar-thumb) var(--surface-scrollbar-track);
+  }
+
+  /* Older Safari has no scrollbar-color. Browsers that support it ignore
+     ::-webkit-scrollbar once scrollbar-color is set, so this is scoped. */
+  @supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+      background-color: var(--surface-scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      border: 3px solid var(--surface-scrollbar-track);
+      border-radius: 9999px;
+      background-color: var(--surface-scrollbar-thumb);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: var(--surface-scrollbar-thumb-hover);
+    }
+
+    ::-webkit-scrollbar-corner {
+      background-color: var(--surface-scrollbar-track);
+    }
   }
 }
