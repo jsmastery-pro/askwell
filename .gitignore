@@ -9,6 +9,9 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
+# Widget loader, built into the web app's public/ by apps/web/scripts/build-widget.mjs
+apps/web/public/widget.js
+
 # Vercel
 .vercel/
 
