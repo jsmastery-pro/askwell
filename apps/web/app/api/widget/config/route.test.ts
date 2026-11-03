@@ -122,6 +122,7 @@ describe("GET /api/widget/config", () => {
     ["a key that's too long", `?key=pk_${"a".repeat(200)}`],
     ["an extra parameter", `?key=${KNOWN_KEY}&owner=1`],
     ["a repeated key", `?key=${KNOWN_KEY}&key=pk_other`],
+    ["a __proto__ parameter", `?key=${KNOWN_KEY}&__proto__=x`],
   ])("returns 400 validation_failed for %s, without touching the database", async (_label, query) => {
     const res = await get(query);
     expect(res.status).toBe(400);

@@ -41,7 +41,9 @@ export function parseInput<T>(schema: SafeParser<T>, input: unknown): ParseResul
  * that expects one string.
  */
 export function parseQuery<T>(schema: SafeParser<T>, searchParams: URLSearchParams): ParseResult<T> {
-  const query: Record<string, string> = {};
+  // Null prototype: "__proto__" must become an own key, so the schema sees
+  // (and a strict schema rejects) every parameter that was sent.
+  const query: Record<string, string> = Object.create(null);
   for (const [name, value] of searchParams) {
     if (Object.hasOwn(query, name)) return validationFailed(`${name}: Send this parameter once.`);
     query[name] = value;

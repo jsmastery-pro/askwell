@@ -45,6 +45,17 @@ describe("parseQuery", () => {
     });
   });
 
+  it.each(["__proto__", "constructor", "toString"])(
+    "passes a %s parameter to the schema, so a strict schema rejects it",
+    async (name) => {
+      const result = parseQuery(widgetConfigQuery, new URLSearchParams(`key=pk_abc&${name}=x`));
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.response.status).toBe(400);
+      expect(await result.response.json()).toMatchObject({ error: { code: "validation_failed" } });
+    },
+  );
+
   it("rejects a repeated parameter", async () => {
     const result = parseQuery(widgetConfigQuery, new URLSearchParams("key=pk_a&key=pk_b"));
     expect(result.success).toBe(false);
