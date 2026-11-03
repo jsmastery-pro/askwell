@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "build": "pnpm -r --if-present build",
-    "db:types": "echo \"db:types is added in Phase 1\""
+    "db:types": "pnpm --silent dlx supabase@2.122.0 gen types --lang typescript --project-id pjyukeqhjqgqazdwwjuv --schema public > packages/db/types.ts.tmp && mv packages/db/types.ts.tmp packages/db/types.ts || (rm -f packages/db/types.ts.tmp && exit 1)"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

@@ -30,7 +30,21 @@ pnpm dev               # http://localhost:3000
 | `pnpm lint` | ESLint across the workspace |
 | `pnpm test` | Vitest across the workspace |
 | `pnpm build` | Build the widget and the web app |
-| `pnpm db:types` | Regenerate `packages/db/types.ts` (added in Phase 1) |
+| `pnpm db:types` | Regenerate `packages/db/types.ts` from the Supabase dev project (see below) |
+
+## Regenerating types
+
+`pnpm db:types` writes `packages/db/types.ts` from the **dev** project's `public` schema, using the pinned Supabase CLI (`supabase@2.122.0` via `pnpm dlx`; nothing to install). Run it after a migration is applied to dev, and commit the result with that migration.
+
+It needs a Supabase personal access token in your shell, not in `.env` (the app never reads it):
+
+```bash
+export SUPABASE_ACCESS_TOKEN=...   # a scoped token from supabase.com/dashboard/account/tokens
+pnpm db:types
+git diff packages/db/types.ts      # should show only the schema change you expect
+```
+
+If the CLI fails, `types.ts` is left unchanged. Agents don't run this: they use the Supabase MCP's type generator, which gives the same output.
 
 ## Vercel
 
