@@ -48,6 +48,8 @@ export default defineConfig(
     "**/coverage/",
     "**/.vercel/",
     "**/next-env.d.ts",
+    // The widget bundle, built into public/ by apps/web/scripts/build-widget.mjs (gitignored).
+    "apps/web/public/widget.js",
   ]),
 
   // Everything outside apps/web: plain JS + typescript-eslint.
