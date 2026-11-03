@@ -92,6 +92,7 @@ function seededKey(owner: typeof OWNER_A | typeof OWNER_B, table: Table): string
 
 const EMBEDDING = "array_fill(0.1::real, array[1536])::extensions.vector";
 
+/** Seeds two owners, each with one row in every table (IDs from IDS). */
 async function seed(db: PGlite): Promise<void> {
   for (const owner of [OWNER_A, OWNER_B] as const) {
     const ids = IDS[owner];
@@ -129,6 +130,7 @@ async function errorAs(
   throw new Error(`Expected "${sql}" to fail as ${role}`);
 }
 
+/** Runs as `role` and returns the keys of the rows it can see in `table`, sorted. */
 async function keysAs(
   db: PGlite,
   role: SupabaseRole,
@@ -143,6 +145,7 @@ async function keysAs(
   });
 }
 
+/** Counts every row in `table` as postgres (no RLS). */
 async function count(db: PGlite, table: Table): Promise<number> {
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from public.${table}`);
   return rows[0]?.n ?? -1;
