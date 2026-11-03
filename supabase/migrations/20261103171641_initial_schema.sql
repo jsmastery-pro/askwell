@@ -215,7 +215,7 @@ to authenticated;
 grant update (name) on table public.projects to authenticated;
 grant delete on table public.projects to authenticated;
 
--- Everything except TRUNCATE.
+-- Everything except TRUNCATE. MAINTAIN needs Postgres 17+ (dev runs 17.11).
 grant select, insert, update, delete, references, trigger, maintain on table
   public.accounts,
   public.projects,
@@ -243,5 +243,12 @@ alter default privileges for role postgres in schema public
 -- Postgres grants EXECUTE on every new function to PUBLIC (which anon and
 -- authenticated inherit). A per-schema revoke can't undo that built-in
 -- default, so this one is global for functions postgres creates.
+--
+-- IMPORTANT for later migrations: because this is global, it covers every
+-- function postgres creates from now on, in ANY schema, including functions
+-- that a later `create extension` creates when it runs as postgres. Nobody
+-- gets EXECUTE on them by default. Every function or extension added later
+-- must grant EXECUTE explicitly to the roles that need it (e.g.
+-- `grant execute on function public.match_chunks(...) to service_role`).
 alter default privileges for role postgres
   revoke execute on functions from public;
