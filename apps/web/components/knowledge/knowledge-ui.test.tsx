@@ -1,12 +1,20 @@
 import type { KnowledgeSource } from "@askwell/shared";
-import { MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS } from "@askwell/shared";
+import { KNOWLEDGE_TITLE_MAX_LENGTH, MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS } from "@askwell/shared";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { addErrorText, deleteErrorText, knowledgeLimitPrompt, sourceCountText, statusView } from "./display";
+import {
+  addErrorText,
+  deleteErrorText,
+  knowledgeLimitPrompt,
+  sourceCountText,
+  statusView,
+  uploadFailureView,
+} from "./display";
 import { checkFile, FILE_ACCEPT } from "./files";
 import { KnowledgeManager, KnowledgeLimitNotice } from "./KnowledgeManager";
 import { KnowledgeSkeleton } from "./KnowledgeSkeleton";
 import { SourceRow, StatusBadge } from "./SourceRow";
+import { UploadFileForm } from "./UploadFileForm";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
@@ -194,14 +202,86 @@ describe("checkFile", () => {
     ["no extension", { name: "README", size: 100, type: "text/plain" }, /isn't supported/],
     ["over 10 MB", { name: "big.pdf", size: MAX_KNOWLEDGE_FILE_BYTES + 1, type: "application/pdf" }, /over 10 MB/],
     ["an empty file", { name: "e.txt", size: 0, type: "text/plain" }, /empty/],
+    [
+      "a name over KNOWLEDGE_TITLE_MAX_LENGTH",
+      { name: `${"n".repeat(KNOWLEDGE_TITLE_MAX_LENGTH)}.pdf`, size: 100, type: "application/pdf" },
+      /file name is too long\. Rename the file to 200 characters or fewer/,
+    ],
   ])("refuses %s", (_label, file, message) => {
     const result = checkFile(file);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message).toMatch(message);
   });
 
+  it("allows a name of exactly KNOWLEDGE_TITLE_MAX_LENGTH characters", () => {
+    const name = `${"n".repeat(KNOWLEDGE_TITLE_MAX_LENGTH - 4)}.pdf`;
+    expect(checkFile({ name, size: 100, type: "application/pdf" }).ok).toBe(true);
+  });
+
   it("allows exactly 10 MB", () => {
     expect(checkFile({ name: "max.pdf", size: MAX_KNOWLEDGE_FILE_BYTES, type: "application/pdf" }).ok).toBe(true);
+  });
+});
+
+describe("uploadFailureView", () => {
+  const error = (code: "internal" | "validation_failed" | "plan_limit_reached", message = "m") => ({ code, message });
+
+  it("a check or reserve failure changes nothing on the server: no refresh, no retry", () => {
+    expect(uploadFailureView({ ok: false, step: "reserve", error: error("plan_limit_reached") })).toEqual({
+      text: "This project is at its source limit. Delete a source to add another.",
+      refresh: false,
+      retrySourceId: null,
+    });
+  });
+
+  it("an upload failure refreshes the list", () => {
+    expect(uploadFailureView({ ok: false, step: "upload", error: error("internal"), pendingSourceId: null })).toEqual({
+      text: "Couldn't upload the file. Try again.",
+      refresh: true,
+      retrySourceId: null,
+    });
+  });
+
+  it("an upload failure whose reservation couldn't be deleted says to delete the pending source", () => {
+    expect(uploadFailureView({ ok: false, step: "upload", error: error("internal"), pendingSourceId: "s1" })).toEqual({
+      text: "Couldn't upload the file. Try again. Delete the pending source below.",
+      refresh: true,
+      retrySourceId: null,
+    });
+  });
+
+  it("a finalize server or network error offers a retry with the same source", () => {
+    expect(uploadFailureView({ ok: false, step: "finalize", error: error("internal"), pendingSourceId: "s1" })).toEqual({
+      text: "Couldn't upload the file. Try again.",
+      refresh: true,
+      retrySourceId: "s1",
+    });
+  });
+
+  it("a refused file at finalize offers no retry", () => {
+    const view = uploadFailureView({
+      ok: false,
+      step: "finalize",
+      error: error("validation_failed", "That PDF can't be read."),
+      pendingSourceId: "s1",
+    });
+    expect(view).toEqual({ text: "That PDF can't be read.", refresh: true, retrySourceId: null });
+  });
+});
+
+describe("UploadFileForm", () => {
+  it("shows Retry after a failed finalize, even at the source limit", () => {
+    const html = renderToStaticMarkup(
+      <UploadFileForm projectId="p1" disabled onUploaded={noop} onChanged={noop} initialRetrySourceId="s1" />,
+    );
+    const retry = (html.match(/<button[^>]*>[^<]*<\/button>/g) ?? []).find((b) => b.endsWith(">Retry</button>"));
+    expect(retry).toBeDefined();
+    expect(retry).not.toMatch(DISABLED);
+  });
+
+  it("shows no Retry by default", () => {
+    const html = renderToStaticMarkup(<UploadFileForm projectId="p1" disabled={false} onUploaded={noop} onChanged={noop} />);
+    expect(html).not.toContain(">Retry<");
   });
 });
 

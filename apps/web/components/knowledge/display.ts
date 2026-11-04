@@ -10,7 +10,7 @@ import {
 } from "@askwell/shared";
 import type { ApiFailure } from "../projects/api";
 import type { LimitPrompt } from "../projects/limit";
-import type { UploadStep } from "./upload";
+import type { UploadResult, UploadStep } from "./upload";
 
 export type StatusTone = "pending" | "ready" | "failed";
 
@@ -92,3 +92,36 @@ export const UPLOAD_STEP_LABELS: Record<UploadStep, string> = {
   upload: "Uploading…",
   finalize: "Processing…",
 };
+
+export type UploadFailureView = {
+  text: string;
+  /** Something changed on the server (a source row may be listed now): refresh the list. */
+  refresh: boolean;
+  /** Offer "Retry" for finalize with this source id (only after a server or network error). */
+  retrySourceId: string | null;
+};
+
+/** How to show a failed upload. */
+export function uploadFailureView(result: Extract<UploadResult, { ok: false }>): UploadFailureView {
+  const text = addErrorText(result.error, "file");
+  switch (result.step) {
+    case "check":
+    case "reserve":
+      return { text, refresh: false, retrySourceId: null };
+    case "upload":
+      return {
+        text: result.pendingSourceId ? `${text} Delete the pending source below.` : text,
+        refresh: true,
+        retrySourceId: null,
+      };
+    case "finalize":
+      // A refused file (validation_failed etc.) is final; a server or network
+      // error may not be, and the claim may have gone through, so retry with
+      // the same id rather than delete.
+      return {
+        text,
+        refresh: true,
+        retrySourceId: result.error.code === "internal" ? result.pendingSourceId : null,
+      };
+  }
+}

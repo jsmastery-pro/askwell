@@ -2,6 +2,7 @@
 // declared size and extension, finalize checks the real ones (§9 "File upload").
 import {
   ALLOWED_FILE_EXTENSIONS,
+  KNOWLEDGE_TITLE_MAX_LENGTH,
   ALLOWED_MIME_TYPES,
   MAX_KNOWLEDGE_FILE_BYTES,
   fileExtension,
@@ -27,12 +28,20 @@ export type FileCheck =
   | { ok: false; message: string };
 
 /**
- * Checks a chosen file's extension and size, and picks the MIME type to
- * declare and upload with. Browsers often report "" (or something else) for
- * .md files, so a type that doesn't match the extension falls back to the
- * extension's first allowed type; finalize checks the real bytes anyway.
+ * Checks a chosen file's name length (it becomes the source title, which
+ * upload-url caps at KNOWLEDGE_TITLE_MAX_LENGTH), extension and size, and
+ * picks the MIME type to declare and upload with. Browsers often report ""
+ * (or something else) for .md files, so a type that doesn't match the
+ * extension falls back to the extension's first allowed type; finalize
+ * checks the real bytes anyway.
  */
 export function checkFile(file: FileInfo): FileCheck {
+  if (file.name.trim().length > KNOWLEDGE_TITLE_MAX_LENGTH) {
+    return {
+      ok: false,
+      message: `That file name is too long. Rename the file to ${KNOWLEDGE_TITLE_MAX_LENGTH} characters or fewer.`,
+    };
+  }
   const ext = fileExtension(file.name);
   if (!isAllowedFileExtension(ext)) {
     return { ok: false, message: `That file type isn't supported. Use ${FILE_RULES_TEXT}` };
