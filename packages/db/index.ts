@@ -23,6 +23,7 @@ type Merge<Base, Override> = Simplify<Omit<Base, keyof Override> & Override>;
 
 type GeneratedPublic = GeneratedDatabase["public"];
 type GeneratedReserve = GeneratedPublic["Functions"]["reserve_knowledge_source"];
+type GeneratedSaveChatTurn = GeneratedPublic["Functions"]["save_chat_turn"];
 
 /**
  * The generator types every function argument and RETURNS TABLE column as
@@ -37,13 +38,27 @@ type ReserveKnowledgeSource = Merge<
   }
 >;
 
+/**
+ * save_chat_turn takes a null conversation ID on a visitor's first message
+ * (it creates the conversation).
+ */
+type SaveChatTurn = Merge<
+  GeneratedSaveChatTurn,
+  { Args: Merge<GeneratedSaveChatTurn["Args"], { p_conversation_id: string | null }> }
+>;
+
 /** The generated Database with the overrides above. Use this, never the generated one. */
 export type Database = Merge<
   GeneratedDatabase,
   {
     public: Merge<
       GeneratedPublic,
-      { Functions: Merge<GeneratedPublic["Functions"], { reserve_knowledge_source: ReserveKnowledgeSource }> }
+      {
+        Functions: Merge<
+          GeneratedPublic["Functions"],
+          { reserve_knowledge_source: ReserveKnowledgeSource; save_chat_turn: SaveChatTurn }
+        >;
+      }
     >;
   }
 >;
