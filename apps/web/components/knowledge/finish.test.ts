@@ -1,6 +1,6 @@
 import type { KnowledgeSource } from "@askwell/shared";
 import { describe, expect, it, vi } from "vitest";
-import { applyFinish } from "./finish";
+import { finishEffects, finishSources } from "./finish";
 import { finishUpload, type UploadDeps } from "./upload";
 
 const row = (id: string, overrides: Partial<KnowledgeSource> = {}): KnowledgeSource => ({
@@ -27,7 +27,10 @@ async function finish(result: Awaited<ReturnType<UploadDeps["finalizeUpload"]>>)
   const deps = finalizeWith(result);
   const outcome = await finishUpload("p1", unfinished.id, deps);
   expect(deps.finalizeUpload).toHaveBeenCalledExactlyOnceWith("p1", "u");
-  return { outcome, update: applyFinish(list, unfinished, outcome) };
+  return {
+    outcome,
+    update: { sources: finishSources(list, unfinished, outcome), ...finishEffects(unfinished, outcome) },
+  };
 }
 
 describe("Finish on an \"Upload not finished\" row", () => {
@@ -52,9 +55,22 @@ describe("Finish on an \"Upload not finished\" row", () => {
     expect(update).toEqual({ sources: list, refresh: true, notice: null });
   });
 
-  it.each(["internal", "unauthorized"] as const)("%s: nothing changed, so no refresh (the row shows the error)", async (code) => {
-    const { outcome, update } = await finish(failure(code));
-    expect(outcome).toEqual({ kind: "error", error: { code, message: code } });
-    expect(update).toEqual({ sources: list, refresh: false, notice: null });
+  it.each(["internal", "unauthorized"] as const)(
+    "%s: the row keeps the error, and the list re-reads (finalize may have marked it failed)",
+    async (code) => {
+      const { outcome, update } = await finish(failure(code));
+      expect(outcome).toEqual({ kind: "error", error: { code, message: code } });
+      expect(update).toEqual({ sources: list, refresh: true, notice: null });
+    },
+  );
+
+  it("two Finishes resolving together both apply (each to the latest list)", () => {
+    const other = row("v", { status: "uploading", title: "other.pdf" });
+    const start = [unfinished, other, row("a")];
+    const readyU = { ...unfinished, status: "ready" as const };
+    // As React applies functional updates: the second sees the first's result.
+    const afterFirst = finishSources(start, unfinished, { kind: "finished", source: readyU });
+    const afterBoth = finishSources(afterFirst, other, { kind: "refused", message: "The file wasn't uploaded. Try again." });
+    expect(afterBoth).toEqual([readyU, start[2]]);
   });
 });

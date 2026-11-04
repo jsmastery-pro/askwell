@@ -7,7 +7,7 @@ import { Button, EmptyState, GlassPanel } from "../ui";
 import { messageClasses } from "../projects/fields";
 import { AddTextForm } from "./AddTextForm";
 import { knowledgeLimitPrompt, sourceCountText } from "./display";
-import { applyFinish } from "./finish";
+import { finishEffects, finishSources } from "./finish";
 import { SourceRow } from "./SourceRow";
 import type { FinishOutcome } from "./upload";
 import { UploadFileForm } from "./UploadFileForm";
@@ -79,10 +79,10 @@ export function KnowledgeManager({
   }
 
   function finished(row: KnowledgeSource, outcome: FinishOutcome) {
-    const update = applyFinish(sources, row, outcome);
-    setSources(update.sources);
-    setNotice(update.notice);
-    if (update.refresh) refresh();
+    setSources((current) => finishSources(current, row, outcome));
+    const effects = finishEffects(row, outcome);
+    setNotice(effects.notice);
+    if (effects.refresh) refresh();
   }
 
   function deleted(id: string) {

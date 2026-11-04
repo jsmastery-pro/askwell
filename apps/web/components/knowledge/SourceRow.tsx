@@ -36,7 +36,7 @@ export function StatusBadge({ status, inFlight = false }: { status: KnowledgeSou
 export interface SourceRowProps {
   source: KnowledgeSource;
   onDeleted: (id: string) => void;
-  /** Finish ran on this "Upload not finished" row and changed something (any outcome but an error). */
+  /** Finish ran on this "Upload not finished" row (every outcome, errors too: the list re-reads). */
   onFinished: (source: KnowledgeSource, outcome: FinishOutcome) => void;
   /**
    * This page's upload form is still uploading this source. It shows
@@ -66,7 +66,7 @@ export function SourceRow({ source, onDeleted, onFinished, inFlight = false, ini
     const outcome = await finishUpload(source.project_id, source.id);
     setFinishing(false);
     if (outcome.kind === "error") setError(finishErrorText(outcome.error));
-    else onFinished(source, outcome);
+    onFinished(source, outcome);
   }
 
   async function remove() {

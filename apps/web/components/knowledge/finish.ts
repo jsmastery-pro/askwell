@@ -3,36 +3,48 @@
 import type { KnowledgeSource } from "@askwell/shared";
 import type { FinishOutcome } from "./upload";
 
-export type FinishUpdate = {
-  /** The list to show until the server re-read arrives. */
-  sources: KnowledgeSource[];
+/**
+ * The list after a Finish outcome for `row`. Pass it to a functional
+ * setState, so two Finishes resolving together each apply to the latest list.
+ */
+export function finishSources(
+  sources: KnowledgeSource[],
+  row: KnowledgeSource,
+  outcome: FinishOutcome,
+): KnowledgeSource[] {
+  switch (outcome.kind) {
+    case "finished":
+      return sources.map((s) => (s.id === row.id ? outcome.source : s));
+    case "refused":
+      // The server deleted the source and its file: drop the row now.
+      return sources.filter((s) => s.id !== row.id);
+    case "gone":
+    case "error":
+      // The server's list says what happened (see finishEffects).
+      return sources;
+  }
+}
+
+export type FinishEffects = {
   /** Re-read the list on the server (router.refresh()). */
   refresh: boolean;
   /** A page-level message that outlives the row (the row may be gone). */
   notice: string | null;
 };
 
-/** Applies a Finish outcome for `row` to the current list. */
-export function applyFinish(sources: KnowledgeSource[], row: KnowledgeSource, outcome: FinishOutcome): FinishUpdate {
+/** What else a Finish outcome does. Every outcome re-reads the list. */
+export function finishEffects(row: KnowledgeSource, outcome: FinishOutcome): FinishEffects {
   switch (outcome.kind) {
-    case "finished":
-      return {
-        sources: sources.map((s) => (s.id === row.id ? outcome.source : s)),
-        refresh: true,
-        notice: null,
-      };
     case "refused":
-      // The server deleted the source and its file: drop the row now, and say why.
-      return {
-        sources: sources.filter((s) => s.id !== row.id),
-        refresh: true,
-        notice: `${row.title}: ${outcome.message}`,
-      };
+      return { refresh: true, notice: `${row.title}: ${outcome.message}` };
+    case "finished":
     case "gone":
-      // Finalized elsewhere or reclaimed: the server's list says which.
-      return { sources, refresh: true, notice: null };
+      // gone: finalized elsewhere or reclaimed.
+      return { refresh: true, notice: null };
     case "error":
-      // Nothing changed on the server; the row shows the error and keeps Finish.
-      return { sources, refresh: false, notice: null };
+      // Ambiguous: finalize may have claimed the source and then marked it
+      // "failed" before erroring. The row shows the error; the re-read shows
+      // the source's real status (and drops Finish if it's no longer uploading).
+      return { refresh: true, notice: null };
   }
 }
