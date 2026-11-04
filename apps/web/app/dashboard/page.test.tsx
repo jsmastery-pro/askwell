@@ -51,6 +51,30 @@ describe("/dashboard", () => {
     expect(html).toContain('href="/dashboard/projects/p1"');
     expect(html).not.toContain("No projects yet");
   });
+
+  it("each project's usage uses the plan read on the server and the server's clock", async () => {
+    vi.useFakeTimers({ now: new Date("2026-11-20T12:00:00Z"), toFake: ["Date"] });
+    try {
+      listOwnProjects.mockResolvedValue([
+        {
+          id: "p1",
+          owner_id: "user_1",
+          name: "Docs bot",
+          public_key: "pk_abc",
+          messages_used: 5,
+          period_start: "2026-11-01T00:00:00+00:00",
+          created_at: "2026-11-03T12:00:00Z",
+        },
+      ]);
+      loadOwnPlan.mockResolvedValue("pro");
+      const { ProjectsSection } = await import("../../components/projects/ProjectsSection");
+      const html = renderToStaticMarkup(await ProjectsSection());
+      expect(html).toContain("5 / 2,000");
+      expect(html).toContain("Dec 1, 2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("/dashboard loading state", () => {
