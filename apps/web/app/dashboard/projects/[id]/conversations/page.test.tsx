@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({
     throw new Error("NEXT_NOT_FOUND");
   },
   useRouter: () => ({ refresh: () => undefined }),
+  useParams: () => ({ id: "11111111-1111-4111-8111-111111111111" }),
 }));
 const connection = vi.fn(async () => undefined);
 vi.mock("next/server", () => ({ connection: () => connection() }));
@@ -24,6 +25,7 @@ const { ConversationsSection } = await import("./ConversationsSection");
 const { ThreadSection } = await import("./[conversationId]/ThreadSection");
 const { default: ConversationsPage } = await import("./page");
 const { default: ConversationsError } = await import("./error");
+const { default: ConversationNotFound } = await import("./[conversationId]/not-found");
 
 const P = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -95,6 +97,12 @@ describe("/dashboard/projects/[id]/conversations/[conversationId]", () => {
   ])("is the 404 page when %s", async (_label, arrange) => {
     arrange();
     await expect(ThreadSection({ projectId: P, conversationId: C })).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("its 404 page names the conversation and links back to the list", () => {
+    const html = renderToStaticMarkup(<ConversationNotFound />);
+    expect(html).toContain("Conversation not found");
+    expect(html).toContain(`href="/dashboard/projects/${P}/conversations"`);
   });
 
   it("is the 404 page for a non-uuid id, without a database call", async () => {
