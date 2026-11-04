@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { connection } from "next/server";
 import type { Plan } from "@askwell/shared";
 import { loadOwnPlan } from "../../lib/accounts/account";
 import { Skeleton } from "../ui";
@@ -25,8 +26,13 @@ export function PlanBadgeSkeleton() {
 /**
  * Makes sure the owner's account row exists, then shows their plan, read with
  * the owner client (RLS). Render inside <Suspense>: it reads the request.
+ *
+ * connection() first, outside the catch below: it keeps the badge out of
+ * Next's prerenders. Otherwise a prerender aborts the account fetch and the
+ * catch turns that abort into "Plan unavailable" and a false error log.
  */
 export async function PlanBadge() {
+  await connection();
   // Outside the try: protect() signals a redirect by throwing.
   await auth.protect();
   const plan = await loadOwnPlan().catch((error: unknown) => {

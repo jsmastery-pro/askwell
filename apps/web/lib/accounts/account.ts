@@ -7,6 +7,7 @@
 import "server-only";
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
+import { connection } from "next/server";
 import { PLANS, type Plan } from "@askwell/shared";
 import { createOwnerClient, UnauthorizedError } from "../supabase/owner";
 import { createServiceClient } from "../supabase/service";
@@ -64,9 +65,15 @@ export async function getOwnPlan(): Promise<Plan> {
 
 /**
  * ensureAccount() then getOwnPlan(), once per request (React `cache`), for
- * the dashboard layout.
+ * server components (the plan badge, the projects and knowledge sections).
+ *
+ * connection() first: with cacheComponents, Next also prerenders these
+ * components while the session is readable (the App Shell carries session
+ * content), and aborts any fetch still open when that prerender completes.
+ * Waiting for the request keeps the upsert and the read out of every prerender.
  */
 export const loadOwnPlan = cache(async (): Promise<Plan> => {
+  await connection();
   await ensureAccount();
   return getOwnPlan();
 });

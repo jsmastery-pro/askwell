@@ -15,6 +15,11 @@ const loadProject = vi.fn();
 vi.mock("../project", () => ({ loadProject: (id: string) => loadProject(id) }));
 const loadOwnPlan = vi.fn();
 vi.mock("../../../../../lib/accounts/account", () => ({ loadOwnPlan: () => loadOwnPlan() }));
+// connection(): resolved by default; a test can hold it open, as a
+// prerender does, to check that nothing runs before the request arrives.
+let connectionGate: Promise<void> = Promise.resolve();
+const connection = vi.fn(() => connectionGate);
+vi.mock("next/server", () => ({ connection: () => connection() }));
 
 // The owner client, recording the PostgREST request listOwnSources() sends.
 const requests: URL[] = [];
@@ -59,7 +64,12 @@ async function render(): Promise<string> {
   return renderToStaticMarkup(await KnowledgeSection({ projectId: PROJECT.id }));
 }
 
+/** Lets every pending promise callback run. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 beforeEach(() => {
+  connectionGate = Promise.resolve();
+  connection.mockClear();
   requests.length = 0;
   rows = [];
   status = 200;
@@ -84,6 +94,23 @@ describe("/dashboard/projects/[id]/knowledge", () => {
     expect(html).toContain("Refund policy");
     expect(html).toContain(">Processing<");
     expect(html).toContain(`1 of ${PLAN_LIMITS.free.knowledgeSources} sources`);
+  });
+
+  it("waits for the request (connection()) before any owner read: nothing starts in a prerender", async () => {
+    let arrive = () => undefined as void;
+    connectionGate = new Promise<void>((resolve) => (arrive = resolve));
+    loadProject.mockResolvedValue(PROJECT);
+    loadOwnPlan.mockResolvedValue("free");
+    const html = render();
+    await flush();
+    expect(connection).toHaveBeenCalledOnce();
+    expect(loadProject).not.toHaveBeenCalled();
+    expect(loadOwnPlan).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+
+    arrive();
+    expect(await html).toContain("Sources");
+    expect(requests).toHaveLength(1);
   });
 
   it("uses the Pro limit for a Pro owner", async () => {
