@@ -4,8 +4,10 @@
 // functions must be callable by service_role only.
 import type { PGlite } from "@electric-sql/pglite";
 import { ALLOWED_FILE_MIME_TYPES, MAX_KNOWLEDGE_FILE_BYTES, PLAN_LIMITS } from "@askwell/shared";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it } from "vitest";
+import type { Database } from "@askwell/db";
 import { applyMigrations, asRole, createTestDb } from "@askwell/db/testing";
+import type { Database as GeneratedDatabase } from "./types";
 
 const OWNER = "user_owner";
 const PROJECT = "00000000-0000-4000-8000-000000000001";
@@ -375,5 +377,33 @@ describe("knowledge function access", () => {
        where p.oid = '${sig}'::regprocedure`,
     );
     expect(rows).toEqual([{ prosecdef: false, lang, proconfig: ['search_path=""'] }]);
+  });
+});
+
+describe("Database type override (index.ts)", () => {
+  type Functions = Database["public"]["Functions"];
+  type Generated = GeneratedDatabase["public"]["Functions"];
+  type Reserve = Functions["reserve_knowledge_source"];
+
+  it("reserve_knowledge_source takes and returns a nullable storage key (pasted text)", () => {
+    expectTypeOf<Reserve["Args"]["p_storage_key"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Reserve["Returns"][number]["storage_key"]>().toEqualTypeOf<string | null>();
+  });
+
+  it("keeps every other field of reserve_knowledge_source as generated", () => {
+    expectTypeOf<Omit<Reserve["Args"], "p_storage_key">>().toEqualTypeOf<
+      Omit<Generated["reserve_knowledge_source"]["Args"], "p_storage_key">
+    >();
+    expectTypeOf<Omit<Reserve["Returns"][number], "storage_key">>().toEqualTypeOf<
+      Omit<Generated["reserve_knowledge_source"]["Returns"][number], "storage_key">
+    >();
+  });
+
+  it("leaves the other functions, the tables and the other schema keys unchanged", () => {
+    expectTypeOf<Omit<Functions, "reserve_knowledge_source">>().toEqualTypeOf<
+      Omit<Generated, "reserve_knowledge_source">
+    >();
+    expectTypeOf<Database["public"]["Tables"]>().toEqualTypeOf<GeneratedDatabase["public"]["Tables"]>();
+    expectTypeOf<keyof Database>().toEqualTypeOf<keyof GeneratedDatabase>();
   });
 });
