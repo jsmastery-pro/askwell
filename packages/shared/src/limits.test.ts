@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALLOWED_FILE_EXTENSIONS,
   ALLOWED_FILE_MIME_TYPES,
+  CONVERSATIONS_PAGE_SIZE,
   API_ERROR_CODES,
   API_ERROR_STATUS,
   MAX_FILE_BYTES,
@@ -21,6 +22,7 @@ describe("limits", () => {
     expect(ALLOWED_FILE_EXTENSIONS).toEqual(["pdf", "md", "txt"]);
     expect(PROJECT_NAME_MIN_LENGTH).toBe(1);
     expect(PROJECT_NAME_MAX_LENGTH).toBe(60);
+    expect(CONVERSATIONS_PAGE_SIZE).toBe(50);
   });
 
   it("lists each MIME type once", () => {
