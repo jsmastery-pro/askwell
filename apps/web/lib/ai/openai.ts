@@ -56,9 +56,19 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
         `Expected ${batch.length} embeddings, got ${response.data.length}.`,
       );
     }
-    // The API tags each vector with its input index; don't rely on order.
-    const ordered = [...response.data].sort((a, b) => a.index - b.index);
-    for (const { embedding } of ordered) {
+    // The API tags each vector with its input index; don't rely on order. Each
+    // index must name a distinct input, or a vector could land on the wrong chunk.
+    const ordered: number[][] = [];
+    for (const { index, embedding } of response.data) {
+      if (!Number.isInteger(index) || index < 0 || index >= batch.length) {
+        throw new OpenAIResponseError(`Embedding index ${index} is out of range.`);
+      }
+      if (ordered[index] !== undefined) {
+        throw new OpenAIResponseError(`Embedding index ${index} appears twice.`);
+      }
+      ordered[index] = embedding;
+    }
+    for (const embedding of ordered) {
       if (embedding.length !== EMBEDDING_DIMENSIONS) {
         throw new OpenAIResponseError(
           `Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embedding.length}.`,

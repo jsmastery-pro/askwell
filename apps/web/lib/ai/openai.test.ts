@@ -97,6 +97,25 @@ describe("embedTexts", () => {
     await expect(embedTexts(["a"])).rejects.toBeInstanceOf(OpenAIResponseError);
   });
 
+  it("rejects duplicate indices", async () => {
+    const vector = Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+    embeddingsCreate.mockResolvedValueOnce({
+      data: [
+        { index: 0, embedding: vector },
+        { index: 0, embedding: vector },
+      ],
+    });
+    await expect(embedTexts(["a", "b"])).rejects.toThrow(/appears twice/);
+  });
+
+  it("rejects out-of-range indices", async () => {
+    const vector = Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+    embeddingsCreate.mockResolvedValueOnce({ data: [{ index: 1, embedding: vector }] });
+    await expect(embedTexts(["a"])).rejects.toThrow(/out of range/);
+    embeddingsCreate.mockResolvedValueOnce({ data: [{ index: -1, embedding: vector }] });
+    await expect(embedTexts(["a"])).rejects.toThrow(/out of range/);
+  });
+
   it("rejects a missing vector", async () => {
     embeddingsCreate.mockResolvedValueOnce({ data: [] });
     await expect(embedTexts(["a"])).rejects.toBeInstanceOf(OpenAIResponseError);
