@@ -82,7 +82,7 @@ describe("EmbedPanel", () => {
 
   it("shows a friendly error", () => {
     const html = render({}, { state: { ...initialChatState, error: "quota_exceeded" } });
-    expect(html).toMatch(/<p role="alert"[^>]*>This chat can(&#x27;|')t answer right now/);
+    expect(html).toMatch(/<p role="alert"[^>]*>This assistant has reached its limit for now/);
   });
 });
 

@@ -48,7 +48,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         conversationId: action.conversationId,
       };
     case "failed":
-      return { ...state, typing: false, error: action.code };
+      return {
+        ...state,
+        typing: false,
+        error: action.code,
+        // The conversation is gone (§6.6: it isn't this project's): start a new one.
+        conversationId: action.code === "not_found" ? null : state.conversationId,
+      };
   }
 }
 
@@ -56,14 +62,17 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 export function friendlyError(code: ApiErrorCode): string {
   switch (code) {
     case "rate_limited":
-      return "You're sending messages a bit fast. Wait a moment, then try again.";
+      return "You're sending messages too fast. Wait a moment, then try again.";
     case "quota_exceeded":
-      return "This chat can't answer right now. Please try again later.";
+      return "This assistant has reached its limit for now. Please try again later.";
     case "validation_failed":
       return `Messages can be up to ${MAX_MESSAGE_LENGTH.toLocaleString("en-US")} characters.`;
     case "message_blocked":
       return "This message can't be sent. Try rewording it.";
+    case "not_found":
+      return "This conversation has ended. Send your message again to start a new one.";
     default:
+      // internal, network errors, and anything unexpected.
       return "Something went wrong. Please try again.";
   }
 }
