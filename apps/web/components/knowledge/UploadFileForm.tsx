@@ -17,6 +17,8 @@ export interface UploadFileFormProps {
   onUploaded: (source: KnowledgeSource) => void;
   /** Something changed on the server even though the upload failed: re-read the list. */
   onChanged: () => void;
+  /** The source this form is uploading or finalizing right now, or null once its flow ends. */
+  onInFlight: (sourceId: string | null) => void;
   /** Start with a failed finalize to retry (tests). */
   initialRetrySourceId?: string;
 }
@@ -27,6 +29,7 @@ export function UploadFileForm({
   disabled,
   onUploaded,
   onChanged,
+  onInFlight,
   initialRetrySourceId,
 }: UploadFileFormProps) {
   const inputId = useId();
@@ -45,6 +48,7 @@ export function UploadFileForm({
 
   function settle(result: UploadResult) {
     setStep(null);
+    onInFlight(null);
     if (result.ok) {
       clearFile();
       setRetrySourceId(null);
@@ -76,12 +80,13 @@ export function UploadFileForm({
     if (!file || disabled) return;
     setError(null);
     setRetrySourceId(null);
-    settle(await uploadKnowledgeFile(projectId, file, setStep));
+    settle(await uploadKnowledgeFile(projectId, file, setStep, undefined, onInFlight));
   }
 
   async function retry() {
     if (!retrySourceId) return;
     setError(null);
+    onInFlight(retrySourceId);
     settle(await finalizeKnowledgeFile(projectId, retrySourceId, setStep));
   }
 

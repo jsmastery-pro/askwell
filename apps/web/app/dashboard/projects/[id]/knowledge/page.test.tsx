@@ -92,7 +92,7 @@ describe("/dashboard/projects/[id]/knowledge", () => {
     expect(url.searchParams.get("order")).toBe("created_at.desc,id.asc");
 
     expect(html).toContain("Refund policy");
-    expect(html).toContain(">Processing<");
+    expect(html).toContain(">Upload not finished<");
     expect(html).toContain(`1 of ${PLAN_LIMITS.free.knowledgeSources} sources`);
   });
 

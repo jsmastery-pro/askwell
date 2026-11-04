@@ -8,7 +8,8 @@ import { AlertIcon } from "../ui/icons";
 import { messageClasses } from "../projects/fields";
 import { formatCreatedDate } from "../projects/format";
 import { deleteSource } from "./api";
-import { deleteErrorText, statusView, TYPE_LABELS, type StatusTone } from "./display";
+import { deleteErrorText, finishErrorText, statusView, TYPE_LABELS, type StatusTone } from "./display";
+import { finishUpload, type FinishOutcome } from "./upload";
 
 const toneClasses: Record<StatusTone, string> = {
   pending: "border-line-strong text-fg-muted",
@@ -17,8 +18,8 @@ const toneClasses: Record<StatusTone, string> = {
 };
 
 /** The status pill. Failed carries an icon, so it doesn't rely on color alone. */
-export function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
-  const { label, tone } = statusView(status);
+export function StatusBadge({ status, inFlight = false }: { status: KnowledgeSource["status"]; inFlight?: boolean }) {
+  const { label, tone } = statusView(status, inFlight);
   return (
     <span
       className={cx(
@@ -35,16 +36,38 @@ export function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
 export interface SourceRowProps {
   source: KnowledgeSource;
   onDeleted: (id: string) => void;
+  /** Finish ran on this "Upload not finished" row and changed something (any outcome but an error). */
+  onFinished: (source: KnowledgeSource, outcome: FinishOutcome) => void;
+  /**
+   * This page's upload form is still uploading this source. It shows
+   * "Uploading…" with no Finish and Delete disabled until the form's flow
+   * ends: finishing or deleting it now would destroy the file being sent.
+   */
+  inFlight?: boolean;
   /** Start on the confirm step (tests). */
   initialConfirming?: boolean;
 }
 
-/** One source: title (as text), type, status, created date, and delete with a confirm step. */
-export function SourceRow({ source, onDeleted, initialConfirming = false }: SourceRowProps) {
+/**
+ * One source: title (as text), type, status, created date, and delete with a
+ * confirm step. An `uploading` row ("Upload not finished") also has Finish.
+ */
+export function SourceRow({ source, onDeleted, onFinished, inFlight = false, initialConfirming = false }: SourceRowProps) {
   const [confirming, setConfirming] = useState(initialConfirming);
   const [pending, setPending] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const failed = source.status === "failed";
+  const unfinished = source.status === "uploading" && !inFlight;
+
+  async function finish() {
+    setFinishing(true);
+    setError(null);
+    const outcome = await finishUpload(source.project_id, source.id);
+    setFinishing(false);
+    if (outcome.kind === "error") setError(finishErrorText(outcome.error));
+    else onFinished(source, outcome);
+  }
 
   async function remove() {
     setPending(true);
@@ -66,9 +89,14 @@ export function SourceRow({ source, onDeleted, initialConfirming = false }: Sour
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <StatusBadge status={source.status} />
+          <StatusBadge status={source.status} inFlight={inFlight} />
+          {unfinished && !confirming ? (
+            <Button variant="secondary" size="sm" loading={finishing} onClick={finish}>
+              Finish
+            </Button>
+          ) : null}
           {confirming ? null : (
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+            <Button variant="ghost" size="sm" disabled={finishing || inFlight} onClick={() => setConfirming(true)}>
               Delete
             </Button>
           )}
@@ -81,6 +109,12 @@ export function SourceRow({ source, onDeleted, initialConfirming = false }: Sour
         </p>
       ) : null}
 
+      {unfinished ? (
+        <p className="text-sm text-fg-muted">
+          This upload didn&apos;t finish. Finish it to process the file, or delete it and upload again.
+        </p>
+      ) : null}
+
       {confirming ? (
         <div role="group" aria-label="Confirm delete" className="flex flex-col gap-3">
           <p className="text-sm text-fg">
@@ -88,7 +122,7 @@ export function SourceRow({ source, onDeleted, initialConfirming = false }: Sour
             it. This can&apos;t be undone.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" loading={pending} onClick={remove}>
+            <Button size="sm" loading={pending} disabled={inFlight} onClick={remove}>
               Delete source
             </Button>
             <Button

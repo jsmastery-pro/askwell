@@ -14,10 +14,15 @@ import type { UploadResult, UploadStep } from "./upload";
 
 export type StatusTone = "pending" | "ready" | "failed";
 
-/** `uploading` shows as Processing too: to the owner both mean "not ready yet". */
-export function statusView(status: KnowledgeSourceStatus): { label: string; tone: StatusTone } {
+/**
+ * `uploading` is a reservation whose finalize never ran (the page reloaded or
+ * the network dropped mid-upload): "Upload not finished", with Finish (§6.4).
+ * `inFlight`: this page's own upload is still sending it, so it's "Uploading…".
+ */
+export function statusView(status: KnowledgeSourceStatus, inFlight = false): { label: string; tone: StatusTone } {
   switch (status) {
     case "uploading":
+      return { label: inFlight ? "Uploading…" : "Upload not finished", tone: "pending" };
     case "processing":
       return { label: "Processing", tone: "pending" };
     case "ready":
@@ -82,6 +87,16 @@ export function deleteErrorText(error: ApiFailure): string {
       return "Your session ended. Sign in again.";
     default:
       return "Couldn't delete the source. Try again.";
+  }
+}
+
+/** A Finish that changed nothing (server, network or session error), in words. */
+export function finishErrorText(error: ApiFailure): string {
+  switch (error.code) {
+    case "unauthorized":
+      return "Your session ended. Sign in again.";
+    default:
+      return "Couldn't finish the upload. Try again.";
   }
 }
 

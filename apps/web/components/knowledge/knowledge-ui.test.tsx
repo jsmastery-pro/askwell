@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   addErrorText,
   deleteErrorText,
+  finishErrorText,
   knowledgeLimitPrompt,
   sourceCountText,
   statusView,
@@ -117,12 +118,12 @@ describe("KnowledgeManager", () => {
 
 describe("SourceRow", () => {
   it("shows Delete, then a confirm step naming the source", () => {
-    const view = renderToStaticMarkup(<SourceRow source={source("a", { title: "FAQ" })} onDeleted={noop} />);
+    const view = renderToStaticMarkup(<SourceRow source={source("a", { title: "FAQ" })} onDeleted={noop} onFinished={noop} />);
     expect(view).toMatch(/<button[^>]*>Delete<\/button>/);
     expect(view).not.toContain("Confirm delete");
 
     const confirm = renderToStaticMarkup(
-      <SourceRow source={source("a", { title: "FAQ" })} onDeleted={noop} initialConfirming />,
+      <SourceRow source={source("a", { title: "FAQ" })} onDeleted={noop} onFinished={noop} initialConfirming />,
     );
     expect(confirm).toContain('aria-label="Confirm delete"');
     expect(confirm).toContain("<strong");
@@ -131,8 +132,71 @@ describe("SourceRow", () => {
     expect(confirm).toMatch(/>Cancel</);
   });
 
+  it("an uploading row shows \"Upload not finished\" with Finish and Delete", () => {
+    const html = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading", title: "<b>guide</b>.pdf" })} onDeleted={noop} onFinished={noop} />,
+    );
+    expect(html).toContain(">Upload not finished<");
+    expect(html).not.toContain(">Processing<");
+    expect(html).toMatch(/<button[^>]*>Finish<\/button>/);
+    expect(html).toMatch(/<button[^>]*>Delete<\/button>/);
+    expect(html).toContain("didn&#x27;t finish");
+    // The title is text, never HTML.
+    expect(html).toContain("&lt;b&gt;guide&lt;/b&gt;.pdf");
+    expect(html).not.toContain("<b>guide</b>");
+  });
+
+  it("a processing or ready row has no Finish", () => {
+    for (const status of ["processing", "ready", "failed"] as const) {
+      const html = renderToStaticMarkup(<SourceRow source={source("a", { status })} onDeleted={noop} onFinished={noop} />);
+      expect(html).not.toMatch(/>Finish</);
+    }
+    expect(renderToStaticMarkup(<StatusBadge status="processing" />)).toContain("Processing");
+  });
+
+  it("the row this page is still uploading shows \"Uploading…\", with no Finish and Delete disabled", () => {
+    const html = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} inFlight />,
+    );
+    expect(html).toContain(">Uploading…<");
+    expect(html).not.toContain("Upload not finished");
+    expect(html).not.toMatch(/>Finish</);
+    expect(html).not.toContain("didn&#x27;t finish");
+    expect(html.match(/<button[^>]*>Delete<\/button>/)?.[0]).toMatch(DISABLED);
+
+    const confirm = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} inFlight initialConfirming />,
+    );
+    expect(confirm.match(/<button[^>]*>(?:<[^>]+>)*Delete source<\/button>/)?.[0]).toMatch(DISABLED);
+  });
+
+  it("KnowledgeManager: only the in-flight upload's row loses Finish", () => {
+    const html = renderToStaticMarkup(
+      <KnowledgeManager
+        projectId="p1"
+        initialSources={[source("mine", { status: "uploading", title: "Mine" }), source("old", { status: "uploading", title: "Old" })]}
+        plan="pro"
+        limit={PLAN_LIMITS.pro.knowledgeSources}
+        initialInFlightId="mine"
+      />,
+    );
+    const row = (title: string) => html.match(new RegExp(`<li[^>]*aria-label="${title}"[\\s\\S]*?</li>`))?.[0] ?? "";
+    expect(row("Mine")).toContain(">Uploading…<");
+    expect(row("Mine")).not.toMatch(/>Finish</);
+    expect(row("Old")).toContain(">Upload not finished<");
+    expect(row("Old")).toMatch(/>Finish</);
+  });
+
+  it("the confirm step on an uploading row hides Finish", () => {
+    const html = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} initialConfirming />,
+    );
+    expect(html).toContain('aria-label="Confirm delete"');
+    expect(html).not.toMatch(/>Finish</);
+  });
+
   it("shows an error state for a failed source", () => {
-    const html = renderToStaticMarkup(<SourceRow source={source("a", { status: "failed" })} onDeleted={noop} />);
+    const html = renderToStaticMarkup(<SourceRow source={source("a", { status: "failed" })} onDeleted={noop} onFinished={noop} />);
     expect(html).toContain(">Failed");
     expect(html).toContain("<svg");
     expect(html).toContain("couldn&#x27;t read this source");
@@ -141,7 +205,7 @@ describe("SourceRow", () => {
 
 describe("StatusBadge and statusView", () => {
   it.each([
-    ["uploading", "Processing", "pending"],
+    ["uploading", "Upload not finished", "pending"],
     ["processing", "Processing", "pending"],
     ["ready", "Ready", "ready"],
     ["failed", "Failed", "failed"],
@@ -183,6 +247,8 @@ describe("error words", () => {
     expect(addErrorText(err("internal"), "file")).toBe("Couldn't upload the file. Try again.");
     expect(deleteErrorText(err("not_found"))).toMatch(/no longer exists/);
     expect(deleteErrorText(err("internal"))).toBe("Couldn't delete the source. Try again.");
+    expect(finishErrorText(err("unauthorized"))).toMatch(/Sign in again/);
+    expect(finishErrorText(err("internal"))).toBe("Couldn't finish the upload. Try again.");
   });
 });
 
@@ -272,7 +338,7 @@ describe("uploadFailureView", () => {
 describe("UploadFileForm", () => {
   it("shows Retry after a failed finalize, even at the source limit", () => {
     const html = renderToStaticMarkup(
-      <UploadFileForm projectId="p1" disabled onUploaded={noop} onChanged={noop} initialRetrySourceId="s1" />,
+      <UploadFileForm projectId="p1" disabled onUploaded={noop} onChanged={noop} onInFlight={noop} initialRetrySourceId="s1" />,
     );
     const retry = (html.match(/<button[^>]*>[^<]*<\/button>/g) ?? []).find((b) => b.endsWith(">Retry</button>"));
     expect(retry).toBeDefined();
@@ -280,7 +346,7 @@ describe("UploadFileForm", () => {
   });
 
   it("shows no Retry by default", () => {
-    const html = renderToStaticMarkup(<UploadFileForm projectId="p1" disabled={false} onUploaded={noop} onChanged={noop} />);
+    const html = renderToStaticMarkup(<UploadFileForm projectId="p1" disabled={false} onUploaded={noop} onChanged={noop} onInFlight={noop} />);
     expect(html).not.toContain(">Retry<");
   });
 });
