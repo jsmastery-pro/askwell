@@ -8,6 +8,7 @@ export * from "./errors";
 export * from "./widget";
 export * from "./embed";
 export * from "./models";
+export * from "./ai";
 export * from "./api/common";
 export * from "./api/widget";
 export * from "./api/projects";
