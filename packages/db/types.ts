@@ -251,6 +251,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_knowledge_source: {
+        Args: { p_project_id: string; p_source_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          project_id: string
+          status: string
+          storage_key: string | null
+          title: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "knowledge_sources"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       create_project: {
         Args: {
           p_max_projects: number
@@ -276,6 +294,26 @@ export type Database = {
       }
       owned_conversation_ids: { Args: never; Returns: string[] }
       owned_project_ids: { Args: never; Returns: string[] }
+      reserve_knowledge_source: {
+        Args: {
+          p_max_sources: number
+          p_project_id: string
+          p_status: string
+          p_storage_key: string
+          p_title: string
+          p_type: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          project_id: string
+          reclaimed_storage_keys: string[]
+          status: string
+          storage_key: string
+          title: string
+          type: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

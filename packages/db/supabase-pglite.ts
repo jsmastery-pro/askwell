@@ -83,6 +83,22 @@ as $$
   )::text
 $$;
 
+-- A minimal "storage" schema: only storage.buckets, with the columns a
+-- migration sets when it creates a bucket (askwell-dev has more, all with
+-- defaults or nullable). No storage.objects and no Storage API: tests check
+-- the bucket row, not file uploads.
+create schema storage;
+create table storage.buckets (
+  id text primary key,
+  name text not null unique,
+  owner uuid,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  public boolean default false,
+  file_size_limit bigint,
+  allowed_mime_types text[]
+);
+
 -- The "public" schema. Supabase grants USAGE on it to the API roles (on top
 -- of Postgres's own USAGE for PUBLIC).
 grant usage on schema public to anon, authenticated, service_role;
