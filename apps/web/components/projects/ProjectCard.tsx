@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useId, useState, type FormEvent } from "react";
 import { PROJECT_NAME_MAX_LENGTH, type Project } from "@askwell/shared";
+import type { Usage } from "../../lib/usage/usage";
+import { UsageMeter } from "../usage/UsageMeter";
 import { Button, GlassPanel } from "../ui";
 import { deleteProject, renameProject, type ApiFailure } from "./api";
 import { inputClasses, messageClasses } from "./fields";
@@ -26,6 +28,8 @@ export function cardErrorText(error: ApiFailure, action: "rename" | "delete"): s
 
 export interface ProjectCardProps {
   project: Project;
+  /** Messages this month against the plan's limit (computed from the server's plan and clock). */
+  usage: Usage;
   onRenamed: (project: Project) => void;
   onDeleted: (id: string) => void;
   /** Start in this mode (tests). */
@@ -33,7 +37,7 @@ export interface ProjectCardProps {
 }
 
 /** One project: name, created date, link to it, inline rename and delete with a confirm step. */
-export function ProjectCard({ project, onRenamed, onDeleted, initialMode = "view" }: ProjectCardProps) {
+export function ProjectCard({ project, usage, onRenamed, onDeleted, initialMode = "view" }: ProjectCardProps) {
   const inputId = useId();
   const [mode, setMode] = useState<CardMode>(initialMode);
   const [name, setName] = useState(project.name);
@@ -116,6 +120,8 @@ export function ProjectCard({ project, onRenamed, onDeleted, initialMode = "view
           </p>
         </div>
       )}
+
+      <UsageMeter usage={usage} />
 
       {mode === "confirm-delete" ? (
         <div role="group" aria-label="Confirm delete" className="flex flex-col gap-3">
