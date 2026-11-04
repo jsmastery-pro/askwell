@@ -130,7 +130,7 @@ The whole product in one flow. When this works end to end, the product is done.
 | File types | PDF, Markdown, TXT. Max 10 MB (`MAX_KNOWLEDGE_FILE_BYTES`); the bucket enforces the same size and types. |
 | Upload     | 1. `upload-url` reserves the source as `uploading` (counts toward the limit) and returns a one-time signed URL. 2. The browser uploads straight to Storage. 3. `finalize` claims the source once (`uploading` → `processing`), checks the real size and PDF bytes, then processes it. A refused file is deleted. A reservation not finalized within 2 hours is reclaimed. |
 | Processing | Extract text (PDF: `unpdf`) → split into chunks → OpenAI embeddings → store in pgvector |
-| Actions    | List sources with status (`uploading` shows as processing), delete a source (deletes its file and chunks) |
+| Actions    | List sources with status, delete a source (deletes its file and chunks). An `uploading` row shows as "Upload not finished" with a Finish button (calls `finalize` again with the same source; if the file never arrived, `finalize` refuses and deletes it). |
 | Limit      | Free: 3 sources per project. Pro: 25. Files and pasted texts count toward the same limit. |
 | Done when  | Uploading a PDF creates chunks; a related question retrieves them                       |
 
