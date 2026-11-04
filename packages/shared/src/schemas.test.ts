@@ -5,9 +5,12 @@ import {
   createProjectBody,
   createTextSourceBody,
   createUploadUrlBody,
+  decodeConversationCursor,
+  encodeConversationCursor,
   fileExtension,
   finalizeUploadBody,
   idParams,
+  listConversationsQuery,
   MAX_KNOWLEDGE_FILE_BYTES,
   MAX_MESSAGE_LENGTH,
   MAX_PASTED_TEXT_LENGTH,
@@ -157,5 +160,50 @@ describe("fileExtension", () => {
     expect(fileExtension("noext")).toBeNull();
     expect(fileExtension(".env")).toBeNull();
     expect(fileExtension("trailing.")).toBeNull();
+  });
+});
+
+describe("listConversationsQuery and the conversation cursor", () => {
+  const cursor = { created_at: "2026-11-04T18:20:32.87489+00:00", id: ID };
+
+  it("no `before` is the first page", () => {
+    expect(listConversationsQuery.parse({})).toEqual({});
+  });
+
+  it("`before` decodes a cursor made by encodeConversationCursor", () => {
+    const before = encodeConversationCursor(cursor);
+    expect(before).toMatch(/^[0-9a-f]+$/);
+    expect(listConversationsQuery.parse({ before })).toEqual({ before: cursor });
+    expect(decodeConversationCursor(before)).toEqual(cursor);
+  });
+
+  it("round-trips UTC 'Z' times and whole seconds", () => {
+    for (const created_at of ["2026-11-04T18:20:32Z", "2026-11-04T18:20:32.123456+00:00"]) {
+      expect(decodeConversationCursor(encodeConversationCursor({ created_at, id: ID }))).toEqual({ created_at, id: ID });
+    }
+  });
+
+  const hex = (value: string) => Array.from(value, (ch) => ch.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+  it.each([
+    ["not hex", "not a cursor!"],
+    ["odd-length hex", "7b2"],
+    ["upper-case hex", hex("{}").toUpperCase() + "AB"],
+    ["empty", ""],
+    ["hex of non-JSON", hex("hello")],
+    ["a JSON array", hex("[1,2]")],
+    ["a bad timestamp", hex(JSON.stringify({ c: "yesterday", i: ID }))],
+    ["a timestamp with a filter injection", hex(JSON.stringify({ c: "2026-11-04T18:20:32Z,id.gt.0", i: ID }))],
+    ["a bad id", hex(JSON.stringify({ c: cursor.created_at, i: "123" }))],
+    ["an extra key", hex(JSON.stringify({ c: cursor.created_at, i: ID, x: 1 }))],
+    ["too long", "ab".repeat(201)],
+  ])("refuses %s", (_label, before) => {
+    expect(decodeConversationCursor(before)).toBeNull();
+    const result = listConversationsQuery.safeParse({ before });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Invalid cursor");
+  });
+
+  it("refuses unknown query parameters", () => {
+    expect(listConversationsQuery.safeParse({ page: "2" }).success).toBe(false);
   });
 });

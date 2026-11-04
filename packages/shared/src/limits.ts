@@ -31,6 +31,9 @@ export const PROJECT_NAME_MIN_LENGTH = 1;
 export const PROJECT_NAME_MAX_LENGTH = 60;
 
 export const KNOWLEDGE_TITLE_MAX_LENGTH = 200;
+
+/** Conversations per page on the Conversations list ("Load older" fetches the next page). */
+export const CONVERSATIONS_PAGE_SIZE = 50;
 export const WIDGET_LABEL_MAX_LENGTH = 40;
 export const WIDGET_HEADER_TEXT_MAX_LENGTH = 80;
 
