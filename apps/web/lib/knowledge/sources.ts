@@ -149,6 +149,25 @@ export async function deleteSourceRow(sourceId: string, projectId: string): Prom
   if (error) throw new KnowledgeStoreError("Couldn't delete the knowledge source.", { cause: error });
 }
 
+/**
+ * Marks the source "failed" in its project, for a route that hit an
+ * unexpected error after claiming it (a claimed source is never reclaimed,
+ * so it would otherwise stay "processing"). Best effort: a failure is logged,
+ * not thrown, so the caller can rethrow the original error.
+ */
+export async function markSourceFailed(sourceId: string, projectId: string): Promise<void> {
+  try {
+    const { error } = await createServiceClient()
+      .from("knowledge_sources")
+      .update({ status: "failed" })
+      .eq("id", sourceId)
+      .eq("project_id", projectId);
+    if (error) console.error(`[knowledge] marking source ${sourceId} failed didn't work`, error);
+  } catch (error) {
+    console.error(`[knowledge] marking source ${sourceId} failed didn't work`, error);
+  }
+}
+
 /** A one-time signed upload for `storageKey` in the knowledge bucket. */
 export async function createSignedUpload(
   storageKey: string,

@@ -14,6 +14,7 @@ import {
   deleteFiles,
   deleteSourceRow,
   downloadFile,
+  markSourceFailed,
   readSource,
 } from "../../../../../../lib/knowledge/sources";
 import { getOwnedProject } from "../../../../../../lib/projects/projects";
@@ -42,37 +43,46 @@ export async function POST(
     // finalized, or reclaimed → no row.
     const source = await claimSource(body.data.sourceId, project.id);
     if (!source) return sourceNotFound("This upload doesn't exist or was already finalized.");
-    const { storage_key: storageKey, type } = source;
-    if (!storageKey || type === "text") throw new Error(`Claimed source ${source.id} has no file.`);
-
-    /** Deletes the file and its source, then answers 400 with `message`. */
-    const refuse = async (message: string) => {
-      await deleteSourceRow(source.id, project.id);
-      await deleteFiles([storageKey]);
-      return refused(message);
-    };
-
-    const bytes = await downloadFile(storageKey);
-    if (!bytes) return refuse("The file wasn't uploaded. Try again.");
-
-    const problem = checkUploadedFile(bytes, type);
-    if (problem) return refuse(problem);
-
-    let text: string;
+    // From here on the source is claimed, so the 2-hour reclaim never touches
+    // it: an unexpected error marks it "failed" (the owner can see and delete
+    // it) instead of leaving it "processing". A timeout can't be caught here.
     try {
-      text = await extractText(bytes, type);
+      const { storage_key: storageKey, type } = source;
+      if (!storageKey || type === "text") throw new Error(`Claimed source ${source.id} has no file.`);
+
+      /** Deletes the file and its source, then answers 400 with `message`. */
+      const refuse = async (message: string) => {
+        await deleteSourceRow(source.id, project.id);
+        await deleteFiles([storageKey]);
+        return refused(message);
+      };
+
+      const bytes = await downloadFile(storageKey);
+      if (!bytes) return refuse("The file wasn't uploaded. Try again.");
+
+      const problem = checkUploadedFile(bytes, type);
+      if (problem) return refuse(problem);
+
+      let text: string;
+      try {
+        text = await extractText(bytes, type);
+      } catch (error) {
+        if (error instanceof ExtractError) return refuse(error.message);
+        throw error;
+      }
+
+      const tooBig = checkTextSize(text);
+      if (tooBig) return refuse(tooBig);
+
+      // A processing failure marks the source "failed" itself; the file stays
+      // so the owner can see it and delete it.
+      await processSource({ sourceId: source.id, projectId: project.id, text });
     } catch (error) {
-      if (error instanceof ExtractError) return refuse(error.message);
+      await markSourceFailed(source.id, project.id);
       throw error;
     }
 
-    const tooBig = checkTextSize(text);
-    if (tooBig) return refuse(tooBig);
-
-    // A processing failure marks the source "failed"; the file stays so the
-    // owner can see it and delete it.
-    await processSource({ sourceId: source.id, projectId: project.id, text });
-
+    // Outside the try: by now the source is "ready" or "failed" already.
     const response: FinalizeUploadResponse = { source: await readSource(source.id, project.id) };
     return Response.json(response);
   } catch (error) {

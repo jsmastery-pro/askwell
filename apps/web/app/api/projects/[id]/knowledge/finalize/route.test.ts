@@ -173,6 +173,36 @@ describe("POST /api/projects/:id/knowledge/finalize", () => {
     expect(db.files.has(key)).toBe(true);
   });
 
+  /** Answers requests whose URL matches `match` with a 500, the rest from the fake. */
+  function failing(match: (url: string, method: string) => boolean) {
+    const fakeFetch = db.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) =>
+      match(String(input), init?.method ?? "GET")
+        ? new Response(JSON.stringify({ statusCode: "500", code: "XX000", message: "boom" }), { status: 500 })
+        : fakeFetch(input, init),
+    );
+  }
+
+  it("an unexpected error after the claim marks the source failed (not stuck processing), then 500", async () => {
+    const { source, key } = uploaded("pdf", PDF);
+    failing((url, method) => method === "GET" && url.includes("/storage/v1/object/knowledge/"));
+    const res = await post(ALICES, source.id);
+    expect(res.status).toBe(500);
+    expect((await res.json()).error.code).toBe("internal");
+    expect(db.sources[0]).toMatchObject({ id: source.id, status: "failed" });
+    expect(db.files.has(key)).toBe(true);
+    expect(embedTexts).not.toHaveBeenCalled();
+  });
+
+  it("an error reading the source back after processing leaves it ready", async () => {
+    const { source } = uploaded("pdf", PDF);
+    failing((url, method) => method === "GET" && url.includes("/rest/v1/knowledge_sources"));
+    const res = await post(ALICES, source.id);
+    expect(res.status).toBe(500);
+    expect(db.sources[0]?.status).toBe("ready");
+    expect(db.chunks).toHaveLength(1);
+  });
+
   it("allows 300 s", () => {
     expect(maxDuration).toBe(300);
   });
