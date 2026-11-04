@@ -154,6 +154,39 @@ describe("SourceRow", () => {
     expect(renderToStaticMarkup(<StatusBadge status="processing" />)).toContain("Processing");
   });
 
+  it("the row this page is still uploading shows \"Uploading…\", with no Finish and Delete disabled", () => {
+    const html = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} inFlight />,
+    );
+    expect(html).toContain(">Uploading…<");
+    expect(html).not.toContain("Upload not finished");
+    expect(html).not.toMatch(/>Finish</);
+    expect(html).not.toContain("didn&#x27;t finish");
+    expect(html.match(/<button[^>]*>Delete<\/button>/)?.[0]).toMatch(DISABLED);
+
+    const confirm = renderToStaticMarkup(
+      <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} inFlight initialConfirming />,
+    );
+    expect(confirm.match(/<button[^>]*>(?:<[^>]+>)*Delete source<\/button>/)?.[0]).toMatch(DISABLED);
+  });
+
+  it("KnowledgeManager: only the in-flight upload's row loses Finish", () => {
+    const html = renderToStaticMarkup(
+      <KnowledgeManager
+        projectId="p1"
+        initialSources={[source("mine", { status: "uploading", title: "Mine" }), source("old", { status: "uploading", title: "Old" })]}
+        plan="pro"
+        limit={PLAN_LIMITS.pro.knowledgeSources}
+        initialInFlightId="mine"
+      />,
+    );
+    const row = (title: string) => html.match(new RegExp(`<li[^>]*aria-label="${title}"[\\s\\S]*?</li>`))?.[0] ?? "";
+    expect(row("Mine")).toContain(">Uploading…<");
+    expect(row("Mine")).not.toMatch(/>Finish</);
+    expect(row("Old")).toContain(">Upload not finished<");
+    expect(row("Old")).toMatch(/>Finish</);
+  });
+
   it("the confirm step on an uploading row hides Finish", () => {
     const html = renderToStaticMarkup(
       <SourceRow source={source("a", { status: "uploading" })} onDeleted={noop} onFinished={noop} initialConfirming />,
@@ -305,7 +338,7 @@ describe("uploadFailureView", () => {
 describe("UploadFileForm", () => {
   it("shows Retry after a failed finalize, even at the source limit", () => {
     const html = renderToStaticMarkup(
-      <UploadFileForm projectId="p1" disabled onUploaded={noop} onChanged={noop} initialRetrySourceId="s1" />,
+      <UploadFileForm projectId="p1" disabled onUploaded={noop} onChanged={noop} onInFlight={noop} initialRetrySourceId="s1" />,
     );
     const retry = (html.match(/<button[^>]*>[^<]*<\/button>/g) ?? []).find((b) => b.endsWith(">Retry</button>"));
     expect(retry).toBeDefined();
@@ -313,7 +346,7 @@ describe("UploadFileForm", () => {
   });
 
   it("shows no Retry by default", () => {
-    const html = renderToStaticMarkup(<UploadFileForm projectId="p1" disabled={false} onUploaded={noop} onChanged={noop} />);
+    const html = renderToStaticMarkup(<UploadFileForm projectId="p1" disabled={false} onUploaded={noop} onChanged={noop} onInFlight={noop} />);
     expect(html).not.toContain(">Retry<");
   });
 });

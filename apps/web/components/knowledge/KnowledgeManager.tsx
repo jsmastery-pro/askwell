@@ -20,6 +20,8 @@ export interface KnowledgeManagerProps {
   plan: Plan;
   /** PLAN_LIMITS[plan].knowledgeSources, from the server. */
   limit: number;
+  /** Start with this source's upload in flight (tests). */
+  initialInFlightId?: string | null;
 }
 
 /** Shown in place of the add forms' purpose at the source limit. */
@@ -46,12 +48,20 @@ export function KnowledgeLimitNotice({ plan }: { plan: Plan }) {
  * server (router.refresh()). Processing sources change on the server: the
  * Refresh button re-reads them (no realtime).
  */
-export function KnowledgeManager({ projectId, initialSources, plan, limit }: KnowledgeManagerProps) {
+export function KnowledgeManager({
+  projectId,
+  initialSources,
+  plan,
+  limit,
+  initialInFlightId = null,
+}: KnowledgeManagerProps) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [sources, setSources] = useState(initialSources);
   /** Why a row went away after Finish (the row itself is gone, so it can't say). */
   const [notice, setNotice] = useState<string | null>(null);
+  /** The source the upload form is still sending (its row must not offer Finish or Delete). */
+  const [inFlightId, setInFlightId] = useState<string | null>(initialInFlightId);
   // A server re-read (router.refresh()) passes new initialSources: show them.
   const [serverSources, setServerSources] = useState(initialSources);
   if (initialSources !== serverSources) {
@@ -99,7 +109,13 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
           <AddTextForm projectId={projectId} disabled={atLimit} onAdded={added} />
         </GlassPanel>
         <GlassPanel>
-          <UploadFileForm projectId={projectId} disabled={atLimit} onUploaded={added} onChanged={refresh} />
+          <UploadFileForm
+            projectId={projectId}
+            disabled={atLimit}
+            onUploaded={added}
+            onChanged={refresh}
+            onInFlight={setInFlightId}
+          />
         </GlassPanel>
       </div>
 
@@ -131,7 +147,13 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
           ) : (
             <ul aria-label="Knowledge sources" className="flex flex-col divide-y divide-line">
               {sources.map((source) => (
-                <SourceRow key={source.id} source={source} onDeleted={deleted} onFinished={finished} />
+                <SourceRow
+                  key={source.id}
+                  source={source}
+                  onDeleted={deleted}
+                  onFinished={finished}
+                  inFlight={source.id === inFlightId}
+                />
               ))}
             </ul>
           )}

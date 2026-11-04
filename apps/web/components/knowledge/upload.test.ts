@@ -53,6 +53,25 @@ describe("uploadKnowledgeFile", () => {
     expect(d.deleteSource).not.toHaveBeenCalled();
   });
 
+  it("reports the reserved source id before the file is sent (so its row can't be finished mid-upload)", async () => {
+    const order: string[] = [];
+    const d = deps({
+      putSignedUpload: vi.fn<UploadDeps["putSignedUpload"]>(async () => {
+        order.push("put");
+        return { ok: true, data: null };
+      }),
+    });
+    await uploadKnowledgeFile("p1", file(), undefined, d, (id) => order.push(`reserved ${id}`));
+    expect(order).toEqual(["reserved s1", "put"]);
+  });
+
+  it("reports nothing when the reservation fails", async () => {
+    const d = deps({ createUploadUrl: vi.fn<UploadDeps["createUploadUrl"]>(async () => failure("plan_limit_reached")) });
+    const onReserved = vi.fn();
+    await uploadKnowledgeFile("p1", file(), undefined, d, onReserved);
+    expect(onReserved).not.toHaveBeenCalled();
+  });
+
   it("stops at the check for a file that's too big, calling nothing", async () => {
     const d = deps();
     const result = await uploadKnowledgeFile("p1", file("big.pdf", MAX_KNOWLEDGE_FILE_BYTES + 1, "application/pdf"), undefined, d);

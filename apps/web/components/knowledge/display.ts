@@ -17,11 +17,12 @@ export type StatusTone = "pending" | "ready" | "failed";
 /**
  * `uploading` is a reservation whose finalize never ran (the page reloaded or
  * the network dropped mid-upload): "Upload not finished", with Finish (§6.4).
+ * `inFlight`: this page's own upload is still sending it, so it's "Uploading…".
  */
-export function statusView(status: KnowledgeSourceStatus): { label: string; tone: StatusTone } {
+export function statusView(status: KnowledgeSourceStatus, inFlight = false): { label: string; tone: StatusTone } {
   switch (status) {
     case "uploading":
-      return { label: "Upload not finished", tone: "pending" };
+      return { label: inFlight ? "Uploading…" : "Upload not finished", tone: "pending" };
     case "processing":
       return { label: "Processing", tone: "pending" };
     case "ready":

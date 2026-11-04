@@ -18,8 +18,8 @@ const toneClasses: Record<StatusTone, string> = {
 };
 
 /** The status pill. Failed carries an icon, so it doesn't rely on color alone. */
-export function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
-  const { label, tone } = statusView(status);
+export function StatusBadge({ status, inFlight = false }: { status: KnowledgeSource["status"]; inFlight?: boolean }) {
+  const { label, tone } = statusView(status, inFlight);
   return (
     <span
       className={cx(
@@ -38,6 +38,12 @@ export interface SourceRowProps {
   onDeleted: (id: string) => void;
   /** Finish ran on this "Upload not finished" row and changed something (any outcome but an error). */
   onFinished: (source: KnowledgeSource, outcome: FinishOutcome) => void;
+  /**
+   * This page's upload form is still uploading this source. It shows
+   * "Uploading…" with no Finish and Delete disabled until the form's flow
+   * ends: finishing or deleting it now would destroy the file being sent.
+   */
+  inFlight?: boolean;
   /** Start on the confirm step (tests). */
   initialConfirming?: boolean;
 }
@@ -46,13 +52,13 @@ export interface SourceRowProps {
  * One source: title (as text), type, status, created date, and delete with a
  * confirm step. An `uploading` row ("Upload not finished") also has Finish.
  */
-export function SourceRow({ source, onDeleted, onFinished, initialConfirming = false }: SourceRowProps) {
+export function SourceRow({ source, onDeleted, onFinished, inFlight = false, initialConfirming = false }: SourceRowProps) {
   const [confirming, setConfirming] = useState(initialConfirming);
   const [pending, setPending] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const failed = source.status === "failed";
-  const unfinished = source.status === "uploading";
+  const unfinished = source.status === "uploading" && !inFlight;
 
   async function finish() {
     setFinishing(true);
@@ -83,14 +89,14 @@ export function SourceRow({ source, onDeleted, onFinished, initialConfirming = f
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <StatusBadge status={source.status} />
+          <StatusBadge status={source.status} inFlight={inFlight} />
           {unfinished && !confirming ? (
             <Button variant="secondary" size="sm" loading={finishing} onClick={finish}>
               Finish
             </Button>
           ) : null}
           {confirming ? null : (
-            <Button variant="ghost" size="sm" disabled={finishing} onClick={() => setConfirming(true)}>
+            <Button variant="ghost" size="sm" disabled={finishing || inFlight} onClick={() => setConfirming(true)}>
               Delete
             </Button>
           )}
@@ -116,7 +122,7 @@ export function SourceRow({ source, onDeleted, onFinished, initialConfirming = f
             it. This can&apos;t be undone.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" loading={pending} onClick={remove}>
+            <Button size="sm" loading={pending} disabled={inFlight} onClick={remove}>
               Delete source
             </Button>
             <Button

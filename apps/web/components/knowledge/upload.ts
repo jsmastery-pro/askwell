@@ -35,12 +35,17 @@ const defaultDeps: UploadDeps = { createUploadUrl, putSignedUpload, finalizeUplo
  * for the UI. When the Storage upload fails, the reservation is deleted so it
  * doesn't hold a source slot until the 2-hour reclaim; if that delete fails
  * too, the result says so (pendingSourceId).
+ *
+ * `onReserved` gets the new source's id as soon as it exists, before the file
+ * is sent: until this call returns, that row is this upload's, and Finish
+ * must not touch it (finalize would refuse the half-sent file and delete it).
  */
 export async function uploadKnowledgeFile(
   projectId: string,
   file: File,
   onStep: (step: UploadStep) => void = () => undefined,
   deps: UploadDeps = defaultDeps,
+  onReserved: (sourceId: string) => void = () => undefined,
 ): Promise<UploadResult> {
   onStep("check");
   const check = checkFile(file);
@@ -54,6 +59,7 @@ export async function uploadKnowledgeFile(
   });
   if (!reserved.ok) return { ok: false, step: "reserve", error: reserved.error };
   const { source, upload } = reserved.data;
+  onReserved(source.id);
 
   onStep("upload");
   const put = await deps.putSignedUpload(upload, file, check.mimeType);
