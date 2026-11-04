@@ -4,9 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { KnowledgeSource, Plan } from "@askwell/shared";
 import { Button, EmptyState, GlassPanel } from "../ui";
+import { messageClasses } from "../projects/fields";
 import { AddTextForm } from "./AddTextForm";
 import { knowledgeLimitPrompt, sourceCountText } from "./display";
+import { applyFinish } from "./finish";
 import { SourceRow } from "./SourceRow";
+import type { FinishOutcome } from "./upload";
 import { UploadFileForm } from "./UploadFileForm";
 
 export interface KnowledgeManagerProps {
@@ -47,6 +50,8 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [sources, setSources] = useState(initialSources);
+  /** Why a row went away after Finish (the row itself is gone, so it can't say). */
+  const [notice, setNotice] = useState<string | null>(null);
   // A server re-read (router.refresh()) passes new initialSources: show them.
   const [serverSources, setServerSources] = useState(initialSources);
   if (initialSources !== serverSources) {
@@ -58,11 +63,20 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
   const refresh = () => startRefresh(() => router.refresh());
 
   function added(source: KnowledgeSource) {
+    setNotice(null);
     setSources((current) => [source, ...current.filter((s) => s.id !== source.id)]);
     refresh();
   }
 
+  function finished(row: KnowledgeSource, outcome: FinishOutcome) {
+    const update = applyFinish(sources, row, outcome);
+    setSources(update.sources);
+    setNotice(update.notice);
+    if (update.refresh) refresh();
+  }
+
   function deleted(id: string) {
+    setNotice(null);
     setSources((current) => current.filter((s) => s.id !== id));
     refresh();
   }
@@ -102,6 +116,12 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
           </Button>
         </div>
 
+        {notice ? (
+          <p role="alert" className={messageClasses}>
+            {notice}
+          </p>
+        ) : null}
+
         <GlassPanel padding="none">
           {sources.length === 0 ? (
             <EmptyState
@@ -111,7 +131,7 @@ export function KnowledgeManager({ projectId, initialSources, plan, limit }: Kno
           ) : (
             <ul aria-label="Knowledge sources" className="flex flex-col divide-y divide-line">
               {sources.map((source) => (
-                <SourceRow key={source.id} source={source} onDeleted={deleted} />
+                <SourceRow key={source.id} source={source} onDeleted={deleted} onFinished={finished} />
               ))}
             </ul>
           )}

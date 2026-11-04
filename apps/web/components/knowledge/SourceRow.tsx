@@ -8,7 +8,8 @@ import { AlertIcon } from "../ui/icons";
 import { messageClasses } from "../projects/fields";
 import { formatCreatedDate } from "../projects/format";
 import { deleteSource } from "./api";
-import { deleteErrorText, statusView, TYPE_LABELS, type StatusTone } from "./display";
+import { deleteErrorText, finishErrorText, statusView, TYPE_LABELS, type StatusTone } from "./display";
+import { finishUpload, type FinishOutcome } from "./upload";
 
 const toneClasses: Record<StatusTone, string> = {
   pending: "border-line-strong text-fg-muted",
@@ -35,16 +36,32 @@ export function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
 export interface SourceRowProps {
   source: KnowledgeSource;
   onDeleted: (id: string) => void;
+  /** Finish ran on this "Upload not finished" row and changed something (any outcome but an error). */
+  onFinished: (source: KnowledgeSource, outcome: FinishOutcome) => void;
   /** Start on the confirm step (tests). */
   initialConfirming?: boolean;
 }
 
-/** One source: title (as text), type, status, created date, and delete with a confirm step. */
-export function SourceRow({ source, onDeleted, initialConfirming = false }: SourceRowProps) {
+/**
+ * One source: title (as text), type, status, created date, and delete with a
+ * confirm step. An `uploading` row ("Upload not finished") also has Finish.
+ */
+export function SourceRow({ source, onDeleted, onFinished, initialConfirming = false }: SourceRowProps) {
   const [confirming, setConfirming] = useState(initialConfirming);
   const [pending, setPending] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const failed = source.status === "failed";
+  const unfinished = source.status === "uploading";
+
+  async function finish() {
+    setFinishing(true);
+    setError(null);
+    const outcome = await finishUpload(source.project_id, source.id);
+    setFinishing(false);
+    if (outcome.kind === "error") setError(finishErrorText(outcome.error));
+    else onFinished(source, outcome);
+  }
 
   async function remove() {
     setPending(true);
@@ -67,8 +84,13 @@ export function SourceRow({ source, onDeleted, initialConfirming = false }: Sour
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <StatusBadge status={source.status} />
+          {unfinished && !confirming ? (
+            <Button variant="secondary" size="sm" loading={finishing} onClick={finish}>
+              Finish
+            </Button>
+          ) : null}
           {confirming ? null : (
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+            <Button variant="ghost" size="sm" disabled={finishing} onClick={() => setConfirming(true)}>
               Delete
             </Button>
           )}
@@ -78,6 +100,12 @@ export function SourceRow({ source, onDeleted, initialConfirming = false }: Sour
       {failed ? (
         <p className="text-sm text-fg-muted">
           We couldn&apos;t read this source. Delete it and try again, or try a different file.
+        </p>
+      ) : null}
+
+      {unfinished ? (
+        <p className="text-sm text-fg-muted">
+          This upload didn&apos;t finish. Finish it to process the file, or delete it and upload again.
         </p>
       ) : null}
 

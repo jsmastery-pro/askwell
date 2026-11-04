@@ -78,3 +78,35 @@ export async function finalizeKnowledgeFile(
     ? { ok: true, source: finalized.data }
     : { ok: false, step: "finalize", error: finalized.error, pendingSourceId: sourceId };
 }
+
+/**
+ * What Finish on an "Upload not finished" row (status `uploading`) came to.
+ * The file may or may not be in Storage: finalize decides.
+ */
+export type FinishOutcome =
+  /** Finalized: the source is now processing, ready or failed. */
+  | { kind: "finished"; source: KnowledgeSource }
+  /** 400: the file never arrived or was refused; the server deleted the source. */
+  | { kind: "refused"; message: string }
+  /** 404: already finalized (e.g. the original upload got there first) or reclaimed. */
+  | { kind: "gone" }
+  /** A server, network or session error: nothing changed, Finish can be tried again. */
+  | { kind: "error"; error: ApiFailure };
+
+/** Finish an unfinished upload: finalize again with the same source id (§6.4). Switches on the §8 code. */
+export async function finishUpload(
+  projectId: string,
+  sourceId: string,
+  deps: Pick<UploadDeps, "finalizeUpload"> = defaultDeps,
+): Promise<FinishOutcome> {
+  const result = await deps.finalizeUpload(projectId, sourceId);
+  if (result.ok) return { kind: "finished", source: result.data };
+  switch (result.error.code) {
+    case "validation_failed":
+      return { kind: "refused", message: result.error.message };
+    case "not_found":
+      return { kind: "gone" };
+    default:
+      return { kind: "error", error: result.error };
+  }
+}
