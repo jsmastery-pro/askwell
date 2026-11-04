@@ -379,10 +379,13 @@ describe("types.ts", () => {
     );
     const functions: Record<keyof Database["public"]["Functions"], true> = {
       claim_knowledge_source: true,
+      consume_message: true,
       create_project: true,
+      match_chunks: true,
       owned_conversation_ids: true,
       owned_project_ids: true,
       reserve_knowledge_source: true,
+      save_chat_turn: true,
     };
     expect(rows.map((row) => row.proname)).toEqual(Object.keys(functions).sort());
     const helpers = rows.filter((row) => (HELPERS as readonly string[]).includes(row.proname));
@@ -655,7 +658,11 @@ describe("functions", () => {
        where pronamespace = 'public'::regnamespace order by proname`,
     );
     expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) expect(row.proconfig, row.proname).toEqual(['search_path=""']);
+    // Other settings may sit beside it (match_chunks sets hnsw.iterative_scan).
+    for (const row of rows) {
+      const searchPath = (row.proconfig ?? []).filter((c) => c.startsWith("search_path="));
+      expect(searchPath, row.proname).toEqual(['search_path=""']);
+    }
   });
 
   it("the helpers are SECURITY DEFINER and STABLE, and only authenticated may execute them", async () => {

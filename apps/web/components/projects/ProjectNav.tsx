@@ -4,9 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "../ui/cx";
 
-/** A project's sections. Knowledge, Conversations and Customize come in later phases. */
+/** A project's sections. Conversations and Customize come in later phases. */
 export function projectSections(projectId: string): { label: string; href: string }[] {
-  return [{ label: "Install", href: `/dashboard/projects/${projectId}/install` }];
+  return [
+    { label: "Knowledge", href: `/dashboard/projects/${projectId}/knowledge` },
+    { label: "Install", href: `/dashboard/projects/${projectId}/install` },
+  ];
 }
 
 /** The project's sub-nav (tabs under its name), with the current section marked. */

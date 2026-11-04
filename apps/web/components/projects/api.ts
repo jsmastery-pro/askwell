@@ -36,7 +36,7 @@ function isApiError(body: unknown): body is ApiError {
  * unexpected success body (e.g. an HTML page from a proxy) is an error, never
  * `ok: true`, so callers can always read the data they were promised.
  */
-async function request<T>(
+export async function request<T>(
   url: string,
   init: RequestInit,
   isValid: (body: unknown) => body is T,
@@ -57,7 +57,7 @@ async function request<T>(
   return { ok: false, error: BAD_RESPONSE };
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
+export const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 /** The fields the projects UI reads from a Project. */

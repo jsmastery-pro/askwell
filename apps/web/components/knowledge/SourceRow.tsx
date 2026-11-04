@@ -1,0 +1,116 @@
+"use client";
+
+import { useState } from "react";
+import type { KnowledgeSource } from "@askwell/shared";
+import { Button } from "../ui";
+import { cx } from "../ui/cx";
+import { AlertIcon } from "../ui/icons";
+import { messageClasses } from "../projects/fields";
+import { formatCreatedDate } from "../projects/format";
+import { deleteSource } from "./api";
+import { deleteErrorText, statusView, TYPE_LABELS, type StatusTone } from "./display";
+
+const toneClasses: Record<StatusTone, string> = {
+  pending: "border-line-strong text-fg-muted",
+  ready: "border-transparent bg-primary text-primary-fg",
+  failed: "border-fg text-fg",
+};
+
+/** The status pill. Failed carries an icon, so it doesn't rely on color alone. */
+export function StatusBadge({ status }: { status: KnowledgeSource["status"] }) {
+  const { label, tone } = statusView(status);
+  return (
+    <span
+      className={cx(
+        "inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium",
+        toneClasses[tone],
+      )}
+    >
+      {tone === "failed" ? <AlertIcon aria-hidden="true" className="size-3.5" /> : null}
+      {label}
+    </span>
+  );
+}
+
+export interface SourceRowProps {
+  source: KnowledgeSource;
+  onDeleted: (id: string) => void;
+  /** Start on the confirm step (tests). */
+  initialConfirming?: boolean;
+}
+
+/** One source: title (as text), type, status, created date, and delete with a confirm step. */
+export function SourceRow({ source, onDeleted, initialConfirming = false }: SourceRowProps) {
+  const [confirming, setConfirming] = useState(initialConfirming);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const failed = source.status === "failed";
+
+  async function remove() {
+    setPending(true);
+    setError(null);
+    const result = await deleteSource(source.id);
+    setPending(false);
+    if (result.ok) onDeleted(result.data);
+    else setError(deleteErrorText(result.error));
+  }
+
+  return (
+    <li className="flex min-w-0 flex-col gap-3 px-5 py-4" aria-label={source.title}>
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="min-w-0 break-words text-sm font-medium text-fg">{source.title}</p>
+          <p className="text-xs text-fg-muted">
+            {TYPE_LABELS[source.type]} · Added{" "}
+            <time dateTime={source.created_at}>{formatCreatedDate(source.created_at)}</time>
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <StatusBadge status={source.status} />
+          {confirming ? null : (
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+              Delete
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {failed ? (
+        <p className="text-sm text-fg-muted">
+          We couldn&apos;t read this source. Delete it and try again, or try a different file.
+        </p>
+      ) : null}
+
+      {confirming ? (
+        <div role="group" aria-label="Confirm delete" className="flex flex-col gap-3">
+          <p className="text-sm text-fg">
+            Delete <strong className="break-words font-semibold">{source.title}</strong>? The bot stops using
+            it. This can&apos;t be undone.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" loading={pending} onClick={remove}>
+              Delete source
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => {
+                setConfirming(false);
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className={messageClasses}>
+          {error}
+        </p>
+      ) : null}
+    </li>
+  );
+}

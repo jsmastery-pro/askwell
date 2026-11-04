@@ -400,8 +400,8 @@ describe("Database type override (index.ts)", () => {
   });
 
   it("leaves the other functions, the tables and the other schema keys unchanged", () => {
-    expectTypeOf<Omit<Functions, "reserve_knowledge_source">>().toEqualTypeOf<
-      Omit<Generated, "reserve_knowledge_source">
+    expectTypeOf<Omit<Functions, "reserve_knowledge_source" | "save_chat_turn">>().toEqualTypeOf<
+      Omit<Generated, "reserve_knowledge_source" | "save_chat_turn">
     >();
     expectTypeOf<Database["public"]["Tables"]>().toEqualTypeOf<GeneratedDatabase["public"]["Tables"]>();
     expectTypeOf<keyof Database>().toEqualTypeOf<keyof GeneratedDatabase>();
