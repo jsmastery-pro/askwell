@@ -11,6 +11,12 @@ import {
 
 export const CHAT_ENDPOINT = "/api/widget/chat";
 
+/**
+ * Give up on a chat reply after 60 s. The route waits on Arcjet, Postgres and
+ * OpenAI (30 s per attempt server-side), so this only trips on a real stall.
+ */
+export const CHAT_REQUEST_TIMEOUT_MS = 60_000;
+
 /** A failed chat request, with the API error code (§8 error shape). */
 export class ChatError extends Error {
   readonly code: ApiErrorCode;
@@ -47,18 +53,32 @@ export async function sendMessage(body: WidgetChatBody): Promise<WidgetChatRespo
   const parsed = widgetChatBody.safeParse(body);
   if (!parsed.success) throw new ChatError("validation_failed", "Check your message and try again.");
 
+  // One deadline for the request and its body, so a stalled reply can't leave
+  // the panel typing forever. Aborting rejects fetch() or response.json().
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
+
   let response: Response;
+  let payload: unknown;
   try {
-    response = await fetch(CHAT_ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(parsed.data),
-    });
-  } catch {
-    throw new ChatError("internal", "Couldn't reach the chat service.");
+    try {
+      response = await fetch(CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsed.data),
+        signal: controller.signal,
+      });
+    } catch {
+      throw new ChatError("internal", "Couldn't reach the chat service.");
+    }
+    payload = await response.json().catch(() => null);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (controller.signal.aborted) {
+    throw new ChatError("internal", "The chat service took too long to answer.");
   }
 
-  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) throw errorFrom(response.status, payload);
 
   if (

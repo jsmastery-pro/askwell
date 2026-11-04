@@ -8,7 +8,7 @@ import {
   type ChatAction,
   type ChatState,
 } from "./chat-state";
-import { CHAT_ENDPOINT, ChatError, sendMessage } from "./send-message";
+import { CHAT_ENDPOINT, CHAT_REQUEST_TIMEOUT_MS, ChatError, sendMessage } from "./send-message";
 
 const KEY = "pk_test_123";
 const VISITOR = "a".repeat(32);
@@ -106,6 +106,63 @@ describe("sendMessage", () => {
     await expect(
       sendMessage({ key: KEY, visitorId: VISITOR, message: "Hi" }),
     ).rejects.toMatchObject({ code: "internal" });
+  });
+
+  describe("timeout", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** A promise that never settles on its own and rejects when `signal` aborts. */
+    const untilAborted = (signal: AbortSignal | null | undefined) =>
+      new Promise<never>((_, reject) =>
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))),
+      );
+
+    it("gives up on a stalled request after CHAT_REQUEST_TIMEOUT_MS", async () => {
+      fetchMock.mockImplementationOnce((_url, init) => untilAborted(init?.signal));
+      const pending = sendMessage({ key: KEY, visitorId: VISITOR, message: "Hi" });
+      const check = expect(pending).rejects.toMatchObject({ code: "internal" });
+
+      await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS - 1);
+      expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await check;
+    });
+
+    it("gives up when the response body stalls", async () => {
+      fetchMock.mockImplementationOnce(async (_url, init) => {
+        const response = new Response(null, { status: 200 });
+        vi.spyOn(response, "json").mockImplementation(() => untilAborted(init?.signal));
+        return response;
+      });
+      const pending = sendMessage({ key: KEY, visitorId: VISITOR, message: "Hi" });
+      const check = expect(pending).rejects.toMatchObject({ code: "internal" });
+
+      await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS);
+      await check;
+    });
+
+    it("lets the panel stop typing and send again after a timeout", async () => {
+      fetchMock
+        .mockImplementationOnce((_url, init) => untilAborted(init?.signal))
+        .mockResolvedValueOnce(reply("Back again"));
+      const h = harness();
+
+      const first = h.run("Hello?");
+      expect(h.current().typing).toBe(true);
+      await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS);
+      await first;
+      expect(h.current()).toMatchObject({ typing: false, error: "internal" });
+
+      await h.run("Hello again");
+      expect(h.current().messages.at(-1)?.text).toBe("Back again");
+    });
+
+    it("clears the timer after a reply", async () => {
+      fetchMock.mockResolvedValueOnce(reply("Fast"));
+      await sendMessage({ key: KEY, visitorId: VISITOR, message: "Hi" });
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   it("treats a malformed success body as internal", async () => {
