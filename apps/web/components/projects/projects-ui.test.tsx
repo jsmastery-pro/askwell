@@ -24,10 +24,13 @@ const project = (id: string, name: string, created_at = "2026-11-03T19:39:11.845
 });
 
 const noop = () => undefined;
+/** The server's clock in these tests: inside the period that started 2026-11-01. */
+const NOW = "2026-11-20T12:00:00.000Z";
+const USAGE = { used: 0, limit: 100, resetsAt: "2026-12-01T00:00:00.000Z", atLimit: false };
 
 describe("ProjectsManager", () => {
   it("shows the create form and the empty state when there are no projects", () => {
-    const html = renderToStaticMarkup(<ProjectsManager initialProjects={[]} plan="free" />);
+    const html = renderToStaticMarkup(<ProjectsManager initialProjects={[]} plan="free" now={NOW} />);
     expect(html).toContain("New project");
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Create project<\/button>/);
     expect(html).toContain("No projects yet");
@@ -39,6 +42,7 @@ describe("ProjectsManager", () => {
       <ProjectsManager
         initialProjects={[project("p2", "Newer bot", "2026-11-03T12:00:00Z"), project("p1", "Docs bot", "2026-10-31T09:00:00Z")]}
         plan="free"
+        now={NOW}
       />,
     );
     expect(html).toContain('aria-label="Your projects"');
@@ -51,9 +55,33 @@ describe("ProjectsManager", () => {
     expect(html.match(/>Delete</g)).toHaveLength(2);
   });
 
+  it("each card shows its messages this month against the plan's limit", () => {
+    const busy = { ...project("p1", "Busy"), messages_used: 12 };
+    const free = renderToStaticMarkup(<ProjectsManager initialProjects={[busy]} plan="free" now={NOW} />);
+    expect(free).toContain("12 / 100");
+    expect(free).toContain("messages this month");
+    expect(free).toContain('Resets <time dateTime="2026-12-01T00:00:00.000Z">Dec 1, 2026</time>');
+    const pro = renderToStaticMarkup(<ProjectsManager initialProjects={[busy]} plan="pro" now={NOW} />);
+    expect(pro).toContain("12 / 2,000");
+  });
+
+  it("a project whose period is over a month old shows 0 used", () => {
+    const stale = { ...project("p1", "Stale"), messages_used: 87, period_start: "2026-09-01T00:00:00+00:00" };
+    const html = renderToStaticMarkup(<ProjectsManager initialProjects={[stale]} plan="free" now={NOW} />);
+    expect(html).toContain("0 / 100");
+    expect(html).not.toContain("87 /");
+  });
+
+  it("a project at its limit shows the limit-reached note", () => {
+    const full = { ...project("p1", "Full"), messages_used: 100 };
+    const html = renderToStaticMarkup(<ProjectsManager initialProjects={[full]} plan="free" now={NOW} />);
+    expect(html).toContain("100 / 100");
+    expect(html).toContain("Limit reached: the widget is showing visitors the quota message.");
+  });
+
   it("renders a project name as text, never HTML", () => {
     const html = renderToStaticMarkup(
-      <ProjectsManager initialProjects={[project("p1", "<img src=x onerror=alert(1)>")]} plan="free" />,
+      <ProjectsManager initialProjects={[project("p1", "<img src=x onerror=alert(1)>")]} plan="free" now={NOW} />,
     );
     expect(html).not.toContain("<img");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
@@ -113,7 +141,7 @@ describe("the project limit", () => {
 describe("ProjectCard", () => {
   it("rename mode shows the name in an input with Save and Cancel", () => {
     const html = renderToStaticMarkup(
-      <ProjectCard project={project("p1", "Docs bot")} onRenamed={noop} onDeleted={noop} initialMode="rename" />,
+      <ProjectCard project={project("p1", "Docs bot")} usage={USAGE} onRenamed={noop} onDeleted={noop} initialMode="rename" />,
     );
     expect(html).toMatch(/<input[^>]*value="Docs bot"/);
     expect(html).toMatch(/maxLength="60"/);
@@ -124,7 +152,7 @@ describe("ProjectCard", () => {
 
   it("delete asks to confirm first, naming the project", () => {
     const html = renderToStaticMarkup(
-      <ProjectCard project={project("p1", "Docs bot")} onRenamed={noop} onDeleted={noop} initialMode="confirm-delete" />,
+      <ProjectCard project={project("p1", "Docs bot")} usage={USAGE} onRenamed={noop} onDeleted={noop} initialMode="confirm-delete" />,
     );
     expect(html).toContain('aria-label="Confirm delete"');
     expect(html).toContain("Delete <strong");
