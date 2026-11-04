@@ -378,9 +378,11 @@ describe("types.ts", () => {
        from pg_proc where pronamespace = 'public'::regnamespace order by proname`,
     );
     const functions: Record<keyof Database["public"]["Functions"], true> = {
+      claim_knowledge_source: true,
       create_project: true,
       owned_conversation_ids: true,
       owned_project_ids: true,
+      reserve_knowledge_source: true,
     };
     expect(rows.map((row) => row.proname)).toEqual(Object.keys(functions).sort());
     const helpers = rows.filter((row) => (HELPERS as readonly string[]).includes(row.proname));
