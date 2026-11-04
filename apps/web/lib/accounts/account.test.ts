@@ -7,6 +7,11 @@ vi.mock("server-only", () => ({}));
 
 const authMock = vi.fn();
 vi.mock("@clerk/nextjs/server", () => ({ auth: () => authMock() }));
+// connection(): resolved by default; a test can hold it open, as a
+// prerender does, to check that nothing runs before the request arrives.
+let connectionGate: Promise<void> = Promise.resolve();
+const connection = vi.fn(() => connectionGate);
+vi.mock("next/server", () => ({ connection: () => connection() }));
 
 // The real supabase-js clients, with fetch recorded, so the tests see the
 // exact requests ensureAccount() and getOwnPlan() send.
@@ -48,12 +53,17 @@ vi.mock("../supabase/owner", () => ({
   UnauthorizedError: FakeUnauthorizedError,
 }));
 
-const { AccountError, ensureAccount, getOwnPlan, parsePlan } = await import("./account");
+const { AccountError, ensureAccount, getOwnPlan, loadOwnPlan, parsePlan } = await import("./account");
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
+/** Lets every pending promise callback run. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 beforeEach(() => {
+  connectionGate = Promise.resolve();
+  connection.mockClear();
   requests.length = 0;
   respond = () => new Response(null, { status: 201 });
   authMock.mockReset();
@@ -148,5 +158,27 @@ describe("parsePlan", () => {
 
   it("rejects anything else", () => {
     expect(() => parsePlan("enterprise")).toThrow(AccountError);
+  });
+});
+
+describe("loadOwnPlan", () => {
+  it("waits for the request (connection()) before any auth read or fetch, then upserts and reads the plan", async () => {
+    let arrive = () => undefined as void;
+    connectionGate = new Promise<void>((resolve) => (arrive = resolve));
+    authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_1" });
+    respond = (req) => (req.client === "owner" ? json({ plan: "pro" }) : new Response(null, { status: 201 }));
+
+    const plan = loadOwnPlan();
+    await flush();
+    expect(connection).toHaveBeenCalledOnce();
+    expect(authMock).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+
+    arrive();
+    expect(await plan).toBe("pro");
+    expect(requests.map((r) => `${r.client} ${r.method} ${r.url.pathname}`)).toEqual([
+      "service POST /rest/v1/accounts",
+      "owner GET /rest/v1/accounts",
+    ]);
   });
 });
