@@ -163,6 +163,15 @@ grant execute on function public.save_chat_turn(uuid, uuid, text, text, text)
 -- p_count is MATCH_COUNT and p_min_similarity MIN_MATCH_SIMILARITY in packages/shared.
 -- ---------------------------------------------------------------------------
 
+-- Load pgvector's library in this session before creating match_chunks.
+-- hnsw.iterative_scan is only defined once the library is loaded; until then
+-- Postgres treats it as an unknown placeholder, and a function SET clause on a
+-- placeholder needs superuser. Migrations on Supabase don't run as superuser,
+-- so without this line the CREATE fails with "permission denied to set
+-- parameter". This line was added to the merged file before it was applied
+-- anywhere (one-time exception, approved by the lead).
+select '[1]'::extensions.vector;
+
 create function public.match_chunks(
   p_project_id uuid,
   p_embedding extensions.vector(1536),
