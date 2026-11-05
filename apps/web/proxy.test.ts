@@ -54,6 +54,23 @@ describe("proxy", () => {
   });
 });
 
+describe("the Clerk webhook route", () => {
+  it("is public: a signed-out POST (no session, as Clerk delivers it) passes the proxy without reading auth", async () => {
+    const auth = vi.fn(signedOut);
+    const delivery = (path: string) =>
+      new NextRequest(new URL(path, "https://askwell.test"), {
+        method: "POST",
+        headers: { "svix-id": "msg_1", "svix-timestamp": "1793865600", "svix-signature": "v1,abc" },
+        body: "{}",
+      });
+    for (const path of ["/api/clerk/webhook", "/api/clerk/webhook?x-vercel-protection-bypass=x"]) {
+      expect(await handler(auth, delivery(path))).toBeUndefined();
+    }
+    expect(auth).not.toHaveBeenCalled();
+    expect(redirectToSignIn).not.toHaveBeenCalled();
+  });
+});
+
 describe("proxy matcher", () => {
   // Next's own matcher (next/experimental/testing/server), which needs the
   // AsyncLocalStorage global Next's runtime normally provides.
