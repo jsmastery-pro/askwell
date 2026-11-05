@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { APP_NAME, DEFAULT_WIDGET_CONFIG } from "@askwell/shared";
 import { requestOrigin, resolveAppUrl } from "../../lib/install/snippet";
+import { getPublicWidgetConfig } from "../../lib/widget/config";
 import { GlassPanel } from "../ui";
 import { cx } from "../ui/cx";
 import { landingWidgetKey } from "./landing-widget";
@@ -23,11 +24,21 @@ export function LiveDemo() {
   );
 }
 
-/** The request-time part: reads the key, then shows the real widget or the mock. */
+/**
+ * The request-time part: reads the key, then shows the real widget or the
+ * mock. A key that doesn't resolve to a project here (another environment's,
+ * or a deleted project's) keeps the mock: the loader would get no config and
+ * show nothing.
+ */
 export async function LandingDemo() {
   await connection();
   const key = landingWidgetKey();
   if (!key) return <MockDemo />;
+  const config = await getPublicWidgetConfig(key).catch((error: unknown) => {
+    console.error("Couldn't load the landing widget's config", error);
+    return null;
+  });
+  if (!config) return <MockDemo />;
   const appUrl = resolveAppUrl(process.env.NEXT_PUBLIC_APP_URL, requestOrigin(await headers()));
   return <RealDemo appUrl={appUrl} publicKey={key} />;
 }

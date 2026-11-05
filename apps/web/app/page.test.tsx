@@ -1,5 +1,6 @@
 import {
   APP_NAME,
+  DEFAULT_WIDGET_CONFIG,
   PLAN_LIMITS,
   PLAN_PRICES,
   PLANS,
@@ -17,6 +18,9 @@ const connection = vi.fn(async () => {});
 vi.mock("next/server", () => ({ connection: () => connection() }));
 let requestHeaders = new Headers({ host: "askwell-preview.vercel.app", "x-forwarded-proto": "https" });
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
+// The key's project lookup (the same one the config route uses).
+const getPublicWidgetConfig = vi.fn(async (_key: string): Promise<unknown> => DEFAULT_WIDGET_CONFIG);
+vi.mock("../lib/widget/config", () => ({ getPublicWidgetConfig: (key: string) => getPublicWidgetConfig(key) }));
 
 const html = renderToStaticMarkup(<Home />);
 const text = (fragment: string) =>
@@ -116,6 +120,8 @@ describe("landing demo (LANDING_WIDGET_KEY)", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    getPublicWidgetConfig.mockClear();
     connection.mockClear();
     requestHeaders = new Headers({ host: "askwell-preview.vercel.app", "x-forwarded-proto": "https" });
   });
@@ -129,6 +135,19 @@ describe("landing demo (LANDING_WIDGET_KEY)", () => {
     expect(text(out)).toContain("Try it: the button in the corner is the real widget.");
     expect(out).not.toContain("Preview of the chat panel");
     expect(connection).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["resolves to no project (another environment's, or deleted)", () => getPublicWidgetConfig.mockResolvedValueOnce(null)],
+    ["can't be looked up (database down)", () => getPublicWidgetConfig.mockRejectedValueOnce(new Error("db down"))],
+  ])("with a key that %s: the static demo, no widget script", async (_label, arrange) => {
+    vi.stubEnv("LANDING_WIDGET_KEY", KEY);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    arrange();
+    const out = await render();
+    expect(getPublicWidgetConfig).toHaveBeenCalledWith(KEY);
+    expect(out).toContain('aria-label="Preview of the chat panel"');
+    expect(out).not.toMatch(/<script/);
   });
 
   it("with a key and no NEXT_PUBLIC_APP_URL: uses this request's origin (each preview has its own)", async () => {
