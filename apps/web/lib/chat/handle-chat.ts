@@ -1,5 +1,5 @@
 // The chat flow behind POST /api/widget/chat (project.md §6.6), in order:
-// protect → validate → count → retrieve → answer → save → trace.
+// protect → validate → count → retrieve → answer → save → analytics.
 //
 // The service client is right here (§9 "Tenant leak", "Public key abuse"):
 // a public route with no owner session. The public key only identifies a
@@ -19,7 +19,7 @@ import { chatCompletion, embedTexts } from "../ai/openai";
 import { protectChat, type OnChatBlocked } from "../arcjet/protect-chat";
 import { createServiceClient } from "../supabase/service";
 import { buildSystemPrompt } from "./prompt";
-import { traceChat } from "./trace";
+import { reportBlocked, reportNewConversation, traceChat, type TraceMessage } from "./trace";
 
 type ArcjetRequest = Parameters<typeof protectChat>[0];
 
@@ -37,11 +37,13 @@ export class ChatStepError extends Error {
   }
 }
 
-/** The project a public key identifies, with its owner's plan, or null. */
-async function projectForKey(key: string): Promise<{ id: string; maxMessages: number } | null> {
+/** The project a public key identifies, with its owner and their plan, or null. */
+async function projectForKey(
+  key: string,
+): Promise<{ id: string; ownerId: string; maxMessages: number } | null> {
   const { data, error } = await createServiceClient()
     .from("projects")
-    .select("id, accounts(plan)")
+    .select("id, owner_id, accounts(plan)")
     .eq("public_key", key)
     .maybeSingle();
   if (error) throw new ChatStepError("project lookup", { cause: error });
@@ -50,7 +52,7 @@ async function projectForKey(key: string): Promise<{ id: string; maxMessages: nu
   // The plan is read here, on the server, for every message (§9 "Plan bypass").
   const plan = PLANS.find((p) => p === data.accounts.plan);
   if (!plan) throw new ChatStepError(`unknown plan "${data.accounts.plan}"`);
-  return { id: data.id, maxMessages: PLAN_LIMITS[plan].messagesPerMonth };
+  return { id: data.id, ownerId: data.owner_id, maxMessages: PLAN_LIMITS[plan].messagesPerMonth };
 }
 
 /** Whether `conversationId` is one of this project's conversations. */
@@ -125,6 +127,7 @@ export async function handleChat(
   // 1. Protect: rate limit + prompt injection, before anything else runs.
   const protection = await protectChat(req, { publicKey: body.key, message: body.message, onBlocked });
   if (!protection.allowed) {
+    reportBlocked(body.key, protection.reason);
     return protection.reason === "rate_limit"
       ? fail("rate_limited", "Too many messages. Wait a minute, then try again.")
       : fail("message_blocked", "This message can't be sent.");
@@ -146,11 +149,12 @@ export async function handleChat(
   const chunks = await retrieve(project.id, body.message);
   let reply = IDK_REPLY;
   let completion: Awaited<ReturnType<typeof chatCompletion>> | null = null;
+  let input: TraceMessage[] = [];
   if (chunks.length > 0) {
-    completion = await chatCompletion({
-      system: buildSystemPrompt(chunks),
-      messages: [{ role: "user", content: body.message }],
-    });
+    const system = buildSystemPrompt(chunks);
+    const messages = [{ role: "user" as const, content: body.message }];
+    input = [{ role: "system", content: system }, ...messages];
+    completion = await chatCompletion({ system, messages });
     reply = completion.text || IDK_REPLY;
   }
 
@@ -158,18 +162,22 @@ export async function handleChat(
   const conversationId = await saveTurn(project.id, body, reply);
   if (conversationId === null) return fail("not_found", NOT_FOUND_CONVERSATION);
 
-  // 7. Trace (Phase 4 hook).
+  // 7. Analytics, sent after the response (lib/chat/trace.ts).
   if (completion) {
     traceChat({
+      ownerId: project.ownerId,
       projectId: project.id,
       conversationId,
+      visitorId: body.visitorId,
       model: completion.model,
+      input,
+      output: completion.text,
       inputTokens: completion.usage.inputTokens,
       outputTokens: completion.usage.outputTokens,
-      totalTokens: completion.usage.totalTokens,
       latencyMs: completion.latencyMs,
     });
   }
+  if (!body.conversationId) reportNewConversation(project.ownerId, project.id, conversationId);
 
   return { ok: true, body: { conversationId, reply } };
 }

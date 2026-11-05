@@ -21,7 +21,10 @@ function getClient(): PostHog | null {
 }
 
 /** Event properties: IDs, counts, reasons. No secrets; `message_blocked` never carries message text (§6.11). */
-export type ServerEventProperties = Record<string, string | number | boolean | null>;
+export type ServerEventProperties = Record<string, JsonValue>;
+
+/** Any JSON value: `$ai_input` and `$ai_output_choices` are arrays of messages. */
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export type ServerEvent = {
   /** The owner's Clerk user ID (the same distinct ID the browser identifies with). */
