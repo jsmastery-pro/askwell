@@ -9,7 +9,7 @@ export function ConversationsSkeleton() {
           <Skeleton shape="text" className="h-6 w-36" />
           <Skeleton shape="text" className="w-64 max-w-full" />
         </div>
-        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-10 w-20 sm:h-8" />
       </div>
       <GlassPanel padding="none" className="flex flex-col divide-y divide-line">
         {[0, 1, 2, 3].map((i) => (

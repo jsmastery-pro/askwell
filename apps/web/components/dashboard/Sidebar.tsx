@@ -48,14 +48,15 @@ export function Sidebar({ plan }: SidebarProps) {
     >
       <Link
         href="/dashboard"
-        className="order-1 min-w-0 flex-1 truncate rounded-control text-base font-semibold tracking-tight text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus md:flex-none"
+        className="order-1 min-w-0 flex-1 truncate rounded-control py-2 text-base font-semibold tracking-tight text-fg outline-none focus-visible:ring-2 focus-visible:ring-focus md:flex-none"
       >
         {APP_NAME}
       </Link>
 
       <div className="order-2 flex items-center gap-3 md:order-3 md:mt-auto md:justify-between md:border-t md:border-line md:pt-4">
         {plan}
-        <UserButton />
+        {/* A 40px avatar on phones (tap target); Clerk's default size from `md` up. */}
+        <UserButton appearance={{ elements: { avatarBox: "size-10 md:size-7" } }} />
       </div>
 
       <button

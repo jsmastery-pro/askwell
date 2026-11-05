@@ -110,7 +110,7 @@ export function ProjectCard({ project, usage, onRenamed, onDeleted, initialMode 
           <h2 className="min-w-0 break-words text-base font-semibold text-fg">
             <Link
               href={href}
-              className="rounded-control outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
+              className="-my-2.5 inline-block rounded-control py-2.5 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
             >
               {project.name}
             </Link>

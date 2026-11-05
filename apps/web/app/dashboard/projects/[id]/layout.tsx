@@ -34,7 +34,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
       <header className="flex min-w-0 flex-col gap-2">
         <Link
           href="/dashboard"
-          className="self-start rounded-control text-sm text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-focus"
+          className="-my-2.5 inline-flex min-h-10 items-center self-start rounded-control text-sm text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-focus"
         >
           ← All projects
         </Link>

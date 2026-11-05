@@ -222,7 +222,7 @@ export function CustomizeForm({ projectId, stored, plan, initial }: CustomizeFor
                 />
               </Field>
 
-              <label htmlFor={ids.badge} className="flex cursor-pointer items-center gap-3 text-sm text-fg has-[:disabled]:cursor-not-allowed">
+              <label htmlFor={ids.badge} className="flex min-h-10 cursor-pointer items-center gap-3 text-sm text-fg has-[:disabled]:cursor-not-allowed">
                 <input
                   id={ids.badge}
                   type="checkbox"

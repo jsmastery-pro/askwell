@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Button } from "./Button";
+import { Button, buttonClasses } from "./Button";
 
 describe("Button", () => {
   it("renders a primary button by default", () => {
@@ -34,5 +34,18 @@ describe("Button", () => {
     expect(html).toMatch(/^<a /);
     expect(html).toContain('href="/dashboard"');
     expect(html).not.toContain("<button");
+  });
+});
+
+describe("Button tap targets", () => {
+  it("sm is 40px tall on phones and compact from sm up", () => {
+    const classes = buttonClasses({ size: "sm" }).split(" ");
+    expect(classes).toContain("h-10");
+    expect(classes).toContain("sm:h-8");
+  });
+
+  it("md and lg are at least 40px everywhere", () => {
+    expect(buttonClasses({ size: "md" }).split(" ")).toContain("h-10");
+    expect(buttonClasses({ size: "lg" }).split(" ")).toContain("h-12");
   });
 });
