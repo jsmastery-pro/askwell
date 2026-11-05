@@ -34,7 +34,7 @@ export function ProjectsSkeleton() {
             <Skeleton shape="text" className="w-24" />
             <Skeleton shape="text" className="w-44 max-w-full" />
             <Skeleton className="h-1.5 w-full" />
-            <Skeleton className="h-8 w-48 max-w-full" />
+            <Skeleton className="h-10 w-48 max-w-full sm:h-8" />
           </GlassPanel>
         ))}
       </div>

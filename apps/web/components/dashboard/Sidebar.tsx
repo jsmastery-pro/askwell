@@ -55,8 +55,9 @@ export function Sidebar({ plan }: SidebarProps) {
 
       <div className="order-2 flex items-center gap-3 md:order-3 md:mt-auto md:justify-between md:border-t md:border-line md:pt-4">
         {plan}
-        {/* A 40px avatar on phones (tap target); Clerk's default size from `md` up. */}
-        <UserButton appearance={{ elements: { avatarBox: "size-10 md:size-7" } }} />
+        {/* A 40px avatar on phones (tap target); Clerk's default size from `md` up.
+            `!` because Clerk's own styles win over a plain class. */}
+        <UserButton appearance={{ elements: { avatarBox: "size-10! md:size-7!" } }} />
       </div>
 
       <button
