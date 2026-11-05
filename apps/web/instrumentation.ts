@@ -5,13 +5,14 @@ import type { Instrumentation } from "next";
 export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   try {
-    const [{ captureServerException }, { distinctIdFromCookies }] = await Promise.all([
+    const [{ captureServerException }, { distinctIdFromCookies }, { posthogServerEnv }] = await Promise.all([
       import("./lib/analytics/server"),
       import("./lib/analytics/distinct-id"),
+      import("./lib/analytics/env"),
     ]);
     await captureServerException(
       error,
-      distinctIdFromCookies(request.headers.cookie, process.env.NEXT_PUBLIC_POSTHOG_KEY),
+      distinctIdFromCookies(request.headers.cookie, posthogServerEnv()?.key),
       {
         // The path without its query: queries may carry keys.
         path: request.path.split("?")[0] ?? request.path,

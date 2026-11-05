@@ -7,16 +7,16 @@
 import "server-only";
 import { after } from "next/server";
 import { PostHog } from "posthog-node";
+import { posthogServerEnv } from "./env";
 
 let client: PostHog | null = null;
 
 /** The shared client, or null when PostHog isn't configured (events are dropped). */
 function getClient(): PostHog | null {
   if (client) return client;
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
-  if (!key || !host) return null;
-  client = new PostHog(key, { host, flushAt: 1, flushInterval: 0 });
+  const env = posthogServerEnv();
+  if (!env) return null;
+  client = new PostHog(env.key, { host: env.host, flushAt: 1, flushInterval: 0 });
   return client;
 }
 
