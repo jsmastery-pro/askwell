@@ -7,6 +7,8 @@ import {
   type CreateTextSourceResponse,
 } from "@askwell/shared";
 import { getOwnPlan } from "../../../../../lib/accounts/account";
+import { serverEvent } from "../../../../../lib/analytics/events";
+import { captureServerEvent } from "../../../../../lib/analytics/server";
 import { jsonError } from "../../../../../lib/api/errors";
 import { ownerRouteError, projectNotFound, requireOwnerId } from "../../../../../lib/api/owner";
 import { parseInput, parseJsonBody } from "../../../../../lib/api/validation";
@@ -22,7 +24,7 @@ export const maxDuration = 60;
 
 export async function POST(request: Request, ctx: RouteContext<"/api/projects/[id]/knowledge">): Promise<Response> {
   try {
-    await requireOwnerId();
+    const ownerId = await requireOwnerId();
 
     const params = parseInput(idParams, await ctx.params);
     if (!params.success) return params.response;
@@ -53,6 +55,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/projects/[i
     await processSource({ sourceId: source.id, projectId: project.id, text });
 
     const response: CreateTextSourceResponse = { source: await readSource(source.id, project.id) };
+    // Only a source that's ready to answer from counts as added.
+    if (response.source.status === "ready") {
+      captureServerEvent(serverEvent(ownerId, "knowledge_added", { project_id: project.id, source_type: "text" }));
+    }
     return Response.json(response, { status: 201 });
   } catch (error) {
     if (error instanceof SourceLimitError) return sourceLimitResponse(error);

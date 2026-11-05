@@ -31,7 +31,7 @@ export default async function InstallPage({ params }: PageProps<"/dashboard/proj
         </p>
       </div>
 
-      <InstallSnippet snippet={snippet} />
+      <InstallSnippet projectId={project.id} snippet={snippet} />
 
       <GlassPanel>
         <ol className="flex list-inside list-decimal flex-col gap-3 text-sm text-fg marker:text-fg-muted">

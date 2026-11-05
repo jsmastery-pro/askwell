@@ -11,8 +11,11 @@ const labels: Record<CopyState, string> = {
   failed: "Copy failed",
 };
 
-/** Copies `text` to the clipboard and says so for two seconds. */
-export function CopyButton({ text }: { text: string }) {
+/**
+ * Copies `text` to the clipboard and says so for two seconds. `onCopied` runs
+ * only after a successful copy.
+ */
+export function CopyButton({ text, onCopied }: { text: string; onCopied?: () => void }) {
   const [state, setState] = useState<CopyState>("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -22,6 +25,7 @@ export function CopyButton({ text }: { text: string }) {
     try {
       await navigator.clipboard.writeText(text);
       setState("copied");
+      onCopied?.();
     } catch {
       setState("failed");
     }

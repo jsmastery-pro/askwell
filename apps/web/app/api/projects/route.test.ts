@@ -21,6 +21,21 @@ vi.mock("@clerk/nextjs/server", () => ({
   }),
 }));
 
+// PostHog: the real lib/analytics/server.ts, with posthog-node's network
+// call recorded. after() has no request here, so events go out at once.
+type SentEvent = { distinctId: string; event: string; properties?: Record<string, unknown> };
+const captureImmediate = vi.fn(async (_event: SentEvent) => {});
+vi.mock("posthog-node", () => ({
+  PostHog: vi.fn(function (this: object) {
+    Object.assign(this, { captureImmediate });
+  }),
+}));
+/** The PostHog events sent so far (after pending sends run). */
+const sentEvents = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return captureImmediate.mock.calls.map(([event]) => event);
+};
+
 const { GET, POST } = await import("./route");
 
 const ALICE = "user_alice";
@@ -34,6 +49,9 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", PUBLISHABLE_KEY);
   vi.stubEnv(["SUPABASE", "SECRET", "KEY"].join("_"), SECRET_KEY);
   signedInAs = ALICE;
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.i.posthog.com");
+  captureImmediate.mockReset();
 });
 
 afterEach(() => {
@@ -62,6 +80,31 @@ function expectNoCors(res: Response) {
 }
 
 describe("POST /api/projects", () => {
+  it("sends project_created once, under the owner's Clerk ID, after the project exists", async () => {
+    const { project } = await (await post({ name: "Docs bot" })).json();
+    expect(await sentEvents()).toEqual([
+      { distinctId: ALICE, event: "project_created", properties: { project_id: project.id } },
+    ]);
+  });
+
+  it("sends no project_created when creating fails (plan limit, bad body)", async () => {
+    expect((await post({ name: "First" })).status).toBe(201);
+    captureImmediate.mockClear();
+    expect((await post({ name: "Second" })).status).toBe(403);
+    expect((await post({ name: "" })).status).toBe(400);
+    expect(await sentEvents()).toEqual([]);
+  });
+
+  it("an analytics failure doesn't change the response", async () => {
+    captureImmediate.mockRejectedValue(new Error("PostHog is down"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const res = await post({ name: "Docs bot" });
+    expect(res.status).toBe(201);
+    expect((await res.json()).project.name).toBe("Docs bot");
+    await sentEvents();
+    vi.mocked(console.error).mockRestore();
+  });
+
   it("creates a project: 201 { project } with a pk_ key and a default config row", async () => {
     const res = await post({ name: "  Docs bot  " });
     expect(res.status).toBe(201);

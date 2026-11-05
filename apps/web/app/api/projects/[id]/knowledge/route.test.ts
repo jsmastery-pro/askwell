@@ -23,6 +23,21 @@ vi.mock("@clerk/nextjs/server", () => ({
 const embedTexts = vi.fn(async (texts: string[]) => texts.map(() => Array<number>(EMBEDDING_DIMENSIONS).fill(0.1)));
 vi.mock("../../../../../lib/ai/openai", () => ({ embedTexts: (texts: string[]) => embedTexts(texts) }));
 
+// PostHog: the real lib/analytics/server.ts, with posthog-node's network
+// call recorded. after() has no request here, so events go out at once.
+type SentEvent = { distinctId: string; event: string; properties?: Record<string, unknown> };
+const captureImmediate = vi.fn(async (_event: SentEvent) => {});
+vi.mock("posthog-node", () => ({
+  PostHog: vi.fn(function (this: object) {
+    Object.assign(this, { captureImmediate });
+  }),
+}));
+/** The PostHog events sent so far (after pending sends run). */
+const sentEvents = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return captureImmediate.mock.calls.map(([event]) => event);
+};
+
 const { POST, maxDuration } = await import("./route");
 
 const ALICE = "user_alice";
@@ -52,6 +67,9 @@ beforeEach(() => {
   signedInAs = ALICE;
   embedTexts.mockClear();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.i.posthog.com");
+  captureImmediate.mockReset();
 });
 
 afterEach(() => {
@@ -61,6 +79,30 @@ afterEach(() => {
 });
 
 describe("POST /api/projects/:id/knowledge", () => {
+  it("sends knowledge_added once (text) when the source is ready; never the text", async () => {
+    expect((await post(ALICES, { title: "Refunds", text: "Refunds take 5 business days." })).status).toBe(201);
+    const events = await sentEvents();
+    expect(events).toEqual([
+      { distinctId: ALICE, event: "knowledge_added", properties: { project_id: ALICES, source_type: "text" } },
+    ]);
+    expect(JSON.stringify(events)).not.toContain("Refunds");
+  });
+
+  it("sends no knowledge_added when processing fails or the request is refused", async () => {
+    embedTexts.mockRejectedValueOnce(new Error("OpenAI is down"));
+    expect((await (await post(ALICES, { title: "T", text: "Some text." })).json()).source.status).toBe("failed");
+    expect((await post(BOBS, { title: "Sneaky", text: "x" })).status).toBe(404);
+    expect(await sentEvents()).toEqual([]);
+  });
+
+  it("an analytics failure doesn't change the response", async () => {
+    captureImmediate.mockRejectedValue(new Error("PostHog is down"));
+    const res = await post(ALICES, { title: "T", text: "Some text." });
+    expect(res.status).toBe(201);
+    expect((await res.json()).source.status).toBe("ready");
+    await sentEvents();
+  });
+
   it("adds the text, processes it into chunks, and returns the ready source (201)", async () => {
     const res = await post(ALICES, { title: "Refunds", text: "Refunds take 5 business days." });
     expect(res.status).toBe(201);

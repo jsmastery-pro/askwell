@@ -1,6 +1,8 @@
 // POST /api/projects/:id/knowledge/finalize: claim an uploaded file once,
 // check the real file, extract its text and process it (project.md §6.4,
 // §9 "File upload"). A refused file is deleted with its source.
+import { serverEvent } from "../../../../../../lib/analytics/events";
+import { captureServerEvent } from "../../../../../../lib/analytics/server";
 import { finalizeUploadBody, idParams, type FinalizeUploadResponse } from "@askwell/shared";
 import { ownerRouteError, projectNotFound, requireOwnerId } from "../../../../../../lib/api/owner";
 import { parseInput, parseJsonBody } from "../../../../../../lib/api/validation";
@@ -29,7 +31,7 @@ export async function POST(
   ctx: RouteContext<"/api/projects/[id]/knowledge/finalize">,
 ): Promise<Response> {
   try {
-    await requireOwnerId();
+    const ownerId = await requireOwnerId();
 
     const params = parseInput(idParams, await ctx.params);
     if (!params.success) return params.response;
@@ -84,6 +86,12 @@ export async function POST(
 
     // Outside the try: by now the source is "ready" or "failed" already.
     const response: FinalizeUploadResponse = { source: await readSource(source.id, project.id) };
+    // Only a source that's ready to answer from counts as added.
+    if (response.source.status === "ready") {
+      captureServerEvent(
+        serverEvent(ownerId, "knowledge_added", { project_id: project.id, source_type: response.source.type }),
+      );
+    }
     return Response.json(response);
   } catch (error) {
     return ownerRouteError("POST /api/projects/:id/knowledge/finalize", error);
