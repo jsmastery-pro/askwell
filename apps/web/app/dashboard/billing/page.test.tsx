@@ -6,7 +6,11 @@ const loadOwnPlan = vi.fn();
 vi.mock("../../../lib/accounts/account", () => ({ loadOwnPlan: () => loadOwnPlan() }));
 vi.mock("@clerk/nextjs", () => ({
   PricingTable: () => <div data-testid="clerk-pricing-table" />,
-  useClerk: () => ({ loaded: true, buildUserProfileUrl: () => "https://dev-slug.accounts.dev/user" }),
+  useClerk: () => ({
+    loaded: true,
+    buildUserProfileUrl: () => "https://dev-slug.accounts.dev/user",
+    buildUrlWithAuth: (to: string) => to,
+  }),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined, replace: () => undefined }) }));
 

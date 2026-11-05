@@ -28,6 +28,18 @@ export function accountPortalBillingUrl(userProfileUrl: string): string {
   return `${userProfileUrl.replace(/\/+$/, "")}/billing`;
 }
 
+/**
+ * Where Manage subscription goes. On a Clerk development instance the account
+ * portal is another site, so the URL must carry the dev session token
+ * (buildUrlWithAuth adds it; in production it changes nothing).
+ */
+export function manageSubscriptionUrl(clerk: {
+  buildUserProfileUrl: () => string;
+  buildUrlWithAuth: (to: string) => string;
+}): string {
+  return clerk.buildUrlWithAuth(accountPortalBillingUrl(clerk.buildUserProfileUrl()));
+}
+
 /** What the current plan includes, from PLAN_LIMITS. */
 function planSummary(plan: Plan): string {
   const { projects, messagesPerMonth, knowledgeSources } = PLAN_LIMITS[plan];
@@ -82,7 +94,7 @@ function ManageSubscription() {
       <Button
         className="self-start"
         disabled={!clerk.loaded}
-        onClick={() => window.location.assign(accountPortalBillingUrl(clerk.buildUserProfileUrl()))}
+        onClick={() => window.location.assign(manageSubscriptionUrl(clerk))}
       >
         Manage subscription
       </Button>

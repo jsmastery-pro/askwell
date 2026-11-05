@@ -9,11 +9,15 @@ vi.mock("@clerk/nextjs", () => ({
     pricingProps(props);
     return <div data-testid="clerk-pricing-table" />;
   },
-  useClerk: () => ({ loaded: true, buildUserProfileUrl: () => "https://dev-slug.accounts.dev/user" }),
+  useClerk: () => ({
+    loaded: true,
+    buildUserProfileUrl: () => "https://dev-slug.accounts.dev/user",
+    buildUrlWithAuth: (to: string) => to,
+  }),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined, replace: () => undefined }) }));
 
-const { accountPortalBillingUrl, BillingSkeleton, BillingView } = await import("./BillingView");
+const { accountPortalBillingUrl, BillingSkeleton, BillingView, manageSubscriptionUrl } = await import("./BillingView");
 const { ACTIVATION_POLL_MS, ACTIVATION_TIMEOUT_MS, activationState, CHECKOUT_RETURN_URL, shouldPoll } = await import(
   "./activation"
 );
@@ -106,5 +110,15 @@ describe("accountPortalBillingUrl", () => {
   it("is the account portal's billing section", () => {
     expect(accountPortalBillingUrl("https://dev-slug.accounts.dev/user")).toBe("https://dev-slug.accounts.dev/user/billing");
     expect(accountPortalBillingUrl("https://dev-slug.accounts.dev/user/")).toBe("https://dev-slug.accounts.dev/user/billing");
+  });
+});
+
+describe("manageSubscriptionUrl", () => {
+  it("is the portal's billing section, decorated with the dev session by Clerk", () => {
+    const clerk = {
+      buildUserProfileUrl: () => "https://dev-slug.accounts.dev/user",
+      buildUrlWithAuth: (to: string) => `${to}?__clerk_db_jwt=dvb_x`,
+    };
+    expect(manageSubscriptionUrl(clerk)).toBe("https://dev-slug.accounts.dev/user/billing?__clerk_db_jwt=dvb_x");
   });
 });
