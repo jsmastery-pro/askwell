@@ -8,7 +8,7 @@ Askwell is an AI support chat widget for any website. A business adds its produc
 
 The chat button sits in a corner of the website. A visitor clicks it, types a question, and gets an answer in a few seconds. The chat you are using on this page is Askwell itself, answering from this text.
 
-Askwell answers only from the info the business added. If the answer isn't in that info, the bot says it doesn't know instead of guessing.
+Askwell's bot is told to answer only from the info the business added, and to say it doesn't know when the answer isn't there. It's an instruction to the AI model, not a guarantee: replies aren't checked against the info, so an answer can occasionally be wrong.
 
 ## How it works
 
@@ -62,9 +62,9 @@ The install snippet is one line of HTML, for example:
 ## Privacy and safety
 
 - Chats are saved so the owner can read them in the dashboard on the Conversations page.
-- Each visitor gets a random ID stored in their browser, so a returning visitor's chats are grouped. Askwell doesn't ask visitors for their name or email.
+- Each visitor gets a random ID stored in their browser, and the same ID may be reused on later visits. Askwell doesn't ask visitors for their name or email.
 - The chat limits how fast one visitor can send messages, and it tries to detect and block messages that try to trick the bot into ignoring its instructions.
-- Only the owner of a project can see its knowledge and its conversations.
+- Only the owner of a project can see its knowledge and its conversations in the dashboard. But the bot answers visitors from that knowledge, so anything you add can end up in a reply to anyone who uses the chat. Don't add private or confidential information.
 
 ## What Askwell doesn't do
 
@@ -82,7 +82,7 @@ The install snippet is one line of HTML, for example:
 
 **How much is Pro?** Pro is $19 per month: 5 projects, 2,000 messages per month per project, 25 knowledge sources per project, and full control of how the widget looks.
 
-**Does the bot make things up?** It is told to answer only from your knowledge. If the answer isn't there, it says it doesn't know.
+**Does the bot make things up?** It is told to answer only from your knowledge and to say it doesn't know otherwise. That's an instruction, not a guarantee, so check its answers in Conversations.
 
 **How long does setup take?** A few minutes: sign up, create a project, add your info, paste one script tag.
 
