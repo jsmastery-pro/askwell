@@ -79,6 +79,7 @@ describe("proxy matcher", () => {
     // Only the exact /embed segment is skipped.
     "/embedded",
     "/embed-preview",
+    "/ingestion",
   ])("runs on %s", async (path) => expect(await runsOn(path)).toBe(true));
 
   it.each([
@@ -88,6 +89,10 @@ describe("proxy matcher", () => {
     "/embed?key=pk_test_123&origin=https://host.example",
     "/widget.js",
     "/widget.js?v=1",
+    // PostHog's reverse proxy: no auth, no Clerk handshake on its XHRs.
+    "/ingest/e/",
+    "/ingest/flags/?v=2",
+    "/ingest/static/array.js",
     // Next internals and static files.
     "/_next/static/chunk.js",
     "/favicon.ico",
