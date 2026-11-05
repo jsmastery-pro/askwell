@@ -56,14 +56,14 @@ The install snippet is one line of HTML, for example:
 - Copy your own snippet from your project's Install page. It already has your project's public key in it.
 - Paste it once into your site's HTML, before the closing `</body>` tag, on every page where the chat should show.
 - It works on any website that lets you add HTML: a hand-written site, a site builder with a "custom code" box, or any framework.
-- The public key (it starts with `pk_`) only identifies your project. It can't change anything, so it's safe to have on a public page.
+- The public key (it starts with `pk_`) identifies your project. It's meant to be on a public page: it can't sign in to your account or change your project, knowledge or settings. Anyone who has it can chat with your bot, and those messages count toward your monthly limit and show up in Conversations.
 - The widget is small and loads on its own. It sits in its own isolated box, so it doesn't change your site's styles.
 
 ## Privacy and safety
 
 - Chats are saved so the owner can read them in the dashboard on the Conversations page.
 - Each visitor gets a random ID stored in their browser, so a returning visitor's chats are grouped. Askwell doesn't ask visitors for their name or email.
-- The chat limits how fast one visitor can send messages, and it refuses messages that try to trick the bot into ignoring its instructions.
+- The chat limits how fast one visitor can send messages, and it tries to detect and block messages that try to trick the bot into ignoring its instructions.
 - Only the owner of a project can see its knowledge and its conversations.
 
 ## What Askwell doesn't do
