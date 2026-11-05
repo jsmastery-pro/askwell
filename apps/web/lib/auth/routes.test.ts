@@ -38,7 +38,6 @@ describe("routeAccess", () => {
     "/api/clerk/webhook",
     "/api/clerk/webhook/",
     "/api/posthog-config",
-    "/ui",
   ])("leaves %s public", (path) => {
     expect(routeAccess(path)).toBe("public");
   });

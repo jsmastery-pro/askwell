@@ -92,9 +92,10 @@
   --surface-skeleton: rgb(0 0 0 / 0.07);
   --surface-focus: rgb(0 0 0 / 0.5);
   --surface-glow: rgb(0 0 0 / 0.07);
+  /* Thumb vs track (WCAG 1.4.11, >= 3:1): 4.35:1, hover 7.17:1. */
   --surface-scrollbar-track: var(--color-grey-100);
-  --surface-scrollbar-thumb: var(--color-grey-400);
-  --surface-scrollbar-thumb-hover: var(--color-grey-500);
+  --surface-scrollbar-thumb: var(--color-grey-500);
+  --surface-scrollbar-thumb-hover: var(--color-grey-600);
   --surface-shadow-glass:
     0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06),
     inset 0 1px 0 rgb(255 255 255 / 0.7);
@@ -122,9 +123,10 @@
   --surface-skeleton: rgb(255 255 255 / 0.08);
   --surface-focus: rgb(255 255 255 / 0.6);
   --surface-glow: rgb(255 255 255 / 0.1);
+  /* Thumb vs track (WCAG 1.4.11, >= 3:1): 4.18:1, hover 7.85:1. */
   --surface-scrollbar-track: var(--color-grey-950);
-  --surface-scrollbar-thumb: var(--color-grey-600);
-  --surface-scrollbar-thumb-hover: var(--color-grey-500);
+  --surface-scrollbar-thumb: var(--color-grey-500);
+  --surface-scrollbar-thumb-hover: var(--color-grey-400);
   --surface-shadow-glass:
     0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.5),
     inset 0 1px 0 rgb(255 255 255 / 0.06);
@@ -157,9 +159,10 @@
   --surface-skeleton: rgb(255 255 255 / 0.08);
   --surface-focus: rgb(255 255 255 / 0.6);
   --surface-glow: rgb(255 255 255 / 0.06);
+  /* Thumb vs track (WCAG 1.4.11, >= 3:1): 4.18:1, hover 7.85:1. */
   --surface-scrollbar-track: var(--color-grey-950);
-  --surface-scrollbar-thumb: var(--color-grey-600);
-  --surface-scrollbar-thumb-hover: var(--color-grey-500);
+  --surface-scrollbar-thumb: var(--color-grey-500);
+  --surface-scrollbar-thumb-hover: var(--color-grey-400);
   --surface-shadow-glass:
     0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.5),
     inset 0 1px 0 rgb(255 255 255 / 0.06);
