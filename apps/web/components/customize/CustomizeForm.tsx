@@ -125,7 +125,7 @@ export function CustomizeForm({ projectId, stored, plan, initial }: CustomizeFor
       <div className="grid gap-6 lg:grid-cols-2">
         <GlassPanel className="min-w-0">
           <form onSubmit={save} noValidate aria-label="Widget settings" className="flex flex-col gap-5">
-            <fieldset disabled={locked} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+            <fieldset disabled={locked || status.kind === "saving"} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
               <Field label="Button color" htmlFor={ids.hex} error={errors.button_color}>
                 <div className="flex items-center gap-2">
                   <input

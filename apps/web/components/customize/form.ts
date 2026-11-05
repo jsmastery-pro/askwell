@@ -51,12 +51,9 @@ export function settingsOf(config: WidgetSettings): WidgetSettings {
 export function customizeReducer(state: CustomizeState, action: CustomizeAction): CustomizeState {
   switch (action.type) {
     case "set":
-      if (state.locked) return state;
-      return {
-        ...state,
-        draft: { ...state.draft, [action.field]: action.value },
-        status: state.status.kind === "saving" ? state.status : { kind: "idle" },
-      };
+      // Locked, or a save is in flight: the response would overwrite the edit.
+      if (state.locked || state.status.kind === "saving") return state;
+      return { ...state, draft: { ...state.draft, [action.field]: action.value }, status: { kind: "idle" } };
     case "reset":
       return { ...state, draft: state.stored, status: { kind: "idle" } };
     case "saving":

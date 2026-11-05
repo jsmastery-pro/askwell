@@ -73,7 +73,7 @@ function PreviewStage({ config }: { config: WidgetSettings }) {
           data-testid="preview-panel"
           aria-hidden={!open}
           style={styles.panel}
-          className="absolute flex h-[calc(100%-88px)] w-[min(300px,calc(100%-32px))] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_48px_rgba(0,0,0,.25)] motion-reduce:transition-none"
+          className="absolute flex h-[calc(100%-88px)] w-[min(300px,calc(100%-32px))] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_48px_rgba(0,0,0,.25)] motion-reduce:transform-none! motion-reduce:transition-none!"
         >
           <div className="border-b border-grey-200 px-4 py-3">
             <p className="truncate text-sm font-semibold text-grey-950">{config.header_text}</p>

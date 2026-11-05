@@ -60,6 +60,22 @@ describe("CustomizeForm", () => {
     expect(html).toMatch(/<fieldset[^>]*disabled=""/);
   });
 
+  it("locks the fields while saving", () => {
+    const state = customizeReducer(
+      customizeReducer(initialState(CUSTOM, "pro"), { type: "set", field: "label", value: "Hi" }),
+      { type: "saving" },
+    );
+    const html = render({ projectId: "p1", stored: CUSTOM, plan: "pro", initial: state });
+    expect(html).toMatch(/<fieldset[^>]*disabled=""/);
+    expect(html).toContain("Saving…");
+  });
+
+  it("the preview panel honors reduced motion over its inline transition", () => {
+    const html = renderToStaticMarkup(<WidgetPreview config={CUSTOM} />);
+    expect(html).toContain("motion-reduce:transition-none!");
+    expect(html).toContain("motion-reduce:transform-none!");
+  });
+
   it("a failed save shows its message", () => {
     const state = customizeReducer(
       customizeReducer(initialState(CUSTOM, "pro"), { type: "set", field: "label", value: "Hi" }),

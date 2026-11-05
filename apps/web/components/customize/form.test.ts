@@ -83,6 +83,17 @@ describe("customizeReducer", () => {
     expect(state.status).toEqual({ kind: "error", message: "Something went wrong. Try again." });
   });
 
+  it("ignores edits while a save is in flight, so the response can't overwrite them", () => {
+    const state = run(
+      initialState(STORED, "pro"),
+      { type: "set", field: "label", value: "Hi" },
+      { type: "saving" },
+      { type: "set", field: "label", value: "Typed during the save" },
+    );
+    expect(state.draft.label).toBe("Hi");
+    expect(state.status).toEqual({ kind: "saving" });
+  });
+
   it("reset discards the draft", () => {
     const state = run(initialState(STORED, "pro"), { type: "set", field: "label", value: "Hi" }, { type: "reset" });
     expect(state.draft).toEqual(STORED);
