@@ -37,6 +37,9 @@ export const MIN_MATCH_SIMILARITY = 0.3;
 /** Public chat rate limit: 20 messages per minute per public key + IP (Arcjet). */
 export const CHAT_RATE_LIMIT = { max: 20, windowSeconds: 60 } as const;
 
+/** Public widget config rate limit: 60 requests per minute per public key + IP (Arcjet). */
+export const CONFIG_RATE_LIMIT = { max: 60, windowSeconds: 60 } as const;
+
 /** An `uploading` reservation not finalized within 2 hours is reclaimed. */
 export const UPLOAD_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
 
