@@ -26,7 +26,9 @@ export const config = {
     // and /widget.js (the loader). They need no auth, and Clerk's handshake
     // redirect can't complete in a cross-site iframe without third-party
     // cookies. `(?![^/])` ends the segment: /embed and /embed/… only.
-    "/((?!_next|embed(?![^/])|widget\\.js(?![^/])|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Also skip /ingest: PostHog's reverse proxy (next.config.ts rewrites),
+    // which needs no auth and must not get Clerk's handshake redirects.
+    "/((?!_next|embed(?![^/])|ingest(?![^/])|widget\\.js(?![^/])|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes.
     "/(api|trpc)(.*)",
   ],

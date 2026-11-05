@@ -7,6 +7,8 @@ engineStrict: true
 
 # Install scripts are off by default; these packages work without theirs.
 allowBuilds:
+  # core-js (via posthog-js): its postinstall only prints a banner.
+  core-js: false
   esbuild: false
   sharp: false
   unrs-resolver: false

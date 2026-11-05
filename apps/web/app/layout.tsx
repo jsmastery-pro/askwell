@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { APP_NAME } from "@askwell/shared";
+import { PostHogIdentify } from "@/components/analytics/PostHogIdentify";
 import {
   AFTER_AUTH_PATH,
   AFTER_SIGN_OUT_PATH,
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           signUpFallbackRedirectUrl={AFTER_AUTH_PATH}
           afterSignOutUrl={AFTER_SIGN_OUT_PATH}
         >
+          <PostHogIdentify />
           {children}
         </ClerkProvider>
       </body>
