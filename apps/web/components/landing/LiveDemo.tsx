@@ -1,10 +1,75 @@
+import { Suspense } from "react";
+import { headers } from "next/headers";
+import { connection } from "next/server";
 import { APP_NAME, DEFAULT_WIDGET_CONFIG } from "@askwell/shared";
+import { requestOrigin, resolveAppUrl } from "../../lib/install/snippet";
 import { GlassPanel } from "../ui";
 import { cx } from "../ui/cx";
+import { landingWidgetKey } from "./landing-widget";
 import { REVEAL } from "./motion";
 import { Section } from "./Section";
 
-// A static mock of the chat panel. The real widget replaces it in Phase 6.
+// The Live demo section (§6.1). With LANDING_WIDGET_KEY set, the page loads
+// the real widget (the house project about Askwell) and this section points
+// at it. Without a key (local dev, an unset environment) it shows a static
+// mock and no widget loads. Only this section reads the key, so the rest of
+// the page stays in the static shell.
+
+export function LiveDemo() {
+  return (
+    <Suspense fallback={<MockDemo />}>
+      <LandingDemo />
+    </Suspense>
+  );
+}
+
+/** The request-time part: reads the key, then shows the real widget or the mock. */
+export async function LandingDemo() {
+  await connection();
+  const key = landingWidgetKey();
+  if (!key) return <MockDemo />;
+  const appUrl = resolveAppUrl(process.env.NEXT_PUBLIC_APP_URL, requestOrigin(await headers()));
+  return <RealDemo appUrl={appUrl} publicKey={key} />;
+}
+
+const SUGGESTED_QUESTIONS = [
+  `What is ${APP_NAME}?`,
+  "How much is Pro?",
+  "How do I add it to my site?",
+] as const;
+
+function RealDemo({ appUrl, publicKey }: { appUrl: string; publicKey: string }) {
+  return (
+    <Section
+      id="demo"
+      eyebrow="Live demo"
+      title="See it answer"
+      intro={`This page runs ${APP_NAME} on itself. The bot answers from a few pages of facts about the product.`}
+    >
+      {/* The same tag as the Install snippet (lib/install/snippet.ts). */}
+      <script src={`${appUrl}/widget.js`} data-key={publicKey} async />
+      <GlassPanel
+        variant="strong"
+        className={cx("mx-auto flex w-full max-w-md flex-col gap-4 text-center", REVEAL)}
+      >
+        <p className="text-base font-medium text-fg">
+          Try it: the button in the corner is the real widget.
+        </p>
+        <p className="text-sm text-fg-muted">Open it and ask anything about {APP_NAME}, for example:</p>
+        <ul className="flex flex-wrap justify-center gap-2" aria-label="Questions to try">
+          {SUGGESTED_QUESTIONS.map((q) => (
+            <li
+              key={q}
+              className="rounded-full border border-line bg-glass px-3 py-1 text-sm text-fg-muted"
+            >
+              {q}
+            </li>
+          ))}
+        </ul>
+      </GlassPanel>
+    </Section>
+  );
+}
 
 const sample = [
   { role: "visitor", text: "Do you ship to Canada?" },
@@ -19,7 +84,8 @@ const sample = [
   },
 ] as const;
 
-export function LiveDemo() {
+/** A static mock of the chat panel, for when no landing widget is configured. */
+function MockDemo() {
   return (
     <Section
       id="demo"
