@@ -111,6 +111,12 @@ describe("accountPortalBillingUrl", () => {
     expect(accountPortalBillingUrl("https://dev-slug.accounts.dev/user")).toBe("https://dev-slug.accounts.dev/user/billing");
     expect(accountPortalBillingUrl("https://dev-slug.accounts.dev/user/")).toBe("https://dev-slug.accounts.dev/user/billing");
   });
+
+  it("keeps a query (Clerk's dev session token) intact, after the new path", () => {
+    expect(accountPortalBillingUrl("https://dev-slug.accounts.dev/user?__clerk_db_jwt=dvb_abc")).toBe(
+      "https://dev-slug.accounts.dev/user/billing?__clerk_db_jwt=dvb_abc",
+    );
+  });
 });
 
 describe("manageSubscriptionUrl", () => {

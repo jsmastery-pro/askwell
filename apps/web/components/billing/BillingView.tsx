@@ -23,9 +23,15 @@ export interface BillingViewProps {
   initialElapsedMs?: number;
 }
 
-/** The account portal's billing section (cancel, change card, invoices). */
+/**
+ * The account portal's billing section (cancel, change card, invoices). The
+ * profile URL can carry a query (on a dev instance, Clerk's session token),
+ * so the path is changed with URL, never by appending to the string.
+ */
 export function accountPortalBillingUrl(userProfileUrl: string): string {
-  return `${userProfileUrl.replace(/\/+$/, "")}/billing`;
+  const url = new URL(userProfileUrl);
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/billing`;
+  return url.toString();
 }
 
 /**
