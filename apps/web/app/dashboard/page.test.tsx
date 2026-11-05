@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import BillingPage from "./billing/page";
 import DashboardError from "./error";
 import DashboardLoading from "./loading";
 import DashboardPage from "./page";
@@ -96,13 +95,5 @@ describe("/dashboard error state", () => {
     expect(html).toMatch(/<button[^>]*>Try again<\/button>/);
     // Never shows the raw error to the owner.
     expect(html).not.toContain("boom");
-  });
-});
-
-describe("/dashboard/billing", () => {
-  it("shows the placeholder", () => {
-    const html = renderToStaticMarkup(<BillingPage />);
-    expect(html).toContain("Billing");
-    expect(html).toContain("Billing arrives soon");
   });
 });
