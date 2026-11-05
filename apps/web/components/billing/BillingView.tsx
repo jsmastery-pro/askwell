@@ -166,7 +166,12 @@ export function BillingView({ plan, afterCheckout, initialElapsedMs = 0 }: Billi
             Upgrade to Pro
           </h2>
           <div className="min-w-0">
-            <PricingTable newSubscriptionRedirectUrl={CHECKOUT_RETURN_URL} fallback={<PricingFallback />} />
+            <PricingTable
+              newSubscriptionRedirectUrl={CHECKOUT_RETURN_URL}
+              fallback={<PricingFallback />}
+              // Clerk's default look (§13), with a 40px button on phones (tap target).
+              appearance={{ elements: { pricingTableCardFooterButton: "min-h-10! sm:min-h-0!" } }}
+            />
           </div>
         </section>
       )}

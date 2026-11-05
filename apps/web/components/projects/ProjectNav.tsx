@@ -28,7 +28,7 @@ export function ProjectNavFallback({ projectId }: { projectId: string }) {
 export function ProjectNavLinks({ projectId, pathname }: { projectId: string; pathname: string | null }) {
   return (
     <nav aria-label="Project" className="min-w-0 overflow-x-auto">
-      <ul className="flex gap-1 border-b border-line">
+      <ul className="flex justify-between border-b border-line sm:justify-start sm:gap-1">
         {projectSections(projectId).map((section) => {
           const active =
             pathname !== null && (pathname === section.href || pathname.startsWith(`${section.href}/`));
@@ -38,7 +38,7 @@ export function ProjectNavLinks({ projectId, pathname }: { projectId: string; pa
                 href={section.href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "-mb-px flex h-10 items-center whitespace-nowrap border-b-2 px-3 text-sm outline-none transition-colors",
+                  "-mb-px flex h-10 items-center whitespace-nowrap border-b-2 px-1.5 text-sm sm:px-3 outline-none transition-colors",
                   "focus-visible:ring-2 focus-visible:ring-focus",
                   active
                     ? "border-primary font-medium text-fg"
