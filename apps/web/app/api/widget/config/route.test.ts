@@ -2,9 +2,27 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@askwell/db";
 import { DEFAULT_WIDGET_CONFIG } from "@askwell/shared";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+
+// Arcjet is mocked at the SDK, so the real protectConfig runs: protect() gives
+// the decision each test sets (ALLOW by default) or throws.
+type Decision = "ALLOW" | "RATE_LIMIT" | "ERROR";
+let arcjetDecision: Decision | Error = "ALLOW";
+const protect = vi.fn(async () => {
+  if (arcjetDecision instanceof Error) throw arcjetDecision;
+  const d = arcjetDecision;
+  return {
+    isDenied: () => d === "RATE_LIMIT",
+    isErrored: () => d === "ERROR",
+    reason: { type: d, message: "Decide API timed out", isRateLimit: () => d === "RATE_LIMIT" },
+  };
+});
+vi.mock("@arcjet/next", () => ({
+  default: () => ({ protect }),
+  fixedWindow: (options: unknown) => [{ type: "RATE_LIMIT", options }],
+}));
 
 // The route runs for real down to supabase-js; only the service client's
 // fetch is faked, so these tests cover parsing, lookup, plan rules and headers.
@@ -57,9 +75,71 @@ function expectPublicCors(res: Response) {
   expect(res.headers.get("access-control-allow-credentials")).toBeNull();
 }
 
+let warn: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
+  vi.stubEnv("ARCJET_KEY", "ajkey_test");
   fetched.length = 0;
   respond = projects("free");
+  arcjetDecision = "ALLOW";
+  protect.mockClear();
+  warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  warn.mockRestore();
+});
+
+describe("GET /api/widget/config rate limit", () => {
+  it("allowed → 200, after one Arcjet check with the public key", async () => {
+    const res = await get(`?key=${KNOWN_KEY}`);
+    expect(res.status).toBe(200);
+    expect(protect).toHaveBeenCalledOnce();
+    expect(protect.mock.calls[0]).toEqual([expect.anything(), { publicKey: KNOWN_KEY }]);
+  });
+
+  it("limited → 429 rate_limited with the public CORS headers, before the database read", async () => {
+    arcjetDecision = "RATE_LIMIT";
+    const res = await get(`?key=${KNOWN_KEY}`);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({
+      error: { code: "rate_limited", message: "Too many requests. Wait a minute, then try again." },
+    });
+    expectPublicCors(res);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(fetched).toHaveLength(0);
+  });
+
+  it.each([
+    ["throws", new Error("network down")],
+    ["returns an error decision", "ERROR" as const],
+  ])("Arcjet %s → fails open: 200 with the config", async (_label, failure) => {
+    arcjetDecision = failure;
+    const res = await get(`?key=${KNOWN_KEY}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ config: DEFAULT_WIDGET_CONFIG });
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("missing ARCJET_KEY → fails open: 200", async () => {
+    vi.stubEnv("ARCJET_KEY", "");
+    const { resetConfigArcjetForTests } = await import("../../../../lib/arcjet/protect-config");
+    resetConfigArcjetForTests();
+    const res = await get(`?key=${KNOWN_KEY}`);
+    resetConfigArcjetForTests();
+    expect(res.status).toBe(200);
+  });
+
+  it("a bad query is rejected with 400 without an Arcjet check", async () => {
+    const res = await get("?key=nope");
+    expect(res.status).toBe(400);
+    expect(protect).not.toHaveBeenCalled();
+  });
+
+  it("the OPTIONS preflight isn't counted", () => {
+    const res = OPTIONS();
+    expect(res.status).toBe(204);
+    expect(protect).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/widget/config", () => {

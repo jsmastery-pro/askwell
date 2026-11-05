@@ -3,6 +3,7 @@ import {
   CHAT_MODEL,
   CHAT_RATE_LIMIT,
   CHUNK_OVERLAP,
+  CONFIG_RATE_LIMIT,
   CHUNK_SIZE,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
@@ -19,6 +20,7 @@ describe("AI settings", () => {
     expect(EMBEDDING_DIMENSIONS).toBe(1536);
     expect(MATCH_COUNT).toBe(5);
     expect(CHAT_RATE_LIMIT).toEqual({ max: 20, windowSeconds: 60 });
+    expect(CONFIG_RATE_LIMIT).toEqual({ max: 60, windowSeconds: 60 });
     expect(UPLOAD_RESERVATION_TTL_MS).toBe(2 * 60 * 60 * 1000);
   });
 
