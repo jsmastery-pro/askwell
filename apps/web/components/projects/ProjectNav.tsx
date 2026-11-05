@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "../ui/cx";
 
-/** A project's sections. Customize comes in a later phase. */
+/** A project's sections, in nav order. */
 export function projectSections(projectId: string): { label: string; href: string }[] {
   return [
     { label: "Conversations", href: `/dashboard/projects/${projectId}/conversations` },
     { label: "Knowledge", href: `/dashboard/projects/${projectId}/knowledge` },
+    { label: "Customize", href: `/dashboard/projects/${projectId}/customize` },
     { label: "Install", href: `/dashboard/projects/${projectId}/install` },
   ];
 }

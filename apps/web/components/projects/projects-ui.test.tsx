@@ -171,10 +171,11 @@ describe("ProjectCard", () => {
 });
 
 describe("ProjectNav", () => {
-  it("has Conversations (first), Knowledge and Install in Phase 4", () => {
+  it("has Conversations (first), Knowledge, Customize and Install", () => {
     expect(projectSections("p1")).toEqual([
       { label: "Conversations", href: "/dashboard/projects/p1/conversations" },
       { label: "Knowledge", href: "/dashboard/projects/p1/knowledge" },
+      { label: "Customize", href: "/dashboard/projects/p1/customize" },
       { label: "Install", href: "/dashboard/projects/p1/install" },
     ]);
   });
