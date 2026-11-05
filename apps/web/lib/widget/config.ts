@@ -24,7 +24,7 @@ export class WidgetConfigError extends Error {
   }
 }
 
-type StoredConfig = {
+export type StoredConfig = {
   button_color: string;
   position: string;
   label: string;
@@ -34,7 +34,7 @@ type StoredConfig = {
 };
 
 /** Narrows a stored `widget_configs` row (text columns with check constraints) to WidgetSettings. */
-function toSettings(row: StoredConfig): WidgetSettings {
+export function toSettings(row: StoredConfig): WidgetSettings {
   const position = WIDGET_POSITIONS.find((p) => p === row.position);
   const animation = WIDGET_ANIMATIONS.find((a) => a === row.animation);
   if (!position || !animation) throw new WidgetConfigError("Stored widget config has an unknown value.");
