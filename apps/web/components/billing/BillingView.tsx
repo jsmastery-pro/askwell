@@ -2,7 +2,7 @@
 
 import { PricingTable, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PLAN_LIMITS, PLAN_PRICES, type Plan } from "@askwell/shared";
 import { Button, GlassPanel, Skeleton, Spinner } from "../ui";
 import { PLAN_NAMES } from "../landing/pricing-rows";
@@ -10,6 +10,7 @@ import {
   ACTIVATION_POLL_MS,
   activationState,
   CHECKOUT_RETURN_URL,
+  elapsedSince,
   shouldPoll,
   type Activation,
 } from "./activation";
@@ -132,16 +133,20 @@ function PricingFallback() {
 export function BillingView({ plan, afterCheckout, initialElapsedMs = 0 }: BillingViewProps) {
   const router = useRouter();
   const [elapsed, setElapsed] = useState(initialElapsedMs);
+  /** When polling started (wall clock), set on the first poll; never read during render. */
+  const startedAt = useRef<number | null>(null);
   const state = activationState(afterCheckout, plan, elapsed);
 
   useEffect(() => {
     if (!shouldPoll(state)) return;
+    startedAt.current ??= Date.now() - initialElapsedMs;
+    const start = startedAt.current;
     const id = setTimeout(() => {
       router.refresh();
-      setElapsed((ms) => ms + ACTIVATION_POLL_MS);
+      setElapsed(elapsedSince(start, Date.now()));
     }, ACTIVATION_POLL_MS);
     return () => clearTimeout(id);
-  }, [state, elapsed, router]);
+  }, [state, elapsed, router, initialElapsedMs]);
 
   // Activated: drop ?checkout=success so a later reload doesn't poll again.
   useEffect(() => {

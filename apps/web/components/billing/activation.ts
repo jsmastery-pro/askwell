@@ -26,3 +26,12 @@ export function activationState(afterCheckout: boolean, plan: Plan, elapsedMs: n
 
 /** Keep polling the server? Only while activating. */
 export const shouldPoll = (state: Activation) => state === "activating";
+
+/**
+ * Time since polling started, by the wall clock. Browsers delay timers in a
+ * background tab, so counting ticks would let "Activating Pro…" run well past
+ * the timeout; measuring real time stops it on time.
+ */
+export function elapsedSince(startedAtMs: number, nowMs: number): number {
+  return Math.max(0, nowMs - startedAtMs);
+}

@@ -18,9 +18,8 @@ vi.mock("@clerk/nextjs", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined, replace: () => undefined }) }));
 
 const { accountPortalBillingUrl, BillingSkeleton, BillingView, manageSubscriptionUrl } = await import("./BillingView");
-const { ACTIVATION_POLL_MS, ACTIVATION_TIMEOUT_MS, activationState, CHECKOUT_RETURN_URL, shouldPoll } = await import(
-  "./activation"
-);
+const { ACTIVATION_POLL_MS, ACTIVATION_TIMEOUT_MS, activationState, CHECKOUT_RETURN_URL, elapsedSince, shouldPoll } =
+  await import("./activation");
 
 const view = (plan: "free" | "pro", afterCheckout = false, initialElapsedMs = 0) =>
   renderToStaticMarkup(<BillingView plan={plan} afterCheckout={afterCheckout} initialElapsedMs={initialElapsedMs} />);
@@ -98,6 +97,15 @@ describe("activation", () => {
     [true, "pro", 40_000, "activated"],
   ] as const)("afterCheckout=%s, plan=%s, %i ms → %s", (afterCheckout, plan, elapsed, state) => {
     expect(activationState(afterCheckout, plan, elapsed)).toBe(state);
+  });
+
+  it("measures elapsed time by the wall clock, so a throttled background tab still times out", () => {
+    const start = 1_000_000;
+    // The browser delayed the 2 s timer to 45 s: one tick, but 45 s really passed.
+    const elapsed = elapsedSince(start, start + 45_000);
+    expect(elapsed).toBe(45_000);
+    expect(activationState(true, "free", elapsed)).toBe("timed-out");
+    expect(elapsedSince(start, start - 5)).toBe(0);
   });
 
   it("only polls while activating", () => {

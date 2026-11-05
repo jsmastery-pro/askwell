@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { useEffect } from "react";
 import { Button, ErrorState, GlassPanel } from "../../../components/ui";
 
@@ -12,6 +13,8 @@ interface BillingErrorProps {
 export default function BillingError({ error, retry }: BillingErrorProps) {
   useEffect(() => {
     console.error(error);
+    // Caught here, so it never reaches window.onerror: report it ourselves (as the dashboard boundary does).
+    if (posthog.__loaded) posthog.captureException(error);
   }, [error]);
 
   return (
