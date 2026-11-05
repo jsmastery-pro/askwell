@@ -5,9 +5,18 @@ import {
   PLANS,
 } from "@askwell/shared";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRICING_ROWS } from "../components/landing";
+import { LandingDemo } from "../components/landing/LiveDemo";
+import { landingWidgetKey } from "../components/landing/landing-widget";
 import Home from "./page";
+
+// The demo reads LANDING_WIDGET_KEY at request time: connection() and the
+// request headers are faked here.
+const connection = vi.fn(async () => {});
+vi.mock("next/server", () => ({ connection: () => connection() }));
+let requestHeaders = new Headers({ host: "askwell-preview.vercel.app", "x-forwarded-proto": "https" });
+vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
 
 const html = renderToStaticMarkup(<Home />);
 const text = (fragment: string) =>
@@ -46,6 +55,19 @@ describe("landing page", () => {
     expect(html).toContain(APP_NAME);
   });
 
+  it("shows the plan names in order, each with its own price", () => {
+    const pricing = html.slice(html.indexOf('id="pricing"'), html.indexOf('id="install"'));
+    const headers = [...pricing.matchAll(/<th[^>]*scope="col"[^>]*>(.*?)<\/th>/g)].map(([, cell]) => {
+      const [, name = "", price = ""] = cell?.match(/^<span[^>]*>(.*?)<\/span><span[^>]*data-price[^>]*>(.*)<\/span>$/) ?? [];
+      return { name: text(name), price: text(price) };
+    });
+    // Written out by hand, not read from PLAN_NAMES / PLAN_PRICES.
+    expect(headers).toEqual([
+      { name: "Free", price: "$0/month" },
+      { name: "Pro", price: "$19/month" },
+    ]);
+  });
+
   it("shows each plan's price from PLAN_PRICES", () => {
     for (const plan of PLANS) {
       const cell = html.match(new RegExp(`<span[^>]*data-price="${plan}"[^>]*>(.*?)</span></th>`));
@@ -82,9 +104,74 @@ describe("landing page", () => {
     expect(text(html)).toContain('data-key="pk_your_key"');
   });
 
-  it("does not load a widget script", () => {
+  it("shows the static demo and no widget script in the static shell", () => {
+    expect(html).toContain('aria-label="Preview of the chat panel"');
     expect(html).not.toMatch(/<script[^>]*widget/);
   });
+});
+
+describe("landing demo (LANDING_WIDGET_KEY)", () => {
+  const KEY = "pk_LandingKey_0123456789abcdefghijklmn";
+  const render = async () => renderToStaticMarkup(await LandingDemo());
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    connection.mockClear();
+    requestHeaders = new Headers({ host: "askwell-preview.vercel.app", "x-forwarded-proto": "https" });
+  });
+
+  it("with a key: loads the real widget from the app URL, and points at it", async () => {
+    vi.stubEnv("LANDING_WIDGET_KEY", KEY);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://askwell.example");
+    const out = await render();
+    const scripts = [...out.matchAll(/<script[^>]*>/g)].map(([tag]) => tag);
+    expect(scripts).toEqual([`<script src="https://askwell.example/widget.js" data-key="${KEY}" async="">`]);
+    expect(text(out)).toContain("Try it: the button in the corner is the real widget.");
+    expect(out).not.toContain("Preview of the chat panel");
+    expect(connection).toHaveBeenCalled();
+  });
+
+  it("with a key and no NEXT_PUBLIC_APP_URL: uses this request's origin (each preview has its own)", async () => {
+    vi.stubEnv("LANDING_WIDGET_KEY", KEY);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    expect(await render()).toContain(`src="https://askwell-preview.vercel.app/widget.js"`);
+  });
+
+  it("is dynamic: waits for connection() before reading the key", async () => {
+    vi.stubEnv("LANDING_WIDGET_KEY", KEY);
+    let release = () => {};
+    connection.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
+    const pending = LandingDemo();
+    vi.stubEnv("LANDING_WIDGET_KEY", "");
+    release();
+    expect(renderToStaticMarkup(await pending)).not.toMatch(/<script/);
+  });
+
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+    ["not a public key", "sk_secret"],
+  ])("without a key (%s): the static demo, no widget script", async (_label, value) => {
+    vi.stubEnv("LANDING_WIDGET_KEY", value);
+    const spy = vi.spyOn(console, "warn");
+    const out = await render();
+    expect(out).toContain('aria-label="Preview of the chat panel"');
+    expect(out).not.toMatch(/<script/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("landingWidgetKey", () => {
+  it("reads a valid public key, trimmed", () => {
+    expect(landingWidgetKey({ LANDING_WIDGET_KEY: " pk_abc_DEF-1 " })).toBe("pk_abc_DEF-1");
+  });
+
+  it.each([undefined, "", "   ", "pk_", "abc", "pk_has space", `pk_${"a".repeat(200)}`])(
+    "is null for %j",
+    (value) => {
+      expect(landingWidgetKey({ LANDING_WIDGET_KEY: value })).toBeNull();
+    },
+  );
 });
 
 describe("pricing rows", () => {
