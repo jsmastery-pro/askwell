@@ -27,6 +27,10 @@ describe("serverEvent", () => {
     serverEvent("user_1", "knowledge_added", { project_id: "p1", source_type: "text", text: "secret" });
     // @ts-expect-error: message_blocked takes a known reason, not the message.
     serverEvent("user_1", "message_blocked", { project_id: "p1", reason: "hello" });
+    // project_id is optional: a block can come before the project is known.
+    expect(serverEvent("user_1", "message_blocked", { reason: "prompt_injection" }).properties).toEqual({
+      reason: "prompt_injection",
+    });
     // @ts-expect-error: not an event in the map.
     serverEvent("user_1", "made_up", {});
   });

@@ -8,8 +8,13 @@
 // code sends with captureServerEvent(serverEvent(...)) from ./server.
 import type { KnowledgeSourceType, Plan } from "@askwell/shared";
 import posthog from "posthog-js";
-import type { ChatBlockReason } from "../arcjet/protect-chat";
 import type { ServerEvent } from "./server";
+
+/**
+ * Why the chat route blocked a message, as sent to PostHog. The chat route
+ * maps Arcjet's reason (ChatBlockReason) to this.
+ */
+export type MessageBlockedReason = "rate_limit" | "prompt_injection";
 
 export type AnalyticsEvents = {
   /** The owner's account row was created (first visit after sign-up). Server. */
@@ -25,7 +30,7 @@ export type AnalyticsEvents = {
   /** The owner's plan went up (Clerk webhook, Phase 5). Server. */
   upgraded: { plan: Plan; previous_plan: Plan };
   /** The chat route blocked a visitor message (B3). Never the message text. Server. */
-  message_blocked: { project_id: string; reason: ChatBlockReason };
+  message_blocked: { project_id?: string; reason: MessageBlockedReason };
 };
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
