@@ -49,6 +49,8 @@ describe("BillingView", () => {
     const html = view("free", true);
     expect(html).toContain("Activating Pro…");
     expect(html).toContain('role="status"');
+    // Just paid: no second Subscribe while the webhook catches up.
+    expect(html).not.toContain("clerk-pricing-table");
   });
 
   it("after the timeout: the payment-received message", () => {
@@ -56,6 +58,7 @@ describe("BillingView", () => {
     expect(html).toContain("Payment received. Your plan will update shortly.");
     expect(html).toContain("Refresh in a minute.");
     expect(html).not.toContain("Activating Pro…");
+    expect(html).not.toContain("clerk-pricing-table");
   });
 
   it("back from checkout and the webhook already made it Pro: the Pro view, no notice", () => {

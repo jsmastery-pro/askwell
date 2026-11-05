@@ -136,7 +136,8 @@ export function BillingView({ plan, afterCheckout, initialElapsedMs = 0 }: Billi
       <CurrentPlan plan={plan} />
       {plan === "pro" ? (
         <ManageSubscription />
-      ) : (
+      ) : state === "activating" || state === "timed-out" ? null : (
+        // Just paid: no pricing table (and no second Subscribe) while the webhook catches up.
         <section aria-labelledby="upgrade-heading" className="flex min-w-0 flex-col gap-3">
           <h2 id="upgrade-heading" className="text-lg font-semibold text-fg">
             Upgrade to Pro
