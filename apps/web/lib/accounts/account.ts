@@ -11,6 +11,8 @@ import { connection } from "next/server";
 import { PLANS, type Plan } from "@askwell/shared";
 import { createOwnerClient, UnauthorizedError } from "../supabase/owner";
 import { createServiceClient } from "../supabase/service";
+import { serverEvent } from "../analytics/events";
+import { captureServerEvent } from "../analytics/server";
 
 /** The account row couldn't be written or read. */
 export class AccountError extends Error {
@@ -26,6 +28,10 @@ export class AccountError extends Error {
  * set by the Clerk webhook is never overwritten. Safe to call on every load:
  * one `INSERT … ON CONFLICT DO NOTHING`.
  *
+ * Sends `signed_up` only when this call inserted the row: RETURNING gives
+ * back inserted rows only, so a repeat call (or a concurrent one that lost the
+ * race) sends nothing.
+ *
  * The user ID comes from Clerk's server-verified session, never from the
  * client. Throws UnauthorizedError without a session, before any write.
  *
@@ -35,10 +41,13 @@ export async function ensureAccount(): Promise<string> {
   const { isAuthenticated, userId } = await auth();
   if (!isAuthenticated || !userId) throw new UnauthorizedError();
 
-  const { error } = await createServiceClient()
+  const { data, error } = await createServiceClient()
     .from("accounts")
-    .upsert({ clerk_user_id: userId }, { onConflict: "clerk_user_id", ignoreDuplicates: true });
+    .upsert({ clerk_user_id: userId }, { onConflict: "clerk_user_id", ignoreDuplicates: true })
+    .select("clerk_user_id");
   if (error) throw new AccountError("Couldn't create your account.", { cause: error });
+
+  if (data && data.length > 0) captureServerEvent(serverEvent(userId, "signed_up", {}));
 
   return userId;
 }

@@ -196,7 +196,7 @@ describe("ProjectNav", () => {
 describe("InstallSnippet", () => {
   it("shows the script tag as text with a copy button", () => {
     const snippet = '<script src="https://x.vercel.app/widget.js" data-key="pk_abc" async></script>';
-    const html = renderToStaticMarkup(<InstallSnippet snippet={snippet} />);
+    const html = renderToStaticMarkup(<InstallSnippet projectId="p1" snippet={snippet} />);
     expect(html).toContain(
       "&lt;script src=&quot;https://x.vercel.app/widget.js&quot; data-key=&quot;pk_abc&quot; async&gt;&lt;/script&gt;",
     );

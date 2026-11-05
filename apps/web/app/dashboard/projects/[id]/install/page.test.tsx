@@ -1,3 +1,4 @@
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +15,7 @@ const loadProject = vi.fn();
 vi.mock("../project", () => ({ loadProject: (id: string) => loadProject(id) }));
 
 const { default: InstallPage } = await import("./page");
+const { InstallSnippet } = await import("../../../../../components/projects/InstallSnippet");
 
 const PROJECT = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -41,6 +43,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("/dashboard/projects/[id]/install", () => {
+  it("gives the snippet the project's ID (for snippet_copied)", async () => {
+    loadProject.mockResolvedValue(PROJECT);
+    const page = await InstallPage({ params: Promise.resolve({ id: PROJECT.id }) } as never);
+    const children = (page.props as { children: ReactNode }).children;
+    const snippet = Children.toArray(children).find(
+      (child): child is ReactElement<{ projectId: string }> => isValidElement(child) && child.type === InstallSnippet,
+    );
+    expect(snippet?.props.projectId).toBe(PROJECT.id);
+  });
+
   it("shows the snippet with the project's key and this request's origin (no NEXT_PUBLIC_APP_URL)", async () => {
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
     loadProject.mockResolvedValue(PROJECT);

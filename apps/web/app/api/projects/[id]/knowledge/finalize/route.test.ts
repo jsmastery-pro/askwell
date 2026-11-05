@@ -22,6 +22,21 @@ vi.mock("@clerk/nextjs/server", () => ({
 const embedTexts = vi.fn(async (texts: string[]) => texts.map(() => Array<number>(EMBEDDING_DIMENSIONS).fill(0.1)));
 vi.mock("../../../../../../lib/ai/openai", () => ({ embedTexts: (texts: string[]) => embedTexts(texts) }));
 
+// PostHog: the real lib/analytics/server.ts, with posthog-node's network
+// call recorded. after() has no request here, so events go out at once.
+type SentEvent = { distinctId: string; event: string; properties?: Record<string, unknown> };
+const captureImmediate = vi.fn(async (_event: SentEvent) => {});
+vi.mock("posthog-node", () => ({
+  PostHog: vi.fn(function (this: object) {
+    Object.assign(this, { captureImmediate });
+  }),
+}));
+/** The PostHog events sent so far (after pending sends run). */
+const sentEvents = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return captureImmediate.mock.calls.map(([event]) => event);
+};
+
 const { POST, maxDuration } = await import("./route");
 const { MAX_CHUNKS_PER_SOURCE } = await import("../../../../../../lib/knowledge/sources");
 
@@ -58,6 +73,9 @@ beforeEach(() => {
   db.projects.push({ id: ALICES, owner_id: ALICE, name: "Alice's bot" }, { id: BOBS, owner_id: "user_bob", name: "Bob's" });
   signedInAs = ALICE;
   embedTexts.mockClear();
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+  vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.i.posthog.com");
+  captureImmediate.mockReset();
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -68,6 +86,35 @@ afterEach(() => {
 });
 
 describe("POST /api/projects/:id/knowledge/finalize", () => {
+  it("sends knowledge_added once with the file type when the upload is ready; never its contents", async () => {
+    const { source } = uploaded("md", new TextEncoder().encode("# Shipping\nWe ship worldwide."));
+    expect((await post(ALICES, source.id)).status).toBe(200);
+    // A repeat finalize is a 404 and sends nothing more.
+    expect((await post(ALICES, source.id)).status).toBe(404);
+    const events = await sentEvents();
+    expect(events).toEqual([
+      { distinctId: ALICE, event: "knowledge_added", properties: { project_id: ALICES, source_type: "md" } },
+    ]);
+    expect(JSON.stringify(events)).not.toContain("ship");
+  });
+
+  it("sends no knowledge_added for a refused, failed or missing upload", async () => {
+    expect((await post(ALICES, uploaded("txt", null).source.id)).status).toBe(400);
+    embedTexts.mockRejectedValueOnce(new Error("OpenAI is down"));
+    const failed = uploaded("pdf", PDF).source;
+    expect((await (await post(ALICES, failed.id)).json()).source.status).toBe("failed");
+    expect(await sentEvents()).toEqual([]);
+  });
+
+  it("an analytics failure doesn't change the response", async () => {
+    captureImmediate.mockRejectedValue(new Error("PostHog is down"));
+    const { source } = uploaded("txt", new TextEncoder().encode("Hello."));
+    const res = await post(ALICES, source.id);
+    expect(res.status).toBe(200);
+    expect((await res.json()).source.status).toBe("ready");
+    await sentEvents();
+  });
+
   it("claims an uploaded PDF, extracts and processes it, and returns it ready", async () => {
     const { source, key } = uploaded("pdf", PDF);
     const res = await post(ALICES, source.id);

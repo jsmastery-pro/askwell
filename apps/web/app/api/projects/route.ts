@@ -8,6 +8,8 @@ import {
   type ListProjectsResponse,
 } from "@askwell/shared";
 import { ensureAccount, getOwnPlan } from "../../../lib/accounts/account";
+import { serverEvent } from "../../../lib/analytics/events";
+import { captureServerEvent } from "../../../lib/analytics/server";
 import { jsonError } from "../../../lib/api/errors";
 import { ownerRouteError, requireOwnerId } from "../../../lib/api/owner";
 import { parseJsonBody } from "../../../lib/api/validation";
@@ -36,6 +38,7 @@ export async function POST(request: Request): Promise<Response> {
     const plan = await getOwnPlan();
 
     const body: CreateProjectResponse = { project: await createProject(ownerId, parsed.data.name, plan) };
+    captureServerEvent(serverEvent(ownerId, "project_created", { project_id: body.project.id }));
     return Response.json(body, { status: 201 });
   } catch (error) {
     if (error instanceof PlanLimitError) {

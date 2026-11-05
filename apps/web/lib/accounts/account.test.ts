@@ -53,6 +53,9 @@ vi.mock("../supabase/owner", () => ({
   UnauthorizedError: FakeUnauthorizedError,
 }));
 
+const captureServerEvent = vi.fn();
+vi.mock("../analytics/server", () => ({ captureServerEvent: (event: unknown) => captureServerEvent(event) }));
+
 const { AccountError, ensureAccount, getOwnPlan, loadOwnPlan, parsePlan } = await import("./account");
 
 const json = (body: unknown, status = 200) =>
@@ -69,6 +72,7 @@ beforeEach(() => {
   authMock.mockReset();
   createServiceClient.mockClear();
   createOwnerClient.mockClear();
+  captureServerEvent.mockReset();
 });
 
 describe("ensureAccount", () => {
@@ -94,6 +98,35 @@ describe("ensureAccount", () => {
     expect(req?.headers.prefer).not.toContain("merge-duplicates");
     // Only the user ID: the plan comes from the column default, never from here.
     expect(req?.body).toEqual({ clerk_user_id: "user_1" });
+  });
+
+  it("sends signed_up once, only when this call inserted the row", async () => {
+    // PostgREST with return=representation: ON CONFLICT DO NOTHING RETURNING
+    // gives back only rows it inserted.
+    const rows = new Set<string>();
+    respond = (req) => {
+      const { clerk_user_id } = req.body as { clerk_user_id: string };
+      if (rows.has(clerk_user_id)) return json([], 201);
+      rows.add(clerk_user_id);
+      return json([{ clerk_user_id }], 201);
+    };
+    authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_1" });
+
+    await ensureAccount();
+    await ensureAccount();
+    await ensureAccount();
+
+    expect(requests[0]?.headers.prefer).toContain("return=representation");
+    expect(requests[0]?.url.searchParams.get("select")).toBe("clerk_user_id");
+    expect(captureServerEvent).toHaveBeenCalledOnce();
+    expect(captureServerEvent).toHaveBeenCalledWith({ distinctId: "user_1", event: "signed_up", properties: {} });
+  });
+
+  it("sends no signed_up when the write fails", async () => {
+    respond = () => json({ code: "42501", message: "permission denied" }, 403);
+    authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_1" });
+    await expect(ensureAccount()).rejects.toBeInstanceOf(AccountError);
+    expect(captureServerEvent).not.toHaveBeenCalled();
   });
 
   it("never overwrites the plan on a repeat call", async () => {
