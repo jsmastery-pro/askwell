@@ -5,8 +5,9 @@
 // grants nothing (§9 "Public key abuse"). The response is the plan-applied
 // config, exactly the 6 WidgetSettings fields: no owner, plan or IDs.
 //
-// TODO(Phase 3): rate limit this public route with Arcjet (per route + public
-// key + IP), as §3 Security and §9 "Cost abuse" require.
+// Rate limited with Arcjet per public key + IP (CONFIG_RATE_LIMIT, §3 Security,
+// §9 "Cost abuse"), before the database read. Over the limit → 429
+// rate_limited, with CORS so the widget can read it. OPTIONS isn't counted.
 import {
   API_ERROR_STATUS,
   widgetConfigQuery,
@@ -16,6 +17,7 @@ import {
 import type { NextRequest } from "next/server";
 import { publicPreflight, withPublicCors, type PublicMethod } from "../../../../lib/api/cors";
 import { jsonError } from "../../../../lib/api/errors";
+import { protectConfig } from "../../../../lib/arcjet/protect-config";
 import { parseQuery } from "../../../../lib/api/validation";
 import { getPublicWidgetConfig } from "../../../../lib/widget/config";
 
@@ -30,6 +32,13 @@ function respond(response: Response): Response {
 export async function GET(request: NextRequest): Promise<Response> {
   const parsed = parseQuery(widgetConfigQuery, request.nextUrl.searchParams);
   if (!parsed.success) return respond(parsed.response);
+
+  const protection = await protectConfig(request, { publicKey: parsed.data.key });
+  if (!protection.allowed) {
+    return respond(
+      jsonError(API_ERROR_STATUS.rate_limited, "rate_limited", "Too many requests. Wait a minute, then try again."),
+    );
+  }
 
   let config: WidgetSettings | null;
   try {
