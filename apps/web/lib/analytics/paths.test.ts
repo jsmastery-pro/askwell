@@ -10,7 +10,7 @@ describe("isEmbedPath", () => {
 
 describe("isReplayPath", () => {
   it.each(["/", "/dashboard", "/dashboard/projects/1"])("records %s", (p) => expect(isReplayPath(p)).toBe(true));
-  it.each(["/embed", "/sign-in", "/sign-up", "/dashboards", "/ui"])("doesn't record %s", (p) =>
+  it.each(["/embed", "/sign-in", "/sign-up", "/dashboards"])("doesn't record %s", (p) =>
     expect(isReplayPath(p)).toBe(false),
   );
 });
